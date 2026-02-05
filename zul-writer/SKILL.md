@@ -248,14 +248,9 @@ Always start with proper XML declaration and ZK namespaces:
 ---
 
 ## Step 3: Validate Generated ZUL
+validate generated ZUL file with @scripts/validate-zul.py
 
 ### Validation Checklist
-
-#### XML Well-formatted
-- [ ] All tags properly closed
-- [ ] Attributes properly quoted
-- [ ] No invalid characters in attribute values
-- [ ] Proper entity encoding for special characters (`&amp;`, `&lt;`, `&gt;`)
 
 #### ZK Namespace Declarations
 - [ ] Additional namespaces as needed:
@@ -267,13 +262,6 @@ Always start with proper XML declaration and ZK namespaces:
 - [ ] **MVC**: Uses `apply` attribute, no MVVM binding expressions
 - [ ] **MVVM**: Uses `viewModel` attribute, proper binding syntax
 - [ ] No mixing of patterns (e.g., don't use `apply` and `viewModel` on same component)
-
-#### Component Nesting Rules
-- [ ] `<listitem>` only inside `<listbox>`
-- [ ] `<row>` only inside `<rows>` inside `<grid>`
-- [ ] `<tab>` and `<tabpanel>` properly paired in `<tabbox>`
-- [ ] `<north>`, `<south>`, `<east>`, `<west>`, `<center>` only inside `<borderlayout>`
-- [ ] `<treeitem>`, `<treerow>`, `<treecell>` properly nested in `<tree>`
 
 #### Attribute Validation
 - [ ] `hflex`/`vflex` values are valid (`1`, `min`, `2`, etc.)
