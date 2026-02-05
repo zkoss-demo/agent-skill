@@ -1,0 +1,7 @@
+<zk>
+    <div>
+        <menubar autodrop="true">
+            <menuitem onClick="Clients.log(event.toString())" iconSclass="z-icon-cog" label="menuitem1"/>
+        </menubar>
+    </div>
+</zk>

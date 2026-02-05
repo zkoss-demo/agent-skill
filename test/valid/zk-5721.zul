@@ -1,0 +1,6 @@
+<zk>
+    <nodom apply="bug.FileNameEncodingComposer">
+        <image id="badNameImg"/>
+        <image id="goodNameImg"/>
+    </nodom>
+</zk>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Test Page"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <window title="Sample Window" border="normal">
+        <vlayout>
+            <label value="Hello World"/>
+            <button label="Click Me"/>
+        </vlayout>
+    </window>
+</zk>

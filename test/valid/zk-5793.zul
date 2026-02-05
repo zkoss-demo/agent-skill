@@ -1,0 +1,20 @@
+<zk>
+    <button label="Upload" upload="true">
+    <attribute name="onUpload">
+        org.zkoss.util.media.Media media = event.getMedia();
+        if (media instanceof org.zkoss.image.Image) {
+            org.zkoss.image.Image img = (org.zkoss.image.Image) media;
+
+        }
+    </attribute>
+    </button>
+    <dropupload>
+        <attribute name="onUpload">
+            org.zkoss.util.media.Media media = event.getMedia();
+            if (media instanceof org.zkoss.image.Image) {
+            org.zkoss.image.Image img = (org.zkoss.image.Image) media;
+
+            }
+        </attribute>
+    </dropupload>
+</zk>

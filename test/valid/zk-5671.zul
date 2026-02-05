@@ -1,0 +1,5 @@
+<zk xmlns:w="client">
+    <textbox id="userMonitorScale"/>
+    <pdfviewer src="resume.pdf" height="100%" w:onRender="console.log('render')"/>
+    <script src="pdfviewer-patch.js"/>
+</zk>

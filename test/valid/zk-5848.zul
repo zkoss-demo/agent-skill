@@ -1,0 +1,19 @@
+<zk>
+    <textbox/>
+    <decimalbox readonly="true" />
+    <script><![CDATA[
+		zk.afterLoad("zul.inp", function () {
+		    var _xNumberInputWidget = {};
+		    zk.override(zul.inp.NumberInputWidget.prototype, _xNumberInputWidget, {
+		        doPaste_: function doPaste_(evt) {
+		            //Bug ZK-3838: add a paste event dealer
+		            var inp = this.getInputNode(),
+		                val = evt.domEvent.originalEvent.clipboardData.getData('text').trim();
+		            if (new RegExp('^[' + this.getAllowedKeys_().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + ']+$').test(val) && !this.isDisabled() && !this.isReadonly() && !this._shallIgnore(evt)) inp.value = val;
+		            evt.stop();
+		            this.$supers('doPaste_', arguments);
+		          }
+		     });
+		});
+	]]></script>
+</zk>

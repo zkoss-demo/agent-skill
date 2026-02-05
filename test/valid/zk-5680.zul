@@ -1,0 +1,14 @@
+<zk>
+    <zscript><![CDATA[
+import org.zkoss.bind.annotation.Command;
+
+public class ErrorVM {
+
+    public void error(){
+        throw new NullPointerException("An application error");
+    }
+}
+    ]]></zscript>
+    <button onClick='throw new NullPointerException("An application error")'/>
+    <button label="Cause Error" onClick="@command('error')" viewModel="@id('vm')@init('bug.ErrorVM')"/>
+</zk>

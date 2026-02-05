@@ -1,0 +1,4 @@
+<zk>
+
+    <intbox id="box" constraint="no positive, no negative, no zero"/><button label="set value" onClick="box.setValue(3)"/>
+</zk>
