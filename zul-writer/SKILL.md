@@ -1,6 +1,6 @@
 ---
 name: zul-writer
-description: Helps users write ZUL pages for the ZK Framework through a structured workflow
+description: Helps users write ZUL pages of ZK Framework through a structured workflow
 context: fork
 ---
 # ZUL Writer
@@ -24,11 +24,11 @@ Ask targeted questions to understand user needs before generating any code. This
 ### Questions to Ask
 
 #### 1. ZK Version
+Try to detect it from user's project, if not found, ask user
 ```
 Which ZK version are you using?
-- ZK 8.x (EE/CE)
-- ZK 9.x (EE/CE)
-- ZK 10.x (EE/CE)
+- 9 or before
+- 10.x
 ```
 **Why it matters**: Different versions have different components and features available.
 
@@ -66,11 +66,8 @@ What layout structure do you need?
 Always start with proper XML declaration and ZK namespaces:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
 <?page title="Page Title"?>
-<zk xmlns="http://www.zkoss.org/2005/zul"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.zkoss.org/2005/zul http://www.zkoss.org/2005/zul/zul.xsd">
+<zk xmlns:n="native" xmlns:ca="client/attribute" xmlns:w="client" xmlns:x="xhtml">
 
     <!-- Page content here -->
 
@@ -81,7 +78,7 @@ Always start with proper XML declaration and ZK namespaces:
 ```xml
 <window id="mainWin" title="Page Title" border="normal"
         apply="com.example.controller.MyComposer">
-    <!-- Components with id attributes for wire binding -->
+    <!-- Components with id attributes for wire components -->
     <textbox id="nameInput"/>
     <button id="submitBtn" label="Submit"/>
 </window>
@@ -249,6 +246,8 @@ Always start with proper XML declaration and ZK namespaces:
 
 ## Step 3: Validate Generated ZUL
 validate generated ZUL file with @scripts/validate-zul.py
+- Layer 1 & 2: General ZUL validation (schema and well-formedness)
+- Layer 3: ZK 10 compatibility checks (ONLY required if target ZK version is 10)
 
 ### Validation Checklist
 
