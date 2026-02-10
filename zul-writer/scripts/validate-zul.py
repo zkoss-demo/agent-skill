@@ -213,7 +213,7 @@ def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
         return False, [f"Compatibility check error: {e}"]
 
 
-def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(DEFAULT_XSD_PATH)) -> bool:
+def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(DEFAULT_XSD_PATH), zk_version: str = "10") -> bool:
     """
     Validate a ZUL file through all validation layers.
 
@@ -252,15 +252,18 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
         print("Layer 2: XSD Schema Validation... SKIPPED")
 
     # Layer 3: ZK 10 Compatibility
-    print("Layer 3: ZK 10 Compatibility... ", end="")
-    is_valid, errors = validate_zk10_compatibility(file_path)
-    if is_valid:
-        print("✓ PASS")
+    if zk_version.startswith("10"):
+        print("Layer 3: ZK 10 Compatibility... ", end="")
+        is_valid, errors = validate_zk10_compatibility(file_path)
+        if is_valid:
+            print("✓ PASS")
+        else:
+            print("✗ FAIL")
+            for error in errors:
+                print(f"  {error}")
+            all_valid = False
     else:
-        print("✗ FAIL")
-        for error in errors:
-            print(f"  {error}")
-        all_valid = False
+        print(f"Layer 3: ZK 10 Compatibility... SKIPPED (Version {zk_version} specified)")
 
     print("-" * 50)
     if all_valid:
@@ -293,6 +296,12 @@ def main():
         default=str(DEFAULT_XSD_PATH),
         help=f"XSD schema URL or local file path (default: {DEFAULT_XSD_PATH})"
     )
+    parser.add_argument(
+        "--zk-version",
+        dest="zk_version",
+        default="10",
+        help="ZK version to validate against (default: 10). Layer 3 checks only run for version 10.x."
+    )
 
     args = parser.parse_args()
 
@@ -303,7 +312,7 @@ def main():
             all_passed = False
             continue
 
-        if not validate_zul(file_path, skip_xsd=args.skip_xsd, xsd_source=args.xsd_source):
+        if not validate_zul(file_path, skip_xsd=args.skip_xsd, xsd_source=args.xsd_source, zk_version=args.zk_version):
             all_passed = False
 
         print()  # Blank line between files
