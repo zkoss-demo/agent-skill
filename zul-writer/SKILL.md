@@ -246,8 +246,19 @@ Always start with proper XML declaration and ZK namespaces:
 
 ## Step 3: Validate Generated ZUL
 validate generated ZUL file with @scripts/validate-zul.py
-- Layer 1 & 2: General ZUL validation (schema and well-formedness)
+- Layer 1: XML well-formedness (no dependencies)
+- Layer 2: XSD schema validation (requires `lxml`)
 - Layer 3: ZK 10 compatibility checks (ONLY required if target ZK version is 10)
+
+### Prerequisites
+Layer 2 (XSD schema validation) requires the `lxml` Python library. If the validation script reports that `lxml` is not installed, follow this sequence:
+
+1. **Check for `uv`**: Run `which uv` to detect if `uv` is available.
+2. **If `uv` is available**: Install with `uv pip install lxml` and run the validation script via `uv run`.
+3. **If `uv` is NOT available**: Ask the user if they'd like to install `uv` first (see https://docs.astral.sh/uv/getting-started/installation/).
+4. **If the user declines `uv`**: Fall back to `pip install lxml` (or `pip3 install lxml`).
+
+Do NOT skip Layer 2 silently. Always inform the user that schema validation was skipped due to the missing dependency and guide them through installation so full validation can run.
 
 ### Validation Checklist
 
