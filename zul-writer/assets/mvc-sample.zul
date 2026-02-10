@@ -1,0 +1,5 @@
+<window id="mainWin" title="Page Title" border="normal" apply="com.example.controller.MyComposer">
+<!-- Components with id attributes for wire components -->
+    <textbox id="nameInput"/>
+    <button id="submitBtn" label="Submit"/>
+</window>

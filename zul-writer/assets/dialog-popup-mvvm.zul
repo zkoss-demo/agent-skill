@@ -1,0 +1,22 @@
+<window id="editDialog" title="Edit Item" border="normal"
+        width="400px" mode="modal" closable="true"
+        viewModel="@id('vm') @init('com.example.EditViewModel')">
+    <vlayout>
+        <grid>
+            <columns>
+                <column width="100px"/>
+                <column/>
+            </columns>
+            <rows>
+                <row>
+                    <label value="Name:"/>
+                    <textbox value="@bind(vm.item.name)" hflex="1"/>
+                </row>
+            </rows>
+        </grid>
+        <hlayout style="margin-top: 10px">
+            <button label="OK" onClick="@command('confirm')"/>
+            <button label="Cancel" onClick="@command('cancel')"/>
+        </hlayout>
+    </vlayout>
+</window>

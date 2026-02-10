@@ -1,0 +1,11 @@
+<!-- Good: Use hflex/vflex for responsive layouts -->
+<hlayout>
+    <textbox hflex="1"/>
+    <button label="Search" hflex="min"/>
+</hlayout>
+
+<!-- Avoid: Fixed pixel widths -->
+<hlayout>
+    <textbox width="300px"/>
+    <button label="Search" width="80px"/>
+</hlayout>

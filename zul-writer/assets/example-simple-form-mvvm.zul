@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="User Registration"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <window id="registrationWin" title="User Registration" border="normal"
+            width="500px"
+            viewModel="@id('vm') @init('com.example.vm.RegistrationViewModel')">
+        <vlayout>
+            <grid>
+                <columns>
+                    <column width="120px" align="right"/>
+                    <column/>
+                </columns>
+                <rows>
+                    <row>
+                        <label value="Username:"/>
+                        <textbox value="@bind(vm.user.username)"
+                                 constraint="no empty" hflex="1"/>
+                    </row>
+                    <row>
+                        <label value="Email:"/>
+                        <textbox value="@bind(vm.user.email)"
+                                 constraint="/.+@.+\..+/: Invalid email"
+                                 hflex="1"/>
+                    </row>
+                    <row>
+                        <label value="Password:"/>
+                        <textbox type="password"
+                                 value="@bind(vm.user.password)"
+                                 constraint="no empty" hflex="1"/>
+                    </row>
+                    <row>
+                        <label value="Country:"/>
+                        <combobox model="@load(vm.countries)"
+                                  selectedItem="@bind(vm.user.country)"
+                                  hflex="1" readonly="true">
+                            <template name="model" var="country">
+                                <comboitem label="@load(country.name)"/>
+                            </template>
+                        </combobox>
+                    </row>
+                </rows>
+            </grid>
+            <separator/>
+            <hlayout>
+                <button label="Register" onClick="@command('register')"
+                        mold="trendy"/>
+                <button label="Clear" onClick="@command('clear')"/>
+            </hlayout>
+        </vlayout>
+    </window>
+</zk>

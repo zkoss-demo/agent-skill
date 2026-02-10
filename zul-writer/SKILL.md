@@ -63,189 +63,41 @@ What layout structure do you need?
 ### Generation Guidelines
 * if users have installed zk-doc mcp server, ask it for component information
 #### XML Structure
-Always start with proper XML declaration and ZK namespaces:
+Always start with proper XML declaration and ZK namespaces like assets/template.zul
 
-```xml
-<?page title="Page Title"?>
-<zk xmlns:n="native" xmlns:ca="client/attribute" xmlns:w="client" xmlns:x="xhtml">
-
-    <!-- Page content here -->
-
-</zk>
-```
 
 #### MVC Pattern Structure
-```xml
-<window id="mainWin" title="Page Title" border="normal"
-        apply="com.example.controller.MyComposer">
-    <!-- Components with id attributes for wire components -->
-    <textbox id="nameInput"/>
-    <button id="submitBtn" label="Submit"/>
-</window>
-```
+See assets/mvc-sample.zul
 
 #### MVVM Pattern Structure
-```xml
-<window id="mainWin" title="Page Title" border="normal"
-        viewModel="@id('vm') @init('com.example.viewmodel.MyViewModel')">
-    <!-- Components with data binding expressions -->
-    <textbox value="@bind(vm.name)"/>
-    <button label="Submit" onClick="@command('submit')"/>
-</window>
-```
+assets/mvvm-pattern-structure.zul
 
 ### Layout Best Practices
 
 #### Use Flexible Sizing
-```xml
-<!-- Good: Use hflex/vflex for responsive layouts -->
-<hlayout>
-    <textbox hflex="1"/>
-    <button label="Search" hflex="min"/>
-</hlayout>
-
-<!-- Avoid: Fixed pixel widths -->
-<hlayout>
-    <textbox width="300px"/>
-    <button label="Search" width="80px"/>
-</hlayout>
-```
+assets/flexible-sizing.zul
 
 #### Borderlayout Example
-```xml
-<borderlayout>
-    <north height="60px" border="none">
-        <div>Header content</div>
-    </north>
-    <west width="200px" splittable="true" collapsible="true">
-        <div>Navigation</div>
-    </west>
-    <center border="none">
-        <div>Main content</div>
-    </center>
-    <south height="30px" border="none">
-        <div>Footer</div>
-    </south>
-</borderlayout>
-```
+assets/borderlayout-example.zul
 
 ### Component Patterns
 
 #### Form with Validation (MVVM)
-```xml
-<grid>
-    <columns>
-        <column width="120px"/>
-        <column/>
-    </columns>
-    <rows>
-        <row>
-            <label value="Name:"/>
-            <textbox value="@bind(vm.user.name)"
-                     constraint="no empty: Name is required"
-                     hflex="1"/>
-        </row>
-        <row>
-            <label value="Email:"/>
-            <textbox value="@bind(vm.user.email)"
-                     constraint="/.+@.+\..+/: Invalid email format"
-                     hflex="1"/>
-        </row>
-        <row>
-            <label value="Age:"/>
-            <intbox value="@bind(vm.user.age)"
-                    constraint="no negative,no zero"
-                    hflex="1"/>
-        </row>
-    </rows>
-</grid>
-<hlayout style="margin-top: 10px">
-    <button label="Save" onClick="@command('save')"/>
-    <button label="Cancel" onClick="@command('cancel')"/>
-</hlayout>
-```
+assets/form-validation-mvvm.zul
 
 #### Data Grid with Selection (MVVM)
-```xml
-<listbox model="@load(vm.items)"
-         selectedItem="@bind(vm.selectedItem)"
-         hflex="1" vflex="1">
-    <listhead>
-        <listheader label="ID" width="80px"/>
-        <listheader label="Name" hflex="2"/>
-        <listheader label="Status" hflex="1"/>
-        <listheader label="Actions" width="120px"/>
-    </listhead>
-    <template name="model" var="item">
-        <listitem>
-            <listcell label="@load(item.id)"/>
-            <listcell label="@load(item.name)"/>
-            <listcell label="@load(item.status)"/>
-            <listcell>
-                <button label="Edit" onClick="@command('edit', item=item)"/>
-                <button label="Delete" onClick="@command('delete', item=item)"/>
-            </listcell>
-        </listitem>
-    </template>
-</listbox>
-```
+assets/data-grid-selection-mvvm.zul
 
 #### Master-Detail Pattern (MVVM)
-```xml
-<hlayout vflex="1" hflex="1">
-    <!-- Master list -->
-    <listbox model="@load(vm.items)"
-             selectedItem="@bind(vm.selectedItem)"
-             hflex="1" vflex="1">
-        <listhead>
-            <listheader label="Name"/>
-        </listhead>
-        <template name="model" var="item">
-            <listitem label="@load(item.name)"/>
-        </template>
-    </listbox>
-
-    <!-- Detail panel -->
-    <vlayout hflex="2" vflex="1"
-             visible="@load(not empty vm.selectedItem)">
-        <label value="@load(vm.selectedItem.name)"
-               style="font-weight: bold; font-size: 16px"/>
-        <separator/>
-        <label value="@load(vm.selectedItem.description)"/>
-    </vlayout>
-</hlayout>
-```
+assets/master-detail-mvvm.zul
 
 #### Dialog/Popup (MVVM)
-```xml
-<window id="editDialog" title="Edit Item" border="normal"
-        width="400px" mode="modal" closable="true"
-        viewModel="@id('vm') @init('com.example.EditViewModel')">
-    <vlayout>
-        <grid>
-            <columns>
-                <column width="100px"/>
-                <column/>
-            </columns>
-            <rows>
-                <row>
-                    <label value="Name:"/>
-                    <textbox value="@bind(vm.item.name)" hflex="1"/>
-                </row>
-            </rows>
-        </grid>
-        <hlayout style="margin-top: 10px">
-            <button label="OK" onClick="@command('confirm')"/>
-            <button label="Cancel" onClick="@command('cancel')"/>
-        </hlayout>
-    </vlayout>
-</window>
-```
+assets/dialog-popup-mvvm.zul
 
 ---
 
 ## Step 3: Validate Generated ZUL
-validate generated ZUL file with @scripts/validate-zul.py
+validate generated ZUL file with scripts/validate-zul.py
 - Layer 1: XML well-formedness (no dependencies)
 - Layer 2: XSD schema validation (requires `lxml`)
 - Layer 3: ZK 10 compatibility checks (ONLY required if target ZK version is 10)
@@ -288,252 +140,23 @@ Do NOT skip Layer 2 silently. Always inform the user that schema validation was 
 
 ### Companion Java Class Suggestions
 
-#### For MVC Pattern - Composer Class
-```java
-package com.example.controller;
-
-import org.zkoss.zk.ui.Component;
-import org.zkoss.zk.ui.select.SelectorComposer;
-import org.zkoss.zk.ui.select.annotation.Wire;
-import org.zkoss.zk.ui.select.annotation.Listen;
-import org.zkoss.zul.*;
-
-public class MyComposer extends SelectorComposer<Component> {
-
-    @Wire
-    private Textbox nameInput;
-
-    @Wire
-    private Button submitBtn;
-
-    @Override
-    public void doAfterCompose(Component comp) throws Exception {
-        super.doAfterCompose(comp);
-        // Initialization logic
-    }
-
-    @Listen("onClick = #submitBtn")
-    public void onSubmit() {
-        String name = nameInput.getValue();
-        // Handle submit
-    }
-}
-```
+#### For MVC Pattern - Composer Class example
+See assets/MyComposer.java
 
 #### For MVVM Pattern - ViewModel Class
-```java
-package com.example.viewmodel;
-
-import org.zkoss.bind.annotation.*;
-import org.zkoss.zk.ui.select.annotation.Wire;
-
-public class MyViewModel {
-
-    private String name;
-    private List<Item> items;
-    private Item selectedItem;
-
-    @Init
-    public void init() {
-        // Initialization logic
-        items = loadItems();
-    }
-
-    // Getters and setters for binding
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public List<Item> getItems() { return items; }
-    public Item getSelectedItem() { return selectedItem; }
-    public void setSelectedItem(Item item) { this.selectedItem = item; }
-
-    @Command
-    @NotifyChange({"items", "selectedItem"})
-    public void save() {
-        // Save logic
-    }
-
-    @Command
-    public void cancel() {
-        // Cancel logic
-    }
-}
-```
-
+See assets/MyViewModel.java
 ---
 
 ## Complete Examples
 
 ### Example 1: Simple Form (MVVM)
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?page title="User Registration"?>
-<zk xmlns="http://www.zkoss.org/2005/zul">
-    <window id="registrationWin" title="User Registration" border="normal"
-            width="500px"
-            viewModel="@id('vm') @init('com.example.vm.RegistrationViewModel')">
-        <vlayout>
-            <grid>
-                <columns>
-                    <column width="120px" align="right"/>
-                    <column/>
-                </columns>
-                <rows>
-                    <row>
-                        <label value="Username:"/>
-                        <textbox value="@bind(vm.user.username)"
-                                 constraint="no empty" hflex="1"/>
-                    </row>
-                    <row>
-                        <label value="Email:"/>
-                        <textbox value="@bind(vm.user.email)"
-                                 constraint="/.+@.+\..+/: Invalid email"
-                                 hflex="1"/>
-                    </row>
-                    <row>
-                        <label value="Password:"/>
-                        <textbox type="password"
-                                 value="@bind(vm.user.password)"
-                                 constraint="no empty" hflex="1"/>
-                    </row>
-                    <row>
-                        <label value="Country:"/>
-                        <combobox model="@load(vm.countries)"
-                                  selectedItem="@bind(vm.user.country)"
-                                  hflex="1" readonly="true">
-                            <template name="model" var="country">
-                                <comboitem label="@load(country.name)"/>
-                            </template>
-                        </combobox>
-                    </row>
-                </rows>
-            </grid>
-            <separator/>
-            <hlayout>
-                <button label="Register" onClick="@command('register')"
-                        mold="trendy"/>
-                <button label="Clear" onClick="@command('clear')"/>
-            </hlayout>
-        </vlayout>
-    </window>
-</zk>
-```
+assets/example-simple-form-mvvm.zul
 
 ### Example 2: Data Management Page (MVVM)
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?page title="Product Management"?>
-<zk xmlns="http://www.zkoss.org/2005/zul">
-    <borderlayout hflex="1" vflex="1"
-                  viewModel="@id('vm') @init('com.example.vm.ProductViewModel')">
-        <north height="50px" border="none">
-            <hlayout valign="middle" hflex="1" style="padding: 10px">
-                <label value="Product Management"
-                       style="font-size: 18px; font-weight: bold"/>
-                <space hflex="1"/>
-                <button label="Add Product"
-                        onClick="@command('showAddDialog')"
-                        iconSclass="z-icon-plus"/>
-            </hlayout>
-        </north>
-        <west width="250px" title="Categories" splittable="true"
-              collapsible="true">
-            <listbox model="@load(vm.categories)"
-                     selectedItem="@bind(vm.selectedCategory)"
-                     vflex="1">
-                <template name="model" var="cat">
-                    <listitem label="@load(cat.name)"/>
-                </template>
-            </listbox>
-        </west>
-        <center border="none">
-            <vlayout vflex="1" hflex="1" style="padding: 10px">
-                <!-- Search bar -->
-                <hlayout>
-                    <textbox value="@bind(vm.searchKeyword)"
-                             placeholder="Search products..."
-                             hflex="1" instant="true"
-                             onChange="@command('search')"/>
-                    <button label="Search" onClick="@command('search')"
-                            iconSclass="z-icon-search"/>
-                </hlayout>
-                <separator/>
-                <!-- Product grid -->
-                <listbox model="@load(vm.products)"
-                         selectedItem="@bind(vm.selectedProduct)"
-                         hflex="1" vflex="1" emptyMessage="No products found">
-                    <listhead>
-                        <listheader label="ID" width="60px" sort="auto(id)"/>
-                        <listheader label="Name" hflex="2" sort="auto(name)"/>
-                        <listheader label="Category" hflex="1"/>
-                        <listheader label="Price" width="100px"
-                                    sort="auto(price)" align="right"/>
-                        <listheader label="Stock" width="80px" align="center"/>
-                        <listheader label="Actions" width="150px"
-                                    align="center"/>
-                    </listhead>
-                    <template name="model" var="prod">
-                        <listitem>
-                            <listcell label="@load(prod.id)"/>
-                            <listcell label="@load(prod.name)"/>
-                            <listcell label="@load(prod.category.name)"/>
-                            <listcell label="@load(prod.price) @converter('formattedNumber', format='$#,##0.00')"/>
-                            <listcell label="@load(prod.stock)"/>
-                            <listcell>
-                                <hlayout>
-                                    <button label="Edit"
-                                            onClick="@command('edit', product=prod)"
-                                            iconSclass="z-icon-edit"/>
-                                    <button label="Delete"
-                                            onClick="@command('delete', product=prod)"
-                                            iconSclass="z-icon-trash"/>
-                                </hlayout>
-                            </listcell>
-                        </listitem>
-                    </template>
-                </listbox>
-                <!-- Paging -->
-                <paging totalSize="@load(vm.totalSize)"
-                        pageSize="@load(vm.pageSize)"
-                        activePage="@bind(vm.activePage)"/>
-            </vlayout>
-        </center>
-    </borderlayout>
-</zk>
-```
+assets/example-data-management-mvvm.zul
 
 ### Example 3: Simple List Page (MVC)
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<?page title="Task List"?>
-<zk xmlns="http://www.zkoss.org/2005/zul">
-    <window id="taskWin" title="My Tasks" border="normal"
-            width="600px"
-            apply="com.example.controller.TaskComposer">
-        <vlayout>
-            <hlayout>
-                <textbox id="taskInput" hflex="1"
-                         placeholder="Enter new task..."/>
-                <button id="addBtn" label="Add Task"/>
-            </hlayout>
-            <separator/>
-            <listbox id="taskList" hflex="1" height="300px"
-                     emptyMessage="No tasks yet">
-                <listhead>
-                    <listheader label="Done" width="60px"/>
-                    <listheader label="Task" hflex="1"/>
-                    <listheader label="Actions" width="80px"/>
-                </listhead>
-            </listbox>
-            <hlayout>
-                <label id="statusLabel" value="0 tasks"/>
-                <space hflex="1"/>
-                <button id="clearBtn" label="Clear Completed"/>
-            </hlayout>
-        </vlayout>
-    </window>
-</zk>
-```
+assets/example-simple-list-mvc.zul
 
 ---
 

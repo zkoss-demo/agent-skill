@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Product Management"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <borderlayout hflex="1" vflex="1"
+                  viewModel="@id('vm') @init('com.example.vm.ProductViewModel')">
+        <north height="50px" border="none">
+            <hlayout valign="middle" hflex="1" style="padding: 10px">
+                <label value="Product Management"
+                       style="font-size: 18px; font-weight: bold"/>
+                <space hflex="1"/>
+                <button label="Add Product"
+                        onClick="@command('showAddDialog')"
+                        iconSclass="z-icon-plus"/>
+            </hlayout>
+        </north>
+        <west width="250px" title="Categories" splittable="true"
+              collapsible="true">
+            <listbox model="@load(vm.categories)"
+                     selectedItem="@bind(vm.selectedCategory)"
+                     vflex="1">
+                <template name="model" var="cat">
+                    <listitem label="@load(cat.name)"/>
+                </template>
+            </listbox>
+        </west>
+        <center border="none">
+            <vlayout vflex="1" hflex="1" style="padding: 10px">
+                <!-- Search bar -->
+                <hlayout>
+                    <textbox value="@bind(vm.searchKeyword)"
+                             placeholder="Search products..."
+                             hflex="1" instant="true"
+                             onChange="@command('search')"/>
+                    <button label="Search" onClick="@command('search')"
+                            iconSclass="z-icon-search"/>
+                </hlayout>
+                <separator/>
+                <!-- Product grid -->
+                <listbox model="@load(vm.products)"
+                         selectedItem="@bind(vm.selectedProduct)"
+                         hflex="1" vflex="1" emptyMessage="No products found">
+                    <listhead>
+                        <listheader label="ID" width="60px" sort="auto(id)"/>
+                        <listheader label="Name" hflex="2" sort="auto(name)"/>
+                        <listheader label="Category" hflex="1"/>
+                        <listheader label="Price" width="100px"
+                                    sort="auto(price)" align="right"/>
+                        <listheader label="Stock" width="80px" align="center"/>
+                        <listheader label="Actions" width="150px"
+                                    align="center"/>
+                    </listhead>
+                    <template name="model" var="prod">
+                        <listitem>
+                            <listcell label="@load(prod.id)"/>
+                            <listcell label="@load(prod.name)"/>
+                            <listcell label="@load(prod.category.name)"/>
+                            <listcell label="@load(prod.price) @converter('formattedNumber', format='$#,##0.00')"/>
+                            <listcell label="@load(prod.stock)"/>
+                            <listcell>
+                                <hlayout>
+                                    <button label="Edit"
+                                            onClick="@command('edit', product=prod)"
+                                            iconSclass="z-icon-edit"/>
+                                    <button label="Delete"
+                                            onClick="@command('delete', product=prod)"
+                                            iconSclass="z-icon-trash"/>
+                                </hlayout>
+                            </listcell>
+                        </listitem>
+                    </template>
+                </listbox>
+                <!-- Paging -->
+                <paging totalSize="@load(vm.totalSize)"
+                        pageSize="@load(vm.pageSize)"
+                        activePage="@bind(vm.activePage)"/>
+            </vlayout>
+        </center>
+    </borderlayout>
+</zk>

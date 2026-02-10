@@ -1,0 +1,21 @@
+<listbox model="@load(vm.items)"
+         selectedItem="@bind(vm.selectedItem)"
+         hflex="1" vflex="1">
+    <listhead>
+        <listheader label="ID" width="80px"/>
+        <listheader label="Name" hflex="2"/>
+        <listheader label="Status" hflex="1"/>
+        <listheader label="Actions" width="120px"/>
+    </listhead>
+    <template name="model" var="item">
+        <listitem>
+            <listcell label="@load(item.id)"/>
+            <listcell label="@load(item.name)"/>
+            <listcell label="@load(item.status)"/>
+            <listcell>
+                <button label="Edit" onClick="@command('edit', item=item)"/>
+                <button label="Delete" onClick="@command('delete', item=item)"/>
+            </listcell>
+        </listitem>
+    </template>
+</listbox>

@@ -1,0 +1,30 @@
+<grid>
+    <columns>
+        <column width="120px"/>
+        <column/>
+    </columns>
+    <rows>
+        <row>
+            <label value="Name:"/>
+            <textbox value="@bind(vm.user.name)"
+                     constraint="no empty: Name is required"
+                     hflex="1"/>
+        </row>
+        <row>
+            <label value="Email:"/>
+            <textbox value="@bind(vm.user.email)"
+                     constraint="/.+@.+\..+/: Invalid email format"
+                     hflex="1"/>
+        </row>
+        <row>
+            <label value="Age:"/>
+            <intbox value="@bind(vm.user.age)"
+                    constraint="no negative,no zero"
+                    hflex="1"/>
+        </row>
+    </rows>
+</grid>
+<hlayout style="margin-top: 10px">
+    <button label="Save" onClick="@command('save')"/>
+    <button label="Cancel" onClick="@command('cancel')"/>
+</hlayout>

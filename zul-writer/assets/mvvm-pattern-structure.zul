@@ -1,0 +1,6 @@
+<window id="mainWin" title="Page Title" border="normal"
+        viewModel="@id('vm') @init('com.example.viewmodel.MyViewModel')">
+    <!-- Components with data binding expressions -->
+    <textbox value="@bind(vm.name)"/>
+    <button label="Submit" onClick="@command('submit')"/>
+</window>

@@ -1,0 +1,4 @@
+<?page title="Page Title"?>
+<zk xmlns:n="native" xmlns:ca="client/attribute" xmlns:w="client" xmlns:x="xhtml">
+    <!-- Page content here -->
+</zk>

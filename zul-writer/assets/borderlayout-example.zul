@@ -1,0 +1,14 @@
+<borderlayout>
+    <north height="60px" border="none">
+        <div>Header content</div>
+    </north>
+    <west width="200px" splittable="true" collapsible="true">
+        <div>Navigation</div>
+    </west>
+    <center border="none">
+        <div>Main content</div>
+    </center>
+    <south height="30px" border="none">
+        <div>Footer</div>
+    </south>
+</borderlayout>

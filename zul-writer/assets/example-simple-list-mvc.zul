@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Task List"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <window id="taskWin" title="My Tasks" border="normal"
+            width="600px"
+            apply="com.example.controller.TaskComposer">
+        <vlayout>
+            <hlayout>
+                <textbox id="taskInput" hflex="1"
+                         placeholder="Enter new task..."/>
+                <button id="addBtn" label="Add Task"/>
+            </hlayout>
+            <separator/>
+            <listbox id="taskList" hflex="1" height="300px"
+                     emptyMessage="No tasks yet">
+                <listhead>
+                    <listheader label="Done" width="60px"/>
+                    <listheader label="Task" hflex="1"/>
+                    <listheader label="Actions" width="80px"/>
+                </listhead>
+            </listbox>
+            <hlayout>
+                <label id="statusLabel" value="0 tasks"/>
+                <space hflex="1"/>
+                <button id="clearBtn" label="Clear Completed"/>
+            </hlayout>
+        </vlayout>
+    </window>
+</zk>
