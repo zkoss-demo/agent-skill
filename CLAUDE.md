@@ -47,3 +47,7 @@ This creates a symlink from `./zul-writer` to `~/.claude/skills/zul-writer`.
 - **Workflow sections**: Step-by-step process the skill follows
 - **Code examples**: Reference patterns and templates
 - **Validation checklists**: Quality checks for generated output
+
+# Reference
+* https://agentskills.io/home
+* https://agentskills.io/specification
