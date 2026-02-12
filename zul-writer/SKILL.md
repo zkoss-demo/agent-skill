@@ -59,7 +59,7 @@ When user provides a UI screenshot or mockup image:
 3. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
 4. **Ask clarifications** - Confirm ZK version and MVC/MVVM preference if not already known. Ask about any ambiguous UI elements
 5. **Generate ZUL** - Proceed to Step 2 with the analyzed requirements
-6. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<?style ?>` or `<style src="..."/>`
+6. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<style>` element (not `<?style ?>` processing instruction)
 
 ---
 
@@ -70,6 +70,7 @@ Find proper components for UI requirements:
 * If users have installed zk-doc-mcp-server, query it for component information
 * Find components and properties from javadoc at https://www.zkoss.org/javadoc/latest/zk/
 * Don't specify `hflex="min"` on `<button>` — it's `display: inline-block` by default
+* Use `<style>` element for inline CSS, not `<?style ?>` processing instruction
 
 #### XML Structure
 Always start with proper XML declaration and ZK namespaces: [assets/template.zul](assets/template.zul)
