@@ -12,7 +12,7 @@ This skill guides users through a 3-step process to create well-structured ZUL p
 
 1. **Clarify Requirements** - Gather information about the page purpose and technical needs
 2. **Generate ZUL** - Create the ZUL file based on gathered requirements
-3. **Validate** - Verify correctness and suggest companion Java classes
+3. **Validate** - Verify correctness and suggest companion Java classes.
 
 ---
 
@@ -61,7 +61,11 @@ What layout structure do you need?
 ## Step 2: Generate ZUL File
 
 ### Generation Guidelines
-* if users have installed zk-doc mcp server, ask it for component information
+find proper component for UI requirements:
+* if users have installed zk-doc-mcp-server, ask it for component information when needed
+* Find component and their property from javadoc at https://www.zkoss.org/javadoc/latest/zk/
+* don't specify `hflex="min"` on button for it's `display: inline-block`
+
 #### XML Structure
 Always start with proper XML declaration and ZK namespaces like assets/template.zul
 
@@ -80,25 +84,18 @@ assets/flexible-sizing.zul
 #### Borderlayout Example
 assets/borderlayout-example.zul
 
-### Component Patterns
+### Component Usage Example - MVVM Pattern
 
-#### Form with Validation (MVVM)
-assets/form-validation-mvvm.zul
-
-#### Data Grid with Selection (MVVM)
-assets/data-grid-selection-mvvm.zul
-
-#### Master-Detail Pattern (MVVM)
-assets/master-detail-mvvm.zul
-
-#### Dialog/Popup (MVVM)
-assets/dialog-popup-mvvm.zul
+* [Form with Validation](assets/form-validation-mvvm.zul)
+* [Data Grid with Selection](assets/data-grid-selection-mvvm.zul)
+* [Master-Detail Pattern](assets/master-detail-mvvm.zul)
+* [Dialog/Popup](assets/dialog-popup-mvvm.zul)
 
 ---
 
 ## Step 3: Validate Generated ZUL
 validate generated ZUL file with scripts/validate-zul.py
-- Layer 1: XML well-formedness (no dependencies)
+- Layer 1: XML well-formatted (no dependencies)
 - Layer 2: XSD schema validation (requires `lxml`)
 - Layer 3: ZK 10 compatibility checks (ONLY required if target ZK version is 10)
 
@@ -133,8 +130,8 @@ Do NOT skip Layer 2 silently. Always inform the user that schema validation was 
 - [ ] Data binding uses correct annotations (`@load`, `@save`, `@bind`)
 
 #### Best Practices
-- [ ] IDs are unique within the page
-- [ ] Avoid inline styles where possible (use sclass)
+- [ ] IDs are unique within one ID space owner : `<window>`, `<idspace>`
+- [ ] Avoid inline styles where possible (use `sclass`)
 - [ ] Use `hflex`/`vflex` instead of fixed dimensions
 - [ ] Include meaningful labels and tooltips for accessibility
 
@@ -189,27 +186,3 @@ assets/example-simple-list-mvc.zul
 | `vflex` | Vertical flexibility | `vflex="1"`, `vflex="min"` |
 | `width` | Fixed width | `width="200px"`, `width="50%"` |
 | `height` | Fixed height | `height="300px"` |
-
----
-
-## Troubleshooting Common Issues
-
-### Issue: Data binding not working
-- Verify `viewModel` attribute is on a container component
-- Check that getter/setter methods exist in ViewModel
-- Ensure `@NotifyChange` is used after data modifications
-
-### Issue: Components not displaying
-- Check if parent has defined height (required for `vflex`)
-- Verify component is not hidden by CSS
-- Check for JavaScript errors in browser console
-
-### Issue: Events not firing
-- MVC: Verify `@Listen` annotation matches component ID
-- MVVM: Check `@command` method exists and is public
-- Ensure event name is correct (e.g., `onClick`, not `onclick`)
-
-### Issue: Constraint validation not showing
-- Ensure constraint syntax is correct
-- Check that component is not readonly
-- Verify form submission triggers validation
