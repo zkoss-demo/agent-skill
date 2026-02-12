@@ -4,6 +4,11 @@ this document contains various UI requirements, used to test agent skill "zul-wr
 
 *   **Personal Profile Info**: A page displaying read-only user information with labels (e.g., Tax ID, Full Name, Parent's Name) and values. Includes a primary confirmation button at the bottom right.
 *   **General Login Page**: A centered login box with a logo, a decorative landscape image, and input fields for organization, username, and password. Includes "Forgot Password" and "Login" buttons.
+*   **User Profile Settings**: A page where a user can edit their profile information (name, email, password). Includes input fields, a "Save Changes" button, and possibly a "Cancel" button.
+*   **Product Catalog Listing**: A page displaying a list of products with basic information (name, price, image). Includes a search bar and filters.
+*   **Order Confirmation Page**: A read-only page summarizing an order after a purchase. Includes order number, list of items, total price, and shipping address. A "Print" button might be present.
+*   **Simple Search Result Display**: A page displaying results from a search query. Each result shows a title, a short description, and a link to the detail page. Pagination at the bottom.
+*   **Contact Us Form**: A form with fields for name, email, subject, and message. Includes a "Send" button and a success/error message display area.
 
 ## Complicated UI Patterns
 

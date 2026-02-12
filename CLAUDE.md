@@ -51,3 +51,4 @@ This creates a symlink from `./zul-writer` to `~/.claude/skills/zul-writer`.
 # Reference
 * https://agentskills.io/home
 * https://agentskills.io/specification
+* https://resources.anthropic.com/hubfs/The-Complete-Guide-to-Building-Skill-for-Claude.pdf?hsLang=en
