@@ -1,41 +1,33 @@
 ---
 name: zul-writer
-description: Helps users write ZUL pages of ZK Framework through a structured workflow
-context: fork
+description: Generate ZK Framework ZUL pages through a structured workflow. Use when users want to create ZUL files, convert UI designs/screenshots/mockups into ZUL code, build forms/grids/dashboards with ZK components, or need help with ZK layout and data binding (MVC or MVVM). Triggers on requests involving ZUL, ZK pages, or UI-to-ZUL conversion from images.
 ---
 # ZUL Writer
 
-
 ## Workflow Overview
 
-This skill guides users through a 3-step process to create well-structured ZUL pages:
+This skill creates well-structured ZUL pages through a 3-step process:
 
-1. **Clarify Requirements** - Gather information about the page purpose and technical needs
-2. **Generate ZUL** - Create the ZUL file based on gathered requirements
-3. **Validate** - Verify correctness and suggest companion Java classes.
+1. **Clarify Requirements** - Gather page purpose, pattern, and layout needs
+2. **Generate ZUL** - Create the ZUL file based on requirements
+3. **Validate** - Verify correctness and suggest companion Java classes
+
+**Alternative entry**: When user provides a UI image (screenshot/mockup), skip to the image-to-ZUL workflow below.
 
 ---
 
 ## Step 1: Clarify User Requirements
 
-### Purpose
-Ask targeted questions to understand user needs before generating any code. This ensures the generated ZUL matches the user's exact requirements.
+Ask targeted questions to understand needs before generating code.
 
 ### Questions to Ask
 
 #### 1. ZK Version
-Try to detect it from user's project, if not found, ask user
-```
-Which ZK version are you using?
+Detect from user's project (check `pom.xml`, `ivy.xml`, or `build.gradle` for ZK dependency version). If not found, ask:
 - 9 or before
 - 10.x
-```
-**Why it matters**: Different versions have different components and features available.
-
 
 #### 2. Page Purpose
-```
-What is the purpose of this page?
 - Data entry form
 - Data list/grid display
 - Dashboard with multiple sections
@@ -43,48 +35,60 @@ What is the purpose of this page?
 - Master-detail view
 - Search and results page
 - Other: [specify]
-```
 
-#### 3. Layout Requirements
-```
-What layout structure do you need?
+#### 3. MVC or MVVM Pattern
+- **MVC**: Composer-based with `apply` attribute and wired components
+- **MVVM**: ViewModel-based with data binding (`@load`, `@save`, `@bind`, `@command`)
+
+#### 4. Layout Requirements
 - Borderlayout (north/south/east/west/center)
 - Vertical layout (vlayout)
 - Horizontal layout (hlayout)
 - Grid-based layout
 - Tabbed layout (tabbox)
 - Combined layouts
-```
+
+---
+
+## Image-to-ZUL Workflow
+
+When user provides a UI screenshot or mockup image:
+
+1. **Analyze the image** - Identify all visible UI elements: layout structure, input fields, buttons, data tables, navigation, labels, icons
+2. **Map to ZK components** - Consult [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) for element-to-component mapping. Prioritize ZK components; fall back to `<n:div>` + CSS only when no suitable ZK component exists
+3. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
+4. **Ask clarifications** - Confirm ZK version and MVC/MVVM preference if not already known. Ask about any ambiguous UI elements
+5. **Generate ZUL** - Proceed to Step 2 with the analyzed requirements
+6. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<?style ?>` or `<style src="..."/>`
 
 ---
 
 ## Step 2: Generate ZUL File
 
 ### Generation Guidelines
-find proper component for UI requirements:
-* if users have installed zk-doc-mcp-server, ask it for component information when needed
-* Find component and their property from javadoc at https://www.zkoss.org/javadoc/latest/zk/
-* don't specify `hflex="min"` on button for it's `display: inline-block`
+Find proper components for UI requirements:
+* If users have installed zk-doc-mcp-server, query it for component information
+* Find components and properties from javadoc at https://www.zkoss.org/javadoc/latest/zk/
+* Don't specify `hflex="min"` on `<button>` — it's `display: inline-block` by default
 
 #### XML Structure
-Always start with proper XML declaration and ZK namespaces like assets/template.zul
-
+Always start with proper XML declaration and ZK namespaces: [assets/template.zul](assets/template.zul)
 
 #### MVC Pattern Structure
-See assets/mvc-sample.zul
+[assets/mvc-sample.zul](assets/mvc-sample.zul)
 
 #### MVVM Pattern Structure
-assets/mvvm-pattern-structure.zul
+[assets/mvvm-pattern-structure.zul](assets/mvvm-pattern-structure.zul)
 
 ### Layout Best Practices
 
 #### Use Flexible Sizing
-assets/flexible-sizing.zul
+[assets/flexible-sizing.zul](assets/flexible-sizing.zul)
 
 #### Borderlayout Example
-assets/borderlayout-example.zul
+[assets/borderlayout-example.zul](assets/borderlayout-example.zul)
 
-### Component Usage Example - MVVM Pattern
+### Component Usage Examples - MVVM Pattern
 
 * [Form with Validation](assets/form-validation-mvvm.zul)
 * [Data Grid with Selection](assets/data-grid-selection-mvvm.zul)
@@ -94,95 +98,47 @@ assets/borderlayout-example.zul
 ---
 
 ## Step 3: Validate Generated ZUL
-validate generated ZUL file with scripts/validate-zul.py
-- Layer 1: XML well-formatted (no dependencies)
+
+Run validation: `scripts/validate-zul.py`
+- Layer 1: XML well-formedness (no dependencies)
 - Layer 2: XSD schema validation (requires `lxml`)
-- Layer 3: ZK 10 compatibility checks (ONLY required if target ZK version is 10)
+- Layer 3: ZK 10 compatibility checks (only if target ZK version is 10)
 
 ### Prerequisites
-Layer 2 (XSD schema validation) requires the `lxml` Python library. If the validation script reports that `lxml` is not installed, follow this sequence:
+Layer 2 requires `lxml`. If missing:
 
-1. **Check for `uv`**: Run `which uv` to detect if `uv` is available.
-2. **If `uv` is available**: Install with `uv pip install lxml` and run the validation script via `uv run`.
-3. **If `uv` is NOT available**: Ask the user if they'd like to install `uv` first (see https://docs.astral.sh/uv/getting-started/installation/).
-4. **If the user declines `uv`**: Fall back to `pip install lxml` (or `pip3 install lxml`).
+1. Check for `uv`: `which uv`
+2. If `uv` available: `uv pip install lxml`, run script via `uv run`
+3. If `uv` not available: ask user to install `uv` (https://docs.astral.sh/uv/getting-started/installation/)
+4. If user declines `uv`: fall back to `pip install lxml`
 
-Do NOT skip Layer 2 silently. Always inform the user that schema validation was skipped due to the missing dependency and guide them through installation so full validation can run.
+Do NOT skip Layer 2 silently. Always inform the user and guide through installation.
 
-### Validation Checklist
-
-#### ZK Namespace Declarations
-- [ ] Additional namespaces as needed:
-  - Native HTML: `xmlns:n="native"`
-  - Client-side: `xmlns:w="client"`
-  - Annotation: `xmlns:a="client/attribute"`
+### Post-Validation Checklist
 
 #### Pattern Consistency
-- [ ] **MVC**: Uses `apply` attribute, no MVVM binding expressions
-- [ ] **MVVM**: Uses `viewModel` attribute, proper binding syntax
-- [ ] No mixing of patterns (e.g., don't use `apply` and `viewModel` on same component)
-
-#### Attribute Validation
-- [ ] `hflex`/`vflex` values are valid (`1`, `min`, `2`, etc.)
-- [ ] `constraint` syntax is correct
-- [ ] Event handlers use correct prefixes (`onClick`, `onChange`, etc.)
-- [ ] MVVM commands use `@command('methodName')` syntax
-- [ ] Data binding uses correct annotations (`@load`, `@save`, `@bind`)
+- **MVC**: Uses `apply` attribute, no MVVM binding expressions
+- **MVVM**: Uses `viewModel` attribute, proper binding syntax
+- No mixing of patterns on same component
 
 #### Best Practices
-- [ ] IDs are unique within one ID space owner : `<window>`, `<idspace>`
-- [ ] Avoid inline styles where possible (use `sclass`)
-- [ ] Use `hflex`/`vflex` instead of fixed dimensions
-- [ ] Include meaningful labels and tooltips for accessibility
+- IDs are unique within each ID space owner (`<window>`, `<idspace>`)
+- Prefer `sclass` over inline styles
+- Prefer `hflex`/`vflex` over fixed dimensions
+- Include meaningful labels and tooltips for accessibility
 
-### Companion Java Class Suggestions
+### Controller Java Class Suggestions
 
-#### For MVC Pattern - Composer Class example
-See assets/MyComposer.java
+#### MVC Pattern - Composer Class
+[assets/MyComposer.java](assets/MyComposer.java)
 
-#### For MVVM Pattern - ViewModel Class
-See assets/MyViewModel.java
+#### MVVM Pattern - ViewModel Class
+[assets/MyViewModel.java](assets/MyViewModel.java)
+
 ---
 
 ## Complete Examples
 
-### Example 1: Simple Form (MVVM)
-assets/example-simple-form-mvvm.zul
-
-### Example 2: Data Management Page (MVVM)
-assets/example-data-management-mvvm.zul
-
-### Example 3: Simple List Page (MVC)
-assets/example-simple-list-mvc.zul
-
----
-
-## Quick Reference
-
-### MVVM Binding Annotations
-| Annotation | Usage | Example |
-|------------|-------|---------|
-| `@load` | One-way (VM to View) | `value="@load(vm.name)"` |
-| `@save` | One-way (View to VM) | `value="@save(vm.name)"` |
-| `@bind` | Two-way binding | `value="@bind(vm.name)"` |
-| `@command` | Method invocation | `onClick="@command('save')"` |
-| `@global-command` | Global command | `onClick="@global-command('refresh')"` |
-
-### Common Constraints
-| Constraint | Description |
-|------------|-------------|
-| `no empty` | Cannot be empty |
-| `no negative` | No negative numbers |
-| `no zero` | No zero value |
-| `no positive` | No positive numbers |
-| `/regex/` | Must match regex |
-| `min X` | Minimum value X |
-| `max X` | Maximum value X |
-
-### Sizing Attributes
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| `hflex` | Horizontal flexibility | `hflex="1"`, `hflex="min"` |
-| `vflex` | Vertical flexibility | `vflex="1"`, `vflex="min"` |
-| `width` | Fixed width | `width="200px"`, `width="50%"` |
-| `height` | Fixed height | `height="300px"` |
+* [Simple Form - MVVM](assets/example-simple-form-mvvm.zul)
+* [Data Management Page - MVVM](assets/example-data-management-mvvm.zul)
+* [Simple List Page - MVC](assets/example-simple-list-mvc.zul)
