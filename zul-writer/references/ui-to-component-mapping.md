@@ -9,7 +9,7 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Header / sidebar / content regions | `<borderlayout>` with `<north>`, `<west>`, `<center>` | Use for full-page layouts |
 | Vertical stack | `<vlayout>` | |
 | Horizontal row | `<hlayout>` | |
-| Tabs | `<tabbox>` with `<tabs>` + `<tabpanels>` | |
+| Tabs / tab-styled navigation bar | `<tabbox>` with `<tabs>` + `<tabpanels>` | Includes nav bars with tab-like buttons — never use `<n:button>` for these |
 | Accordion | `<tabbox>` with `mold="accordion"` | |
 | Splitter panels | `<splitlayout>`  | |
 | Card / panel | `<groupbox>` or `<panel>` | `<groupbox>` for titled sections |
@@ -68,9 +68,16 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Badge / tag | No direct component | Use `<label sclass="...">` + CSS |
 | Popover | `<popup>` | |
 
+## Common Mistakes — Do NOT Use Native HTML For These
+
+- **Tab-like navigation** → Use `<tabbox>`, not `<n:button class="tab">`
+- **Dropdown menus** → Use `<combobox>` or `<menubar>`, not `<n:select>`
+- **Data tables** → Use `<listbox>` or `<grid>`, not `<n:table>`
+- **Modal dialogs** → Use `<window mode="modal">`, not `<n:div class="modal">`
+
 ## Fallback Strategy: div + CSS
 
-When no ZK component matches, use native HTML via the `n:` namespace:
+Only use native HTML via the `n:` namespace when **no** ZK component can achieve the UI pattern:
 
 ```xml
 <!-- Card with custom styling -->
