@@ -1,5 +1,5 @@
 <!-- Content tabs: all content below the tab strip goes INSIDE <tabpanel>, not as siblings outside <tabbox> -->
-<tabbox hflex="1" vflex="1">
+<tabbox>
     <tabs>
         <tab label="Tab A" selected="true"/>
         <tab label="Tab B"/>
