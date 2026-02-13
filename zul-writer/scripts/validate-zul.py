@@ -5,7 +5,9 @@ ZUL File Validator
 Validates ZUL files for:
   Layer 1: XML well-formedness (no dependencies)
   Layer 2: XSD schema validation (requires lxml)
-  Layer 3: ZK 10 compatibility checks (no dependencies)
+  Layer 3: Attribute placement check (requires lxml) - catches misplaced
+           attributes that XSD's anyAttribute wildcard allows through
+  Layer 4: ZK 10 compatibility checks (no dependencies)
 
 Note: ZK's official XSD may have issues. This script defaults to using the
 revised local schema in ../assets/zul.xsd. Use --xsd to override it.
@@ -131,6 +133,189 @@ def validate_xsd_schema(file_path: Path, xsd_source: str = str(DEFAULT_XSD_PATH)
         return False, [f"Validation error: {e}"]
 
 
+def build_attribute_map(xsd_path: Path) -> tuple[dict[str, set[str]], dict[str, list[str]]] | tuple[None, None]:
+    """
+    Parse the XSD to build per-element valid attribute maps.
+
+    Returns:
+        (element_attrs, attr_elements) where:
+        - element_attrs: {element_name: {valid_attr_names}}
+        - attr_elements: {attr_name: [element_names]} (reverse map for hints)
+        Or (None, None) if lxml is unavailable.
+    """
+    try:
+        from lxml import etree
+    except ImportError:
+        return None, None
+
+    XS = "{http://www.w3.org/2001/XMLSchema}"
+
+    tree = etree.parse(str(xsd_path))
+    root = tree.getroot()
+
+    # Step 1: Collect attributeGroup definitions
+    raw_groups = {}  # name -> (direct_attrs, ref_groups)
+    for ag in root.iterchildren(f'{XS}attributeGroup'):
+        name = ag.get('name')
+        if name is None:
+            continue
+        direct_attrs = set()
+        ref_groups = []
+        for child in ag:
+            if child.tag == f'{XS}attribute':
+                attr_name = child.get('name')
+                if attr_name:
+                    direct_attrs.add(attr_name)
+            elif child.tag == f'{XS}attributeGroup':
+                ref = child.get('ref')
+                if ref:
+                    ref_groups.append(ref)
+        raw_groups[name] = (direct_attrs, ref_groups)
+
+    # Resolve attributeGroups recursively
+    resolved_groups = {}
+
+    def resolve_group(name, visited=None):
+        if visited is None:
+            visited = set()
+        if name in resolved_groups:
+            return resolved_groups[name]
+        if name in visited or name not in raw_groups:
+            return set()
+        visited.add(name)
+        direct, refs = raw_groups[name]
+        result = set(direct)
+        for ref in refs:
+            result |= resolve_group(ref, visited)
+        resolved_groups[name] = result
+        return result
+
+    for name in raw_groups:
+        resolve_group(name)
+
+    # Step 2: Collect complexType definitions
+    def collect_type_attrs(ct_elem):
+        """Collect attributes from a complexType element (handles nested structures)."""
+        attrs = set()
+        for child in ct_elem:
+            if child.tag == f'{XS}attribute':
+                attr_name = child.get('name')
+                if attr_name:
+                    attrs.add(attr_name)
+            elif child.tag == f'{XS}attributeGroup':
+                ref = child.get('ref')
+                if ref and ref in resolved_groups:
+                    attrs |= resolved_groups[ref]
+            elif child.tag == f'{XS}complexContent':
+                # Handle type extension (e.g., toolbarbuttonType extends buttonType)
+                for ext in child:
+                    if ext.tag == f'{XS}extension':
+                        base = ext.get('base')
+                        if base and base in type_attrs:
+                            attrs |= type_attrs[base]
+                        attrs |= collect_type_attrs(ext)
+        return attrs
+
+    type_attrs = {}  # type_name -> set of attr names
+    # Two-pass: first collect all, then resolve extensions
+    type_elems = {}
+    for ct in root.iterchildren(f'{XS}complexType'):
+        name = ct.get('name')
+        if name is None:
+            continue
+        type_elems[name] = ct
+
+    # Process types without extensions first, then with extensions
+    for name, ct in type_elems.items():
+        has_extension = ct.find(f'{XS}complexContent/{XS}extension') is not None
+        if not has_extension:
+            type_attrs[name] = collect_type_attrs(ct)
+    for name, ct in type_elems.items():
+        if name not in type_attrs:
+            type_attrs[name] = collect_type_attrs(ct)
+
+    # Step 3: Map element names to valid attributes
+    element_attrs = {}
+    for elem in root.iterchildren(f'{XS}element'):
+        name = elem.get('name')
+        type_name = elem.get('type')
+        if name and type_name and type_name in type_attrs:
+            element_attrs[name] = type_attrs[type_name]
+
+    # Step 4: Build reverse map
+    attr_elements = {}
+    for elem_name, attrs in element_attrs.items():
+        for attr in attrs:
+            if attr not in attr_elements:
+                attr_elements[attr] = []
+            attr_elements[attr].append(elem_name)
+
+    return element_attrs, attr_elements
+
+
+def validate_attribute_placement(file_path: Path, xsd_path: Path) -> tuple[bool, list[str]]:
+    """
+    Layer 3: Check that attributes are used on components that support them.
+    Catches misplaced attributes that XSD's anyAttribute wildcard allows through.
+
+    The XSD uses xs:anyAttribute in zkAttrGroup which permits any unqualified
+    attribute on any component. This check parses the XSD to determine which
+    attributes each component actually declares, then flags mismatches.
+
+    Returns:
+        (True, []) if all attributes are correctly placed
+        (False, [error_messages]) if misplaced attributes found
+    """
+    element_attrs, attr_elements = build_attribute_map(xsd_path)
+    if element_attrs is None:
+        return False, ["lxml is required for attribute placement check. Install with: pip install lxml"]
+
+    try:
+        from lxml import etree
+    except ImportError:
+        return False, ["lxml is required for attribute placement check."]
+
+    errors = []
+    ZUL_NS = "http://www.zkoss.org/2005/zul"
+    all_known_attrs = set(attr_elements.keys())
+
+    with open(file_path, 'rb') as f:
+        doc = etree.parse(f)
+
+    for elem in doc.iter():
+        tag = elem.tag
+        if not isinstance(tag, str) or '{' not in tag:
+            continue
+        ns, local = tag.split('}', 1)
+        ns = ns[1:]
+
+        if ns != ZUL_NS or local == 'zk':
+            continue
+
+        valid_attrs = element_attrs.get(local)
+        if valid_attrs is None:
+            continue
+
+        for attr_name in elem.attrib:
+            # Skip namespaced attributes (ca:, w:, client:, etc.)
+            if '{' in attr_name:
+                continue
+            # Skip attributes not defined anywhere in XSD (truly custom)
+            if attr_name not in all_known_attrs:
+                continue
+            if attr_name not in valid_attrs:
+                line = elem.sourceline if hasattr(elem, 'sourceline') else '?'
+                valid_on = sorted(attr_elements.get(attr_name, []))
+                hint = f"Valid on: {', '.join(valid_on[:8])}"
+                if len(valid_on) > 8:
+                    hint += f" (+{len(valid_on) - 8} more)"
+                errors.append(
+                    f"Line {line}: Attribute '{attr_name}' is not supported on <{local}>. {hint}"
+                )
+
+    return len(errors) == 0, errors
+
+
 REMOVED_ATTRIBUTES = {
     "autostart": (["audio"], "Deprecated since 7.0.0, use \"autoplay\" attribute instead."),
     "widths": (["box", "hbox", "vbox"], "Deprecated since 5.0.0, put <cell width> inside instead."),
@@ -166,8 +351,8 @@ REMOVED_COMPONENTS = {
 
 def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
     """
-    Layer 3: Check for ZK 10 compatibility issues that may not be caught by XSD.
-    (e.g., deprecated or removed attributes allowed by XSD wildcards)
+    Layer 4: Check for ZK 10 compatibility issues.
+    (e.g., deprecated or removed attributes)
 
     Returns:
         (True, []) if compatible
@@ -188,6 +373,9 @@ def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
         
         # Check all elements
         for elem in root.iter():
+            # Skip non-element nodes (comments, PIs) where tag is callable
+            if not isinstance(elem.tag, str):
+                continue
             # Get local name (without namespace)
             tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
             tag_lower = tag.lower()
@@ -196,7 +384,7 @@ def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
             
             # Check for removed components
             if tag_lower in REMOVED_COMPONENTS:
-                errors.append(f"{line_str}ZK 10 Compatibility: Component <{tag}> is removed. {REMOVED_COMPONENTS[tag_lower]}")
+                errors.append(f"{line_str}Component <{tag}> is removed. {REMOVED_COMPONENTS[tag_lower]}")
             
             # Check for removed attributes
             for attr_name, attr_value in elem.attrib.items():
@@ -205,7 +393,7 @@ def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
                 if attr_name_local in REMOVED_ATTRIBUTES:
                     components, hint = REMOVED_ATTRIBUTES[attr_name_local]
                     if tag_lower in components:
-                        errors.append(f"{line_str}ZK 10 Compatibility: Attribute '{attr_name_local}' on <{tag}> is removed. {hint}")
+                        errors.append(f"{line_str}Attribute '{attr_name_local}' on <{tag}> is removed. {hint}")
 
         return len(errors) == 0, errors
 
@@ -251,9 +439,24 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
     else:
         print("Layer 2: XSD Schema Validation... SKIPPED")
 
-    # Layer 3: ZK 10 Compatibility
+    # Layer 3: Attribute Placement Check
+    if not skip_xsd:
+        xsd_path = Path(xsd_source) if not xsd_source.startswith(('http://', 'https://')) else DEFAULT_XSD_PATH
+        print("Layer 3: Attribute Placement... ", end="")
+        is_valid, errors = validate_attribute_placement(file_path, xsd_path)
+        if is_valid:
+            print("✓ PASS")
+        else:
+            print("✗ FAIL")
+            for error in errors:
+                print(f"  {error}")
+            all_valid = False
+    else:
+        print("Layer 3: Attribute Placement... SKIPPED")
+
+    # Layer 4: ZK 10 Compatibility
     if zk_version.startswith("10"):
-        print("Layer 3: ZK 10 Compatibility... ", end="")
+        print("Layer 4: ZK 10 Compatibility... ", end="")
         is_valid, errors = validate_zk10_compatibility(file_path)
         if is_valid:
             print("✓ PASS")
@@ -263,7 +466,7 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
                 print(f"  {error}")
             all_valid = False
     else:
-        print(f"Layer 3: ZK 10 Compatibility... SKIPPED (Version {zk_version} specified)")
+        print(f"Layer 4: ZK 10 Compatibility... SKIPPED (Version {zk_version} specified)")
 
     print("-" * 50)
     if all_valid:
