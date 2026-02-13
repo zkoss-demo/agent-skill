@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk xmlns="http://www.zkoss.org/2005/zul" xmlns:ca="client/attribute">
+    <window title="Search Form" border="normal">
+        <hlayout valign="middle">
+            <!-- BUG: textbox does not support iconSclass -->
+            <!-- iconSclass belongs to LabelImageElement (button, tab, menuitem, etc.) -->
+            <textbox id="searchBox" hflex="min" width="260px"
+                     ca:placeholder="Search by reference, description..."
+                     iconSclass="z-icon-search"/>
+            <button label="Search" iconSclass="z-icon-search"/>
+        </hlayout>
+    </window>
+</zk>
