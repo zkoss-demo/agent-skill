@@ -8,9 +8,16 @@ maven is required.
 
 # Prompts to zul 
 
-| Prompt | Zul |
-| --- | --- |
-| **Personal Profile Info**: A page displaying read-only user information with labels (e.g., Tax ID, Full Name, Parent's Name) and values. Includes a primary confirmation button at the bottom right. | [user-info.zul](src/main/webapp/zk9/user-info.zul) |
+| Prompt | Zul                                                              |
+| --- |------------------------------------------------------------------|
+| **Personal Profile Info**: A page displaying read-only user information with labels (e.g., Tax ID, Full Name, Parent's Name) and values. Includes a primary confirmation button at the bottom right. | [user-info.zul](src/main/webapp/zk9/user-info.zul)               |
+| **Order Confirmation Page**: A read-only page summarizing an order after a purchase. Includes order number, list of items, total price, and shipping address. A "Print" button might be present. | [order-summary.zul](src/main/webapp/order-summary.zul)           |
+| **Product Catalog Listing**: A page displaying a list of products with basic information (name, price, image). Includes a search bar and filters. | [product-list.zul](src/main/webapp/zk9/product-list.zul)         |
+| **Application Dashboard & Activity Feed**: A layout with a header. Main content area contains status summary boxes (Application Status, ID, Date, Amount) and a separate section for recent messages/notifications in a list format. | [app-dashboard.zul](src/main/webapp/app-dashboard.zul)           |
+| **Financial Document Processing**: A header-based form for document details. Includes a tabbed interface (Tabbox) with different sections (e.g., Disbursement, Posting Details). Inside a tab is a data grid for line items. Bottom section contains action radio buttons and save/submit buttons. | [financial-document.zul](src/main/webapp/financial-document.zul) |
+|  **Multi-level Navigation Dashboard**: A complex layout featuring a collapsible sidebar menu with hierarchical "tree-like" navigation. The main area displays recent tasks in a grid with filters and sorting options. | [nav-dashboard.zul](src/main/webapp/nav-dashboard.zul)           |
+|  **Admin Search & Management Grid**: A comprehensive management page with a search filter bar at the top (Status, Date range). Below is a large data grid with checkboxes for bulk actions, numerous columns (Event ID, Type, Status, Context, Timestamps), and pagination controls at the bottom. | [event-management.zul](src/main/webapp/event-management.zul)     |
+| *   **Bank Reconciliation System**: A dense, tabular interface for financial reconciliation. Features a multi-row header, a toolbar with action buttons, a set of tabs for different reconciliation types, and a large data grid with many columns for transaction details. | [bank-reconciliation.zul](src/main/webapp/bank-reconciliation.zul)                                                                 |
 
 # Screenshots to zul
 * ![Bank Reconciliation Dashboard.png](ui-screenshots/Bank%20Reconciliation%20Dashboard.png) -> [bank-reconciliation.zul](src/main/webapp/bank-reconciliation.zul)
