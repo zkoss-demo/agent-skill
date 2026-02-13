@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?page title="Product Management"?>
-<zk xmlns="http://www.zkoss.org/2005/zul">
+<zk>
     <borderlayout hflex="1" vflex="1"
                   viewModel="@id('vm') @init('com.example.vm.ProductViewModel')">
         <north height="50px" border="none">

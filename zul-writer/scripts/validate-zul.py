@@ -15,6 +15,8 @@ revised local schema in ../assets/zul.xsd. Use --xsd to override it.
 
 import sys
 import argparse
+import re
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -22,6 +24,34 @@ from pathlib import Path
 # Default to the revised local schema file
 DEFAULT_XSD_PATH = Path(__file__).parent.parent / "assets" / "zul.xsd"
 ZK_XSD_URL = "http://www.zkoss.org/2005/zul/zul.xsd"
+ZK_NS = "http://www.zkoss.org/2005/zul"
+
+
+def inject_default_namespace(file_path: Path) -> Path | None:
+    """
+    ZK's default namespace (http://www.zkoss.org/2005/zul) is implicit —
+    ZUL files don't need to declare it. For XSD/attribute validation,
+    inject it into a temp copy if missing.
+
+    Returns temp file path if injection was needed, None if already present.
+    """
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    if f'xmlns="{ZK_NS}"' in content:
+        return None
+
+    # Find the first real element tag (skip PIs <?...?> and comments)
+    match = re.search(r'<([a-zA-Z][\w.-]*)', content)
+    if not match:
+        return None
+
+    modified = content[:match.end()] + f' xmlns="{ZK_NS}"' + content[match.end():]
+
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.zul', delete=False)
+    tmp.write(modified)
+    tmp.close()
+    return Path(tmp.name)
 
 
 def validate_xml_wellformedness(file_path: Path) -> tuple[bool, str | None]:
@@ -425,34 +455,43 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
         # Skip Layer 2 if XML is malformed
         return False
 
-    # Layer 2: XSD Schema Validation
-    if not skip_xsd:
-        print("Layer 2: XSD Schema Validation... ", end="")
-        is_valid, errors = validate_xsd_schema(file_path, xsd_source)
-        if is_valid:
-            print("✓ PASS")
-        else:
-            print("✗ FAIL")
-            for error in errors:
-                print(f"  {error}")
-            all_valid = False
-    else:
-        print("Layer 2: XSD Schema Validation... SKIPPED")
+    # For Layer 2 & 3: inject default ZK namespace if not declared
+    # (ZK treats http://www.zkoss.org/2005/zul as implicit default)
+    ns_injected_path = inject_default_namespace(file_path) if not skip_xsd else None
+    schema_file = ns_injected_path or file_path
 
-    # Layer 3: Attribute Placement Check
-    if not skip_xsd:
-        xsd_path = Path(xsd_source) if not xsd_source.startswith(('http://', 'https://')) else DEFAULT_XSD_PATH
-        print("Layer 3: Attribute Placement... ", end="")
-        is_valid, errors = validate_attribute_placement(file_path, xsd_path)
-        if is_valid:
-            print("✓ PASS")
+    try:
+        # Layer 2: XSD Schema Validation
+        if not skip_xsd:
+            print("Layer 2: XSD Schema Validation... ", end="")
+            is_valid, errors = validate_xsd_schema(schema_file, xsd_source)
+            if is_valid:
+                print("✓ PASS")
+            else:
+                print("✗ FAIL")
+                for error in errors:
+                    print(f"  {error}")
+                all_valid = False
         else:
-            print("✗ FAIL")
-            for error in errors:
-                print(f"  {error}")
-            all_valid = False
-    else:
-        print("Layer 3: Attribute Placement... SKIPPED")
+            print("Layer 2: XSD Schema Validation... SKIPPED")
+
+        # Layer 3: Attribute Placement Check
+        if not skip_xsd:
+            xsd_path = Path(xsd_source) if not xsd_source.startswith(('http://', 'https://')) else DEFAULT_XSD_PATH
+            print("Layer 3: Attribute Placement... ", end="")
+            is_valid, errors = validate_attribute_placement(schema_file, xsd_path)
+            if is_valid:
+                print("✓ PASS")
+            else:
+                print("✗ FAIL")
+                for error in errors:
+                    print(f"  {error}")
+                all_valid = False
+        else:
+            print("Layer 3: Attribute Placement... SKIPPED")
+    finally:
+        if ns_injected_path:
+            ns_injected_path.unlink(missing_ok=True)
 
     # Layer 4: ZK 10 Compatibility
     if zk_version.startswith("10"):
