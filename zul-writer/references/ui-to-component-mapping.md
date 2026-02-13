@@ -9,8 +9,8 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Header / sidebar / content regions | `<borderlayout>` with `<north>`, `<west>`, `<center>` | Use for full-page layouts |
 | Vertical stack | `<vlayout>` | |
 | Horizontal row | `<hlayout>` | |
-| Tabs / tab-styled navigation bar | `<tabbox>` with `<tabs>` + `<tabpanels>` | Includes nav bars with tab-like buttons — never use `<n:button>` for these |
-| Accordion | `<tabbox>` with `mold="accordion"` | |
+| Navigation tabs (tabs that switch visible content) | `<tabbox>` with `<tabs>` + `<tabpanels>` | All content below the tab strip belongs INSIDE `<tabpanel>` — never place it as siblings outside `<tabbox>` |
+| Accordion | `<tabbox mold="accordion">` | |
 | Splitter panels | `<splitlayout>`  | |
 | Card / panel | `<groupbox>` or `<panel>` | `<groupbox>` for titled sections |
 | Grid-aligned form | `<grid>` with `<columns>` + `<rows>` | Label + input pairs |

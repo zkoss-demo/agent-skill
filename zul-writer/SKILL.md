@@ -37,8 +37,9 @@ Detect from user's project (check `pom.xml`, `ivy.xml`, or `build.gradle` for ZK
 - Other: [specify]
 
 #### 3. MVC or MVVM Pattern
-- **MVC**: Composer-based with `apply` attribute and wired components
-- **MVVM**: ViewModel-based with data binding (`@load`, `@save`, `@bind`, `@command`)
+Present both options with equal weight — do NOT mark either as "(Recommended)":
+- **MVVM**: ViewModel-based with `@bind`/`@command` data binding — testable, requires more ZK familiarity
+- **MVC**: Composer-based with `apply` and wired components — straightforward, beginner-friendly
 
 #### 4. Layout Requirements
 - Borderlayout (north/south/east/west/center)
@@ -56,10 +57,13 @@ When user provides a UI screenshot or mockup image:
 
 1. **Analyze the image** - Identify all visible UI elements: layout structure, input fields, buttons, data tables, navigation, labels, icons
 2. **Map to ZK components** - Consult [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) for element-to-component mapping. Prioritize ZK components; fall back to `<n:div>` + CSS only when no suitable ZK component exists
-3. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
-4. **Ask clarifications** - Confirm ZK version and MVC/MVVM preference if not already known. Ask about any ambiguous UI elements
-5. **Generate ZUL** - Proceed to Step 2 with the analyzed requirements
-6. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<style>` element (not `<?style ?>` processing instruction)
+3. **Identify tab content scope** - When tabs are present, determine what content belongs inside each `<tabpanel>`:
+   - **Content tabs** (tabs that switch visible content below): all content below the tab strip up to the next major layout boundary belongs INSIDE `<tabpanel>`, not as siblings outside `<tabbox>`. See [assets/content-tabbox.zul](assets/content-tabbox.zul)
+   - **Navigation-only tabs** (top menu bars, routing tabs): use empty `<tabpanel/>` elements
+4. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
+5. **Ask clarifications** - Confirm ZK version and MVC/MVVM preference if not already known. Ask about any ambiguous UI elements
+6. **Generate ZUL** - Proceed to Step 2 with the analyzed requirements
+7. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<style>` element (not `<?style ?>` processing instruction)
 
 ---
 
@@ -103,10 +107,11 @@ Always start with proper XML declaration and ZK namespaces: [assets/template.zul
 Run validation: `scripts/validate-zul.py`
 - Layer 1: XML well-formedness (no dependencies)
 - Layer 2: XSD schema validation (requires `lxml`)
-- Layer 3: ZK 10 compatibility checks (only if target ZK version is 10)
+- Layer 3: Attribute placement check (requires `lxml`) - catches misplaced attributes (e.g. `iconSclass` on `textbox`)
+- Layer 4: ZK 10 compatibility checks (only if target ZK version is 10)
 
 ### Prerequisites
-Layer 2 requires `lxml`. If missing:
+Layer 2 and 3 require `lxml`. If missing:
 
 1. Check for `uv`: `which uv`
 2. If `uv` available: `uv pip install lxml`, run script via `uv run`

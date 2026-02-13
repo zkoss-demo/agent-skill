@@ -1,0 +1,19 @@
+<!-- Content tabs: all content below the tab strip goes INSIDE <tabpanel>, not as siblings outside <tabbox> -->
+<tabbox hflex="1" vflex="1">
+    <tabs>
+        <tab label="Tab A" selected="true"/>
+        <tab label="Tab B"/>
+        <tab label="Tab C"/>
+    </tabs>
+    <tabpanels>
+        <tabpanel>
+            <!-- tab A content here (toolbars, filters, tables, etc.) -->
+        </tabpanel>
+        <tabpanel>
+            <!-- tab B content here -->
+        </tabpanel>
+        <tabpanel>
+            <!-- tab C content here -->
+        </tabpanel>
+    </tabpanels>
+</tabbox>
