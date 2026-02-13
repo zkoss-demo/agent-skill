@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="User Information"?>
+<zk xmlns="http://www.zkoss.org/2005/zul"
+    xmlns:n="native">
+    <window id="userInfoWin" title="User Information" border="normal"
+            width="600px"
+            viewModel="@id('vm') @init('zwriter.UserInfoViewModel')">
+        <vlayout spacing="10px" style="padding: 10px">
+            <grid hflex="1" sclass="form-grid">
+                <columns>
+                    <column width="150px" align="right"/>
+                    <column/>
+                </columns>
+                <rows>
+                    <row>
+                        <label value="Tax ID:"/>
+                        <label value="@load(vm.user.taxId)"/>
+                    </row>
+                    <row>
+                        <label value="Full Name:"/>
+                        <label value="@load(vm.user.fullName)"/>
+                    </row>
+                    <row>
+                        <label value="Parent's Name:"/>
+                        <label value="@load(vm.user.parentName)"/>
+                    </row>
+                    <row>
+                        <label value="Date of Birth:"/>
+                        <label value="@load(vm.user.dateOfBirth)"/>
+                    </row>
+                    <row>
+                        <label value="Address:"/>
+                        <label value="@load(vm.user.address)"/>
+                    </row>
+                    <row>
+                        <label value="Phone Number:"/>
+                        <label value="@load(vm.user.phoneNumber)"/>
+                    </row>
+                    <row>
+                        <label value="Email:"/>
+                        <label value="@load(vm.user.email)"/>
+                    </row>
+                </rows>
+            </grid>
+            <separator/>
+            <hlayout hflex="1" style="justify-content: flex-end">
+                <button label="Confirm" onClick="@command('confirm')"
+                        sclass="btn-primary" hflex="min"/>
+            </hlayout>
+        </vlayout>
+    </window>
+</zk>

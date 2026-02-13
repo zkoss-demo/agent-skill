@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk xmlns="http://www.zkoss.org/2005/zk/config"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.zkoss.org/2005/zk/config http://www.zkoss.org/2005/zk/config/zk.xsd">
+	<client-config>
+		<debug-js>true</debug-js>
+	</client-config>
+<!--		<enable-source-map>true</enable-source-map>-->
+<!--		<error-reload>-->
+<!--			<device-type>ajax</device-type>-->
+<!--			<error-code>403</error-code>-->
+<!--			<reload-uri>/timeout.zul</reload-uri>-->
+<!--		</error-reload>-->
+	<system-config>
+		<id-generator-class>org.zkoss.zk.ui.impl.StaticIdGenerator</id-generator-class>
+	</system-config>
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zkmax.tablet.ui.disabled</name>-->
+<!--		<value>true</value>-->
+<!--	</library-property>-->
+
+<!--	<listener>-->
+<!--		<listener-class>ticket.EventThreadCleanup</listener-class>-->
+<!--	</listener>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zk.ui.processMask.enabled</name>-->
+<!--		<value>true</value>-->
+<!--	</library-property>-->
+<!--		<listener-class>ticket.MyExecutionInit</listener-class>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zk.ui.activate.wait.retry.timeout</name>-->
+<!--		<value>2000</value>-->
+<!--	</library-property>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zk.ui.activate.wait.retry.abort</name>-->
+<!--		<value>true</value>-->
+<!--	</library-property>-->
+<!--	<listener>-->
+<!--		<listener-class>bug.DeadDesktopIntercepter</listener-class>-->
+<!--	</listener>-->
+<!--	<listener>-->
+<!--		<listener-class>immediando.SystemEventQueueComposer</listener-class>-->
+<!--	</listener>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zkmax.tablet.ui.disabled</name>-->
+<!--		<value>true</value>-->
+<!--	</library-property>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zkmax.touch.disabled</name>-->
+<!--		<value>true</value>-->
+<!--	</library-property>-->
+	<session-config>
+<!--		<max-desktops-per-session>2</max-desktops-per-session>-->
+		<device-type>ajax</device-type>
+<!--	    <session-timeout>5</session-timeout>-->
+	    <timeout-uri>/</timeout-uri>
+		<automatic-timeout>true</automatic-timeout>
+		<timeout-message>session timeout.</timeout-message>
+
+		<!--
+	    <timer-keep-alive>true</timer-keep-alive>
+		<timeout-message>script:<![CDATA[
+		   $('body').append('<div id="z-timeout"><span>Timeout, <b>move mouse</b> to refresh...<img src="/zkdemo/images/refresh2.gif" style="display:none;"/></span></div>');
+		   $("#z-timeout").slideDown(1000);
+		   $('body').mouseover(function() {
+		     $("img","#z-timeout").show();
+			 $('#container > div:gt(0)').fadeOut(1000);
+			 setTimeout("location.reload()", 1500);
+		   });
+		    if (zk.cpsp != null){
+		        zk.cpsp.stop();
+		    }
+	    ]]></timeout-message>
+	    <timeout-message>script:<![CDATA[
+	    alert('timeout');
+	    $('body').append('<div id="timeout"><span>Timeout</span></div>');
+	    $("#z-timeout").slideDown(1000);
+	    ]]></timeout-message>
+		 -->
+	</session-config>
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zk.WPD.cache</name>-->
+<!--		<value>false</value>-->
+<!--	</library-property>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.web.preferred.locale</name>-->
+<!--		<value>zh</value>-->
+<!--	</library-property>-->
+<!--	<system-config>-->
+<!--		<ui-factory-class>org.zkoss.zk.ui.http.SerializableUiFactory</ui-factory-class>-->
+<!--	</system-config>-->
+	<error-page>
+		<exception-type>java.lang.Throwable</exception-type>
+		<location>/error.zul</location>
+	</error-page>
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zkmax.tablet.ui.disabled</name>-->
+<!--		<value>true</value>-->
+<!--	</library-property>-->
+
+	<!--	<library-property>-->
+<!--		<name>org.zkoss.theme.preferred</name>-->
+<!--		<value>breeze</value>-->
+<!--	</library-property>-->
+<!--	<listener>-->
+<!--		<listener-class>org.zkoss.zkmax.au.websocket.WebSocketWebAppInit</listener-class>-->
+<!--	</listener>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zkmax.au.websocket.WebSocketEndPoint.reconnectionAttempts</name>-->
+<!--		<value>3</value>-->
+<!--	</library-property>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.web.util.resource.dir</name>-->
+<!--		<value>/zkpatch</value>-->
+<!--	</library-property>-->
+<!--	<xel-config>-->
+<!--		<evaluator-class>org.zkoss.zel.impl.ExpressionFactoryImpl</evaluator-class>-->
+<!--	</xel-config>-->
+<!--<language-config>-->
+<!--    <addon-uri>/metainfo/zk/a11y-addon.xml</addon-uri>-->
+<!--</language-config>-->
+<!--<library-property>-->
+<!--    <name>org.zkoss.bind.DebuggerFactory.enable</name>-->
+<!--    <value>true</value>-->
+<!--</library-property>-->
+<!--&lt;!&ndash;-->
+
+
+<!--<device-config>-->
+<!--   <device-type>ajax</device-type>-->
+<!--   <embed><![CDATA[-->
+<!--        <script type="text/javascript" src="/zk8support/zkpatch/errorbox-zk-5568-another.js"></script>-->
+<!--    ]]></embed>-->
+<!--</device-config>-->
+<!--	<system-property>-->
+<!--		<name>org.zkoss.zel.impl.parser.COERCE_TO_ZERO</name>-->
+<!--		<value>true</value>-->
+<!--	</system-property>-->
+<!--	<library-property>-->
+<!--		<name>org.zkoss.zul.nativebar</name>-->
+<!--		<value>false</value>-->
+<!--	</library-property>-->
+<!--<library-property>-->
+<!--    <name>org.zkoss.zkex.ui.comet.smartconnection.disabled</name>-->
+<!--    <value>false</value>-->
+<!--  </library-property>-->
+<!--	<system-config>-->
+<!--		<file-repository>/Users/hawk/Downloads</file-repository>-->
+<!--	</system-config>-->
+<!--<richlet>-->
+<!--    <richlet-name>T2802</richlet-name>-->
+<!--    <richlet-class>support.issue.T2802Richlet</richlet-class>-->
+<!--</richlet>-->
+<!--<richlet-mapping>-->
+<!--    <richlet-name>T2802</richlet-name>-->
+<!--    <url-pattern>/t2802</url-pattern>-->
+<!--</richlet-mapping>-->
+</zk>

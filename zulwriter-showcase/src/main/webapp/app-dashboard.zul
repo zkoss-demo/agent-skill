@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Application Dashboard"?>
+<zk xmlns="http://www.zkoss.org/2005/zul"
+    xmlns:n="native">
+    <borderlayout hflex="1" vflex="1"
+                  apply="zwriter.AppDashboardComposer">
+
+        <!-- Header -->
+        <north height="60px" border="none">
+            <div sclass="dashboard-header"
+                 style="background: #1565c0; color: white; padding: 0 24px;
+                        display: flex; align-items: center; height: 100%">
+                <hlayout valign="middle" hflex="1" style="height: 100%; align-items: center">
+                    <label value="Application Dashboard"
+                           style="font-size: 22px; font-weight: bold; color: white"/>
+                    <space hflex="1"/>
+                    <label id="currentDateLabel"
+                           style="font-size: 13px; color: rgba(255,255,255,0.85)"/>
+                </hlayout>
+            </div>
+        </north>
+
+        <!-- Main Content -->
+        <center border="none" style="background: #f5f5f5">
+            <vlayout hflex="1" vflex="1" spacing="16px"
+                     style="padding: 24px; overflow: auto">
+
+                <!-- Status Summary Section -->
+                <label value="Status Summary"
+                       style="font-size: 18px; font-weight: bold; color: #333"/>
+
+                <hlayout hflex="1" spacing="16px">
+
+                    <!-- Application Status Card -->
+                    <vlayout id="statusCard" hflex="1"
+                             style="background: white; border-radius: 8px;
+                                    padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12)">
+                        <label value="Application Status"
+                               style="font-size: 12px; color: #888; text-transform: uppercase;
+                                      letter-spacing: 0.5px"/>
+                        <label id="appStatusLabel"
+                               style="font-size: 24px; font-weight: bold; color: #2e7d32;
+                                      margin-top: 8px"/>
+                        <label id="appStatusDetailLabel"
+                               style="font-size: 12px; color: #666; margin-top: 4px"/>
+                    </vlayout>
+
+                    <!-- Application ID Card -->
+                    <vlayout id="idCard" hflex="1"
+                             style="background: white; border-radius: 8px;
+                                    padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12)">
+                        <label value="Application ID"
+                               style="font-size: 12px; color: #888; text-transform: uppercase;
+                                      letter-spacing: 0.5px"/>
+                        <label id="appIdLabel"
+                               style="font-size: 24px; font-weight: bold; color: #1565c0;
+                                      margin-top: 8px"/>
+                        <label id="appIdDetailLabel"
+                               style="font-size: 12px; color: #666; margin-top: 4px"/>
+                    </vlayout>
+
+                    <!-- Date Card -->
+                    <vlayout id="dateCard" hflex="1"
+                             style="background: white; border-radius: 8px;
+                                    padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12)">
+                        <label value="Submission Date"
+                               style="font-size: 12px; color: #888; text-transform: uppercase;
+                                      letter-spacing: 0.5px"/>
+                        <label id="submissionDateLabel"
+                               style="font-size: 24px; font-weight: bold; color: #333;
+                                      margin-top: 8px"/>
+                        <label id="submissionDateDetailLabel"
+                               style="font-size: 12px; color: #666; margin-top: 4px"/>
+                    </vlayout>
+
+                    <!-- Amount Card -->
+                    <vlayout id="amountCard" hflex="1"
+                             style="background: white; border-radius: 8px;
+                                    padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12)">
+                        <label value="Amount"
+                               style="font-size: 12px; color: #888; text-transform: uppercase;
+                                      letter-spacing: 0.5px"/>
+                        <label id="amountLabel"
+                               style="font-size: 24px; font-weight: bold; color: #e65100;
+                                      margin-top: 8px"/>
+                        <label id="amountDetailLabel"
+                               style="font-size: 12px; color: #666; margin-top: 4px"/>
+                    </vlayout>
+
+                </hlayout>
+
+                <separator/>
+
+                <!-- Recent Messages / Notifications Section -->
+                <hlayout valign="middle" hflex="1">
+                    <label value="Recent Messages"
+                           style="font-size: 18px; font-weight: bold; color: #333"/>
+                    <space hflex="1"/>
+                    <label id="messageCountLabel"
+                           style="font-size: 13px; color: #666"/>
+                </hlayout>
+
+                <listbox id="messageListbox" hflex="1" height="320px"
+                         nonselectableTags="*"
+                         emptyMessage="No recent messages."
+                         style="border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12)">
+                    <listhead>
+                        <listheader label="" width="40px" align="center"/>
+                        <listheader label="Subject" hflex="3"/>
+                        <listheader label="From" hflex="1"/>
+                        <listheader label="Date" width="140px"/>
+                        <listheader label="Priority" width="90px" align="center"/>
+                    </listhead>
+                </listbox>
+
+                <!-- Actions Bar -->
+                <hlayout hflex="1" style="justify-content: flex-end">
+                    <space hflex="1"/>
+                    <button id="refreshBtn" label="Refresh"
+                            iconSclass="z-icon-refresh"/>
+                    <button id="viewAllBtn" label="View All Messages"
+                            iconSclass="z-icon-envelope"/>
+                </hlayout>
+
+            </vlayout>
+        </center>
+
+    </borderlayout>
+</zk>

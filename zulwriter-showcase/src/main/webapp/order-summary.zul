@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Order Summary"?>
+<zk xmlns="http://www.zkoss.org/2005/zul"
+    xmlns:n="native">
+    <window id="orderSummaryWin" title="Order Summary" border="normal"
+            width="700px" closable="false"
+            apply="zwriter.OrderSummaryComposer">
+        <vlayout spacing="12px" style="padding: 16px">
+
+            <!-- Order Header -->
+            <hlayout valign="middle" hflex="1">
+                <vlayout hflex="1">
+                    <label id="orderNumberLabel" style="font-size: 20px; font-weight: bold"/>
+                    <label id="orderDateLabel" style="color: #666; font-size: 13px"/>
+                </vlayout>
+                <label id="orderStatusLabel" sclass="order-status"
+                       style="font-size: 14px; font-weight: bold; color: #2e7d32;
+                              background: #e8f5e9; padding: 4px 12px; border-radius: 4px"/>
+            </hlayout>
+
+            <separator/>
+
+            <!-- Order Items -->
+            <label value="Items Ordered" style="font-size: 16px; font-weight: bold"/>
+            <listbox id="itemListbox" hflex="1" nonselectableTags="*"
+                     emptyMessage="No items in this order.">
+                <listhead>
+                    <listheader label="#" width="40px" align="center"/>
+                    <listheader label="Product" hflex="3"/>
+                    <listheader label="Qty" width="60px" align="center"/>
+                    <listheader label="Unit Price" width="110px" align="right"/>
+                    <listheader label="Subtotal" width="110px" align="right"/>
+                </listhead>
+            </listbox>
+
+            <!-- Totals Section -->
+            <vlayout hflex="1" style="border-top: 2px solid #ddd; padding-top: 10px">
+                <hlayout hflex="1">
+                    <space hflex="1"/>
+                    <vlayout style="min-width: 220px">
+                        <hlayout hflex="1">
+                            <label value="Subtotal:" hflex="1" style="text-align: right; padding-right: 12px"/>
+                            <label id="subtotalLabel" style="font-weight: bold; min-width: 90px; text-align: right"/>
+                        </hlayout>
+                        <hlayout hflex="1">
+                            <label value="Shipping:" hflex="1" style="text-align: right; padding-right: 12px"/>
+                            <label id="shippingLabel" style="min-width: 90px; text-align: right"/>
+                        </hlayout>
+                        <hlayout hflex="1">
+                            <label value="Tax:" hflex="1" style="text-align: right; padding-right: 12px"/>
+                            <label id="taxLabel" style="min-width: 90px; text-align: right"/>
+                        </hlayout>
+                        <separator bar="true"/>
+                        <hlayout hflex="1">
+                            <label value="Total:" hflex="1" style="text-align: right; padding-right: 12px; font-size: 16px; font-weight: bold"/>
+                            <label id="totalLabel" style="font-size: 16px; font-weight: bold; color: #1565c0; min-width: 90px; text-align: right"/>
+                        </hlayout>
+                    </vlayout>
+                </hlayout>
+            </vlayout>
+
+            <separator/>
+
+            <!-- Shipping Address -->
+            <label value="Shipping Address" style="font-size: 16px; font-weight: bold"/>
+            <vlayout id="addressBlock" style="background: #f5f5f5; padding: 12px; border-radius: 4px">
+                <label id="recipientLabel" style="font-weight: bold"/>
+                <label id="addressLine1Label"/>
+                <label id="addressLine2Label"/>
+                <label id="cityStateZipLabel"/>
+                <label id="countryLabel"/>
+            </vlayout>
+
+            <separator/>
+
+            <!-- Print Button -->
+            <hlayout hflex="1" style="justify-content: flex-end">
+                <space hflex="1"/>
+                <button id="printBtn" label="Print" iconSclass="z-icon-print"/>
+            </hlayout>
+
+        </vlayout>
+    </window>
+</zk>
