@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?page title="Event Management"?>
+<?taglib uri="http://www.zkoss.org/dsp/web/core" prefix="c"?>
 <zk xmlns="http://www.zkoss.org/2005/zul"
     xmlns:n="native">
     <borderlayout hflex="1" vflex="1"
