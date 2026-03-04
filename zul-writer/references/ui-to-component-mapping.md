@@ -75,9 +75,9 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 - **Data tables** → Use `<listbox>` or `<grid>`, not `<n:table>`
 - **Modal dialogs** → Use `<window mode="modal">`, not `<n:div class="modal">`
 
-## Fallback Strategy: div + CSS
+## Fallback Strategy: HTML + CSS
 
-Only use native HTML via the `n:` namespace when **no** ZK component can achieve the UI pattern:
+Only use native HTML via the `n:` namespace when **no** ZK component can achieve the UI pattern e.g.:
 
 ```xml
 <!-- Card with custom styling -->
