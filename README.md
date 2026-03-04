@@ -38,6 +38,9 @@ zul-writer/
 - `valid/` — well-formed ZUL files that should pass validation
 - `wrong/` — ZUL files with known issues (malformed XML, invalid attributes)
 
+## [UI Screenshots](zulwriter-showcase/ui-screenshots/)
+Generated UI screenshots for testing with https://stitch.withgoogle.com/
+
 ## Install
 
 Symlink the skill to Claude Code's global skill directory (`~/.claude/skills/`):
