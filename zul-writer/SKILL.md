@@ -49,6 +49,10 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 - Tabbed layout (tabbox)
 - Combined layouts
 
+#### 5. ZK Charts (only when charts are needed)
+
+If the ZUL page requires a `<charts>` component, read [references/charts-dependency.md](references/charts-dependency.md) and follow the dependency-check steps before generating any chart code.
+
 ---
 
 ## Image-to-ZUL Workflow
