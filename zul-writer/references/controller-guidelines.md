@@ -29,3 +29,49 @@ When writing a ViewModel for the MVVM pattern:
 4. **Commands**: Use the `@Command` annotation on methods triggered by UI interactions (buttons, listbox changes). If a command requires context from the UI, use `@BindingParam("paramName")` in the method signature.
 5. **Notification**: Use the `@NotifyChange` annotation on `@Command` methods to explicitly declare which properties have changed and require UI re-rendering (e.g., `@NotifyChange({"filteredList", "totalSize", "activePage"})`).
 6. **Data Processing**: Keep filtering, sorting, and paging logic inside the ViewModel acting on the sample data to provide a fully functional example of data manipulation.
+
+## Data Model Usage (Listbox & Grid)
+
+ZK components like `Listbox` and `Grid` use a model-driven rendering approach. Developers should manipulate the data model rather than the UI components directly.
+
+### 1. Model-Driven Rendering
+
+```mermaid
+graph TD
+    M[ListModel] -- notifies --> C[Component Listbox/Grid]
+    C -- requests data --> M
+    C -- invokes --> R[Renderer]
+    R -- creates --> V[View Listitem/Row]
+```
+
+*   **ListModel**: Stores domain objects and notifies the component of data changes.
+*   **Component**: Acts as a controller, listening for model changes and handling client events.
+*   **Renderer**: Composes the UI for each element in the model.
+
+### 2. Recommended Implementation: `ListModelList`
+
+For most collections, use `org.zkoss.zul.ListModelList`. It implements `java.util.List` and handles UI notifications automatically.
+
+```java
+ListModelList<String> model = new ListModelList<>(myDataList);
+// CRUD operations update the UI automatically
+model.add("New Item");
+model.remove(0);
+model.set(0, "Updated");
+```
+
+### 3. Selection & Sorting
+
+> [!IMPORTANT]
+> Do NOT use `listbox.setSelectedIndex()` or `listitem.setSelected()` when a model is assigned. Always use the `ListModel` API.
+
+*   **Selection**: Use `model.getSelection()` and `model.addToSelection(item)`.
+*   **Sorting**: Implement `org.zkoss.zul.ext.Sortable` in custom models. `ListModelList` supports sorting via `model.sort(comparator, ascending)`.
+
+### 4. Assignment Methods
+
+| Method | Example (ZUL) |
+| :--- | :--- |
+| **Composer (MVC)** | `<listbox id="mylist"/>` (wired in Java: `mylist.setModel(model)`) |
+| **Data Binding (MVVM)** | `<listbox model="@init(vm.items)"/>` |
+| **EL Expression** | `<listbox model="${items}"/>` |
