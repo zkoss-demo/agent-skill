@@ -1,0 +1,52 @@
+<zk>
+    <style>
+    .kanbantag{
+        display:inline-block;
+        line-height: 26px;
+        height:26px;
+        border-radius: 5px;
+        padding: 0px 6px;
+        margin-bottom: 5px;
+        color: white;
+    }
+    .z-portalchildren-frame&gt;.z-portalchildren-content .z-panel.kanbantask,.kanbantask .z-panel-body{
+        background-color: white;
+    }
+    </style>
+    <div viewModel="@id(&apos;vm&apos;)@init(&apos;demo.layout.kanban.KanbanViewModel&apos;)">
+        <portallayout orient="vertical">
+            <portalchildren title="Todo" counterVisible="true" hflex="1">
+                <forEach items="@init(vm.todoTasks)">
+                    <apply template="kanban-panel" item="${each}"/>
+                </forEach>
+            </portalchildren>
+            <portalchildren title="Active" counterVisible="true" hflex="1">
+                <forEach items="@init(vm.activeTasks)">
+                    <apply template="kanban-panel" item="${each}"/>
+                </forEach>
+            </portalchildren>
+            <portalchildren title="Complete" counterVisible="true" hflex="1">
+                <forEach items="@init(vm.completeTasks)">
+                    <apply template="kanban-panel" item="${each}"/>
+                </forEach>
+            </portalchildren>
+        </portallayout>
+    </div>
+    <template name="kanban-panel">
+        <panel border="normal" title="@load(item.taskName)" hflex="1" sclass="kanbantask">
+            <panelchildren>
+                <vlayout hflex="1">
+                    <label value="@load(item.taskDescription)"/>
+                    <hlayout>
+                        <image src="@load(item.taskImage)" style="width:30px;height30px;border-radius:15px;"/>
+                        <div hflex="1">
+                            <forEach items="@init(item.tags)" var="tag">
+                                <label value="@load(tag.label)" sclass="kanbantag" style="@load(&quot;background-color:&quot;.concat(tag.color))"/>
+                            </forEach>
+                        </div>
+                    </hlayout>
+                </vlayout>
+            </panelchildren>
+        </panel>
+    </template>
+</zk>

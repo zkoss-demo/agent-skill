@@ -149,8 +149,6 @@ For guidelines on writing controller code, refer to [references/controller-guide
 
 ---
 
-## Complete Examples
+### Complete Examples & Patterns
 
-* [Simple Form - MVVM](assets/example-simple-form-mvvm.zul)
-* [Data Management Page - MVVM](assets/example-data-management-mvvm.zul)
-* [Simple List Page - MVC](assets/example-simple-list-mvc.zul)
+For complex UI patterns like Kanban Boards or Dashboards, and for complete template examples, refer to [references/use-case-guidelines.md](references/use-case-guidelines.md).
