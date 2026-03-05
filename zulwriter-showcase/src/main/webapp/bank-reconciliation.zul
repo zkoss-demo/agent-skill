@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?page title="Bank Reconciliation Dashboard"?>
+<!-- Generated from: ui-screenshots/Bank Reconciliation Dashboard.png -->
 <zk xmlns="http://www.zkoss.org/2005/zul" xmlns:n="native" xmlns:ca="client/attribute" xmlns:w="client" xmlns:x="xhtml">
 <style>
     .recon-page { background: #f5f7fa; }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?page title="Monthly Feedback Dashboard"?>
+<!-- Generated from: ui-screenshots/Feedback Dashboard.png -->
 <zk xmlns="http://www.zkoss.org/2005/zul"
     xmlns:n="native">
 

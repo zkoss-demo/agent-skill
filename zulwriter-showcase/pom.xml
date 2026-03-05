@@ -38,9 +38,9 @@
             <version>${zk.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.30</version>
+            <groupId>org.zkoss.chart</groupId>
+            <artifactId>zkcharts</artifactId>
+            <version>12.2.0.0-Eval</version>
         </dependency>
     </dependencies>
     <licenses>
