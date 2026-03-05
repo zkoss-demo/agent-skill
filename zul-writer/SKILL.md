@@ -139,6 +139,8 @@ Do NOT skip Layer 2 silently. Always inform the user and guide through installat
 
 ### Controller Java Class Suggestions
 
+For guidelines on writing controller code, refer to [references/controller-guidelines.md](references/controller-guidelines.md).
+
 #### MVC Pattern - Composer Class
 [assets/MyComposer.java](assets/MyComposer.java)
 
