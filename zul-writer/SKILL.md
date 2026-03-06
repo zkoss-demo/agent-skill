@@ -6,11 +6,12 @@ description: Generate ZK Framework ZUL pages through a structured workflow. Use 
 
 ## Workflow Overview
 
-This skill creates well-structured ZUL pages through a 3-step process:
+This skill creates well-structured ZK pages through a 4-step process:
 
 1. **Clarify Requirements** - Gather page purpose, pattern, and layout needs
 2. **Generate ZUL** - Create the ZUL file based on requirements
-3. **Validate** - Verify correctness and suggest companion Java classes
+3. **Validate ZUL** - Verify correctness of the generated ZUL
+4. **Generate Controller Class** - Create the corresponding Java class (ViewModel or Composer)
 
 **Alternative entry**: When user provides a UI image (screenshot/mockup), skip to the image-to-ZUL workflow below.
 
@@ -66,7 +67,7 @@ When user provides a UI screenshot or mockup image:
    - **Navigation-only tabs** (top menu bars, routing tabs): use empty `<tabpanel/>` elements
 4. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
 5. **Ask clarifications** - Confirm ZK version and MVC/MVVM preference if not already known. Ask about any ambiguous UI elements
-6. **Generate ZUL** - Proceed to Step 2 with the analyzed requirements
+6. **Generate Files** - Proceed to Step 2 to generate the ZUL, then Step 3 for validation, and finally Step 4 to generate the mandatory Java controller class.
 7. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<style>` element (not `<?style ?>` processing instruction)
 
 ---
@@ -137,17 +138,23 @@ Do NOT skip Layer 2 silently. Always inform the user and guide through installat
 - Prefer `hflex`/`vflex` over fixed dimensions
 - Include meaningful labels and tooltips for accessibility
 
-### Controller Java Class Suggestions
 
-For guidelines on writing controller code, refer to [references/controller-guidelines.md](references/controller-guidelines.md).
+## Step 4: Generate Controller Class
+
+Generate the corresponding Java controller class (ViewModel or Composer) for the ZUL page. 
+
+### Controller Generation Guidelines
+
+1. **Pattern Consistency**: 
+   - Use **ViewModel** for MVVM patterns.
+   - Use **Composer** for MVC patterns.
+2. **Implementation Details**: Follow the technical requirements in [references/controller-guidelines.md](references/controller-guidelines.md).
 
 #### MVC Pattern - Composer Class
 [assets/MyComposer.java](assets/MyComposer.java)
 
 #### MVVM Pattern - ViewModel Class
 [assets/MyViewModel.java](assets/MyViewModel.java)
-
----
 
 ### Complete Examples & Patterns
 
