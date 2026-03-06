@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window id="compareRevisionsWin" title="Compare Revisions"
+        width="760px" mode="modal" closable="true" border="normal"
+        apply="zwriter.CompareRevisionsComposer"
+        xmlns:n="native">
+
+    <style>
+        .cr-subtitle { color: #666; font-size: 13px; margin: 0 0 16px; }
+        .cr-col-header { color: #aaa; font-size: 11px; font-weight: 700;
+                         letter-spacing: 0.08em; text-transform: uppercase; }
+        .cr-original { color: #555; }
+        .cr-original-modified { color: #bbb; text-decoration: line-through; }
+        .cr-field-label { font-weight: 700; font-size: 14px; color: #333; }
+        .cr-revised-modified { color: #1a6fc8; font-weight: 500; }
+        .cr-revised-critical { color: #d94f4f; font-weight: 700; }
+        .cr-badge {
+            display: inline-block;
+            background: #e5ecf5;
+            color: #6b8db8;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 3px;
+            margin-top: 3px;
+        }
+        .cr-avatar {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        .cr-footer-note { color: #aaa; font-size: 12px; }
+        .cr-btn-done {
+            background-color: #1a1a2e;
+            color: #fff;
+            border: none;
+            margin-left: 8px;
+        }
+        .cr-btn-done:hover { background-color: #2a2a4e; }
+        .cr-row-cell { padding: 14px 16px; vertical-align: middle; }
+    </style>
+
+    <!-- Subtitle -->
+    <n:p class="cr-subtitle">
+        Reviewing changes between <n:strong>v1.2 (Original)</n:strong> and <n:strong>v1.3 (Revised)</n:strong>
+    </n:p>
+
+    <!-- Comparison Grid -->
+    <grid id="comparisonGrid" hflex="1">
+        <columns>
+            <column hflex="1" align="right">
+                <n:span class="cr-col-header">ORIGINAL (V1.2)</n:span>
+            </column>
+            <column width="220px" align="center">
+                <n:span class="cr-col-header">FIELD NAME</n:span>
+            </column>
+            <column hflex="1">
+                <n:span class="cr-col-header">REVISED (V1.3)</n:span>
+            </column>
+        </columns>
+        <rows>
+
+            <!-- Reference ID (unchanged) -->
+            <row>
+                <label value="REF-99201" sclass="cr-original"/>
+                <label value="Reference ID" sclass="cr-field-label"/>
+                <label value="REF-99201"/>
+            </row>
+
+            <!-- Status (modified) -->
+            <row>
+                <label value="Pending" sclass="cr-original-modified"/>
+                <vlayout spacing="0">
+                    <label value="Status" sclass="cr-field-label"/>
+                    <n:span class="cr-badge">MODIFIED</n:span>
+                </vlayout>
+                <hlayout valign="middle">
+                    <label value="Approved" sclass="cr-revised-modified"/>
+                    <label value=" ✓" sclass="cr-revised-modified"/>
+                </hlayout>
+            </row>
+
+            <!-- Modified Date (modified) -->
+            <row>
+                <label value="2023-10-01 10:00" sclass="cr-original-modified"/>
+                <vlayout spacing="0">
+                    <label value="Modified Date" sclass="cr-field-label"/>
+                    <n:span class="cr-badge">MODIFIED</n:span>
+                </vlayout>
+                <label value="2023-10-02 14:30" sclass="cr-revised-modified"/>
+            </row>
+
+            <!-- Modified By (modified) -->
+            <row>
+                <label value="j.doe@company.com" sclass="cr-original-modified"/>
+                <vlayout spacing="0">
+                    <label value="Modified By" sclass="cr-field-label"/>
+                    <n:span class="cr-badge">MODIFIED</n:span>
+                </vlayout>
+                <hlayout valign="middle">
+                    <image id="modifiedByAvatar" sclass="cr-avatar" src="/img/avatar-asmith.png"/>
+                    <label id="modifiedByEmail" value="a.smith@company.com" sclass="cr-revised-modified"/>
+                </hlayout>
+            </row>
+
+            <!-- Priority (modified) -->
+            <row>
+                <label value="Medium" sclass="cr-original-modified"/>
+                <vlayout spacing="0">
+                    <label value="Priority" sclass="cr-field-label"/>
+                    <n:span class="cr-badge">MODIFIED</n:span>
+                </vlayout>
+                <label value="High  !" sclass="cr-revised-critical"/>
+            </row>
+
+            <!-- Department (unchanged) -->
+            <row>
+                <label value="Finance" sclass="cr-original"/>
+                <label value="Department" sclass="cr-field-label"/>
+                <label value="Finance"/>
+            </row>
+
+        </rows>
+    </grid>
+
+    <!-- Footer -->
+    <hlayout hflex="1" style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee;">
+        <hlayout hflex="1" valign="middle">
+            <label value="ℹ" style="color: #aaa; margin-right: 4px;"/>
+            <label value="Differences are highlighted for clarity." sclass="cr-footer-note"/>
+        </hlayout>
+        <hlayout valign="middle">
+            <button id="downloadPdfBtn" label="Download PDF"/>
+            <button id="doneBtn" label="Done" sclass="cr-btn-done"/>
+        </hlayout>
+    </hlayout>
+
+</window>
