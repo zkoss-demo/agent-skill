@@ -13,13 +13,13 @@ This skill creates well-structured ZK pages through a 4-step process:
 3. **Validate ZUL** - Verify correctness of the generated ZUL
 4. **Generate Controller Class** - Create the corresponding Java class (ViewModel or Composer)
 
-**Alternative entry**: When user provides a UI image (screenshot/mockup), skip to the image-to-ZUL workflow below.
+**Alternative entry**: When user provides a UI image (screenshot/mockup), perform the **Visual Analysis** below first, then proceed to the 4-step process.
 
 ---
 
 ## Step 1: Clarify User Requirements
 
-Ask targeted questions to understand needs before generating code.
+Ask targeted questions to understand needs. If starting from an image, use the results of the **Visual Analysis** to inform these questions.
 
 ### Questions to Ask
 
@@ -56,7 +56,7 @@ If the ZUL page requires a `<charts>` component, read [references/charts-depende
 
 ---
 
-## Image-to-ZUL Workflow
+## Visual Analysis (for Images/Mockups)
 
 When user provides a UI screenshot or mockup image:
 
@@ -66,9 +66,9 @@ When user provides a UI screenshot or mockup image:
    - **Content tabs** (tabs that switch visible content below): all content below the tab strip up to the next major layout boundary belongs INSIDE `<tabpanel>`, not as siblings outside `<tabbox>`. See [assets/content-tabbox.zul](assets/content-tabbox.zul)
    - **Navigation-only tabs** (top menu bars, routing tabs): use empty `<tabpanel/>` elements
 4. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
-5. **Ask clarifications** - Confirm ZK version and MVC/MVVM preference if not already known. Ask about any ambiguous UI elements
-6. **Generate Files** - Proceed to Step 2 to generate the ZUL, then Step 3 for validation, and finally Step 4 to generate the mandatory Java controller class.
-7. **Include CSS** - When fallback `n:div` elements are used, include companion CSS via `<style>` element (not `<?style ?>` processing instruction)
+5. **Include CSS** - When fallback `n:div` elements are used, identify companion CSS needs.
+
+**Transition**: After visual analysis, proceed to **Step 1: Clarify User Requirements** to confirm ZK version, pattern preference, and any ambiguous elements.
 
 ---
 
