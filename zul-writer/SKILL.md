@@ -6,7 +6,7 @@ description: Generate ZK Framework ZUL pages through a structured workflow. Use 
 
 ## Workflow Overview
 
-This skill creates well-structured ZK pages through a 4-step process:
+This skill creates well-structured zul pages through a 4-step process:
 
 1. **Clarify Requirements** - Gather page purpose, pattern, and layout needs
 2. **Generate ZUL** - Create the ZUL file based on requirements
@@ -14,6 +14,20 @@ This skill creates well-structured ZK pages through a 4-step process:
 4. **Generate Controller Class** - Create the corresponding Java class (ViewModel or Composer)
 
 **Alternative entry**: When user provides a UI image (screenshot/mockup), perform the **Visual Analysis** below first, then proceed to the 4-step process.
+
+---
+
+## Visual Analysis (for Images/Mockups)
+
+When a UI screenshot or mockup image is provided, perform this analysis **before** starting the 4-step workflow:
+
+1. **Visual Breakdown**: Identify all UI elements (layout, inputs, buttons, tables, navigation).
+2. **Component & Layout Strategy**: Plan the ZK component mapping (refer to [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md)) and determine the overall layout (e.g., `<borderlayout>`, nested `<vlayout>`).
+3. **Tab Content Scope**: If tabs are present, determine content boundaries. Items switching with tabs must go INSIDE `<tabpanel>`. See [assets/content-tabbox.zul](assets/content-tabbox.zul).
+4. **Identify Custom Styling**: Mark areas that require fallback `<n:div>` elements or custom CSS.
+
+**Transition**: Use these findings to inform **Step 1: Clarify User Requirements** and eventually **Step 2: Generate ZUL File**.
+
 
 ---
 
@@ -56,54 +70,41 @@ If the ZUL page requires a `<charts>` component, read [references/charts-depende
 
 ---
 
-## Visual Analysis (for Images/Mockups)
-
-When user provides a UI screenshot or mockup image:
-
-1. **Analyze the image** - Identify all visible UI elements: layout structure, input fields, buttons, data tables, navigation, labels, icons
-2. **Map to ZK components** - Consult [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) for element-to-component mapping. Prioritize ZK components; fall back to `<n:div>` + CSS only when no suitable ZK component exists
-3. **Identify tab content scope** - When tabs are present, determine what content belongs inside each `<tabpanel>`:
-   - **Content tabs** (tabs that switch visible content below): all content below the tab strip up to the next major layout boundary belongs INSIDE `<tabpanel>`, not as siblings outside `<tabbox>`. See [assets/content-tabbox.zul](assets/content-tabbox.zul)
-   - **Navigation-only tabs** (top menu bars, routing tabs): use empty `<tabpanel/>` elements
-4. **Infer layout** - Determine the overall layout structure (borderlayout, vlayout/hlayout nesting, grid)
-5. **Include CSS** - When fallback `n:div` elements are used, identify companion CSS needs.
-
-**Transition**: After visual analysis, proceed to **Step 1: Clarify User Requirements** to confirm ZK version, pattern preference, and any ambiguous elements.
-
----
-
 ## Step 2: Generate ZUL File
 
 ### Generation Guidelines
-Find proper components for UI requirements:
-* If users have installed zk-doc-mcp-server, query it for component information
-* Find components and properties from javadoc at https://www.zkoss.org/javadoc/latest/zk/
-* Don't specify `hflex="min"` on `<button>` — it's `display: inline-block` by default
-* Use `<style>` element for inline CSS, not `<?style ?>` processing instruction
 
-#### XML Structure
-Always start with proper XML declaration and ZK namespaces: [assets/template.zul](assets/template.zul)
+When generating the ZUL file, follow these technical guidelines:
 
-#### MVC Pattern Structure
-[assets/mvc-sample.zul](assets/mvc-sample.zul)
+1. **Map UI Elements**: Consult [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) to choose the correct ZK components. 
+   - Prioritize ZK components over native HTML.
+   - Use layout components like `<borderlayout>`, `<vlayout>`, and `<hlayout>` effectively.
+2. **Handle CSS Inclusion**: 
+   - If fallback `<n:div>` elements (native HTML) are used, identify and include the necessary CSS.
+   - Use the `<style>` element for inline CSS; **do not** use the `<?style ?>` processing instruction.
+3. **ZK Documentation**:
+   - Query `zk-doc-mcp-server` for detailed component info if available.
+   - Use [ZK Javadoc](https://www.zkoss.org/javadoc/latest/zk/) for properties and event details.
+4. **Best Practices**:
+   - Don't specify `hflex="min"` on `<button>` (it's `display: inline-block` by default).
+   - Use meaningful IDs and follow the [assets/template.zul](assets/template.zul) structure.
 
-#### MVVM Pattern Structure
-[assets/mvvm-pattern-structure.zul](assets/mvvm-pattern-structure.zul)
+### Layout & Component Patterns
 
-### Layout Best Practices
+#### XML & Pattern Structures
+- **Base Template**: [assets/template.zul](assets/template.zul)
+- **MVC Structure**: [assets/mvc-sample.zul](assets/mvc-sample.zul)
+- **MVVM Structure**: [assets/mvvm-pattern-structure.zul](assets/mvvm-pattern-structure.zul)
 
-#### Use Flexible Sizing
-[assets/flexible-sizing.zul](assets/flexible-sizing.zul)
+#### Sizing & Layouts
+- **Flexible Sizing (hflex/vflex)**: [assets/flexible-sizing.zul](assets/flexible-sizing.zul)
+- **Borderlayout Example**: [assets/borderlayout-example.zul](assets/borderlayout-example.zul)
 
-#### Borderlayout Example
-[assets/borderlayout-example.zul](assets/borderlayout-example.zul)
-
-### Component Usage Examples - MVVM Pattern
-
-* [Form with Validation](assets/form-validation-mvvm.zul)
-* [Data Grid with Selection](assets/data-grid-selection-mvvm.zul)
-* [Master-Detail Pattern](assets/master-detail-mvvm.zul)
-* [Dialog/Popup](assets/dialog-popup-mvvm.zul)
+#### Common MVVM Patterns
+- [Form with Validation](assets/form-validation-mvvm.zul)
+- [Data Grid with Selection](assets/data-grid-selection-mvvm.zul)
+- [Master-Detail Pattern](assets/master-detail-mvvm.zul)
+- [Dialog/Popup](assets/dialog-popup-mvvm.zul)
 
 ---
 
