@@ -1,6 +1,6 @@
 ---
 name: zul-writer
-description: Generate ZK Framework ZUL pages through a structured workflow. Use when users want to create ZUL files, convert UI designs/screenshots/mockups into ZUL code, build forms/grids/dashboards with ZK components, or need help with ZK layout and data binding (MVC or MVVM). Triggers on requests involving ZUL, ZK pages, or UI-to-ZUL conversion from images.
+description: Generate ZK Framework zul pages (.zul) through a structured workflow. Use when users want to create ZUL files, convert UI description/screenshots/mockups into ZUL code, build forms/grids/dashboards with ZK components. Triggers on requests involving ZUL, ZK pages, or UI-to-ZUL conversion from images.
 version: 1.0.0
 ---
 # ZUL Writer
@@ -25,7 +25,7 @@ When a UI screenshot or mockup image is provided, perform this analysis **before
 1. **Visual Breakdown**: Identify all UI elements (layout, inputs, buttons, tables, navigation).
 2. **Component & Layout Strategy**: Plan the ZK component mapping (refer to [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md)) and determine the overall layout (e.g., `<borderlayout>`, nested `<vlayout>`).
 3. **Tab Content Scope**: If tabs are present, determine content boundaries. Items switching with tabs must go INSIDE `<tabpanel>`. See [assets/content-tabbox.zul](assets/content-tabbox.zul).
-4. **Identify Custom Styling**: Mark areas that require fallback `<n:div>` elements or custom CSS.
+4. **Identify Custom Styling**: Mark areas that require fallback HTML elements or custom CSS.
 
 **Transition**: Use these findings to inform **Step 1: Clarify User Requirements** and eventually **Step 2: Generate ZUL File**.
 
@@ -71,7 +71,7 @@ If the ZUL page requires a `<charts>` component, read [references/charts-depende
 
 ---
 
-## Step 2: Generate ZUL File
+## Step 2: Generate a ZUL File
 
 ### Generation Guidelines
 
@@ -81,7 +81,7 @@ When generating the ZUL file, follow these technical guidelines:
    - Prioritize ZK components over native HTML.
    - Use layout components like `<borderlayout>`, `<vlayout>`, and `<hlayout>` effectively.
 2. **Handle CSS Inclusion**: 
-   - If fallback `<n:div>` elements (native HTML) are used, identify and include the necessary CSS.
+   - If fallback native HTML elements (e.g. `<n:div>`) are used, identify and include the necessary CSS.
    - Use the `<style>` element for inline CSS; **do not** use the `<?style ?>` processing instruction.
 3. **ZK Documentation**:
    - Query `zk-doc-mcp-server` for detailed component info if available.

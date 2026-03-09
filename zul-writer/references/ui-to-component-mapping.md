@@ -77,10 +77,15 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 
 ## Fallback Strategy: HTML + CSS
 
-Only use native HTML via the `n:` namespace when **no** ZK component can achieve the UI pattern e.g.:
+When a UI control cannot be mapped to an existing ZK component, you can construct it by combining HTML elements with custom CSS.
+
+However, there is a crucial consideration: **whether this UI control needs to send events to the server.**
+
+1. **Requires server events:** Use ZK's own `<div>` or `<span>`.
+2. **No server events needed:** Use native HTML elements( e.g. `<n:div>` and `<n:span>` with the native namespace).
 
 ```xml
-<!-- Card with custom styling -->
+<!-- Example 1: No events needed, using native HTML -->
 <n:div class="custom-card" xmlns:n="native">
     <n:div class="card-header">Title</n:div>
     <n:div class="card-body">
@@ -88,6 +93,11 @@ Only use native HTML via the `n:` namespace when **no** ZK component can achieve
         <textbox hflex="1"/>
     </n:div>
 </n:div>
+
+<!-- Example 2: Click event needed, using ZK components -->
+<div sclass="custom-clickable-card" onClick="@command('handleCardClick')">
+    <div sclass="card-header">Interactive Title</div>
+</div>
 ```
 
 Common fallback scenarios:
