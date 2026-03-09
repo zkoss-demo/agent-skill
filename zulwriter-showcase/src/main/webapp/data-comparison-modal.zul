@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated from: ui-screenshots/Data Comparison Modal.png -->
 <window id="compareRevisionsWin" title="Compare Revisions"
         width="760px" mode="modal" closable="true" border="normal"
         apply="zwriter.CompareRevisionsComposer"
