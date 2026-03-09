@@ -1,6 +1,7 @@
 ---
 name: zul-writer
 description: Generate ZK Framework ZUL pages through a structured workflow. Use when users want to create ZUL files, convert UI designs/screenshots/mockups into ZUL code, build forms/grids/dashboards with ZK components, or need help with ZK layout and data binding (MVC or MVVM). Triggers on requests involving ZUL, ZK pages, or UI-to-ZUL conversion from images.
+version: 1.0.0
 ---
 # ZUL Writer
 
