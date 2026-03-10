@@ -67,7 +67,7 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 
 #### 5. ZK Charts (only when charts are needed)
 
-If the ZUL page requires a `<charts>` component, read [references/charts-dependency.md](references/charts-dependency.md) and follow the dependency-check steps before generating any chart code.
+If the ZUL page requires a `<charts>` component, read [references/charts-guidelines.md](references/charts-guidelines.md) and follow the dependency-check steps before generating any chart code.
 
 ---
 
@@ -89,6 +89,7 @@ When generating the ZUL file, follow these technical guidelines:
 4. **Best Practices**:
    - Don't specify `hflex="min"` on `<button>` (it's `display: inline-block` by default).
    - Use meaningful IDs and follow the [assets/template.zul](assets/template.zul) structure.
+
 
 ### Layout & Component Patterns
 
