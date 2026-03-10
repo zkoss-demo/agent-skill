@@ -1,11 +1,16 @@
 #!/bin/bash
 
-# Install zul-writer skill to Claude Code via symlink
-# Usage: ./install-skill.sh
+# Install ZK agent skills to AI tools via symlink
+# Usage: ./install-skill.sh [--tool claude|gemini|github|all]
+
+TOOL="claude"
+if [[ "$1" == "--tool" && -n "$2" ]]; then
+    TOOL="$2"
+fi
 
 SKILL_NAME="zul-writer"
-SKILL_SOURCE="$(cd "$(dirname "$0")/$SKILL_NAME" && pwd)"
-SKILL_TARGET="$HOME/.claude/skills/$SKILL_NAME"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+SKILL_SOURCE="$REPO_ROOT/skills/$SKILL_NAME"
 
 # Check if source skill directory exists
 if [ ! -d "$SKILL_SOURCE" ]; then
@@ -13,39 +18,57 @@ if [ ! -d "$SKILL_SOURCE" ]; then
     exit 1
 fi
 
-# Check if SKILL.md exists in source
-if [ ! -f "$SKILL_SOURCE/SKILL.md" ]; then
-    echo "Error: SKILL.md not found in $SKILL_SOURCE"
-    exit 1
-fi
-
-# Create skills directory if it doesn't exist
-mkdir -p "$HOME/.claude/skills"
-
-# Remove existing symlink or directory if it exists
-if [ -L "$SKILL_TARGET" ]; then
-    echo "Removing existing symlink at $SKILL_TARGET"
-    rm "$SKILL_TARGET"
-elif [ -d "$SKILL_TARGET" ]; then
-    echo "Warning: Directory exists at $SKILL_TARGET"
-    read -p "Remove it and create symlink? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf "$SKILL_TARGET"
-    else
-        echo "Aborted."
-        exit 1
+install_claude() {
+    SKILL_TARGET="$HOME/.claude/skills/$SKILL_NAME"
+    mkdir -p "$HOME/.claude/skills"
+    
+    if [ -L "$SKILL_TARGET" ]; then
+        rm "$SKILL_TARGET"
+    elif [ -d "$SKILL_TARGET" ]; then
+        echo "Warning: Directory exists at $SKILL_TARGET. Skipping Claude install."
+        return
     fi
-fi
+    
+    ln -s "$SKILL_SOURCE" "$SKILL_TARGET"
+    echo "Successfully installed to Claude Code: $SKILL_TARGET"
+}
 
-# Create symlink
-ln -s "$SKILL_SOURCE" "$SKILL_TARGET"
+install_github() {
+    GITHUB_DIR="$REPO_ROOT/.github/skills"
+    mkdir -p "$GITHUB_DIR"
+    SKILL_TARGET="$GITHUB_DIR/$SKILL_NAME"
+    
+    if [ -L "$SKILL_TARGET" ]; then
+        rm "$SKILL_TARGET"
+    fi
+    
+    ln -s "../../skills/$SKILL_NAME" "$SKILL_TARGET"
+    echo "Successfully linked for GitHub Copilot / Cursor: $SKILL_TARGET"
+}
 
-if [ $? -eq 0 ]; then
-    echo "Successfully installed $SKILL_NAME skill"
-    echo "  Source: $SKILL_SOURCE"
-    echo "  Target: $SKILL_TARGET"
-else
-    echo "Error: Failed to create symlink"
-    exit 1
-fi
+install_gemini() {
+    # Gemini CLI auto-discovers from the skills/ directory in the extension root
+    echo "Gemini CLI integration ready."
+    echo "To install as a Gemini extension, run: gemini extension install $REPO_ROOT"
+}
+
+case "$TOOL" in
+    "claude")
+        install_claude
+        ;;
+    "github")
+        install_github
+        ;;
+    "gemini")
+        install_gemini
+        ;;
+    "all")
+        install_claude
+        install_github
+        install_gemini
+        ;;
+    *)
+        echo "Error: Unknown tool '$TOOL'. Use claude, gemini, github, or all."
+        exit 1
+        ;;
+esac

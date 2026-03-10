@@ -1,0 +1,6 @@
+{
+    "name": "zk-agent-skills",
+    "version": "1.0.0",
+    "description": "ZK Framework agent skills for Gemini CLI",
+    "contextFileName": "GEMINI.md"
+}

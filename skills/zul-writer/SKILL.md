@@ -1,7 +1,16 @@
 ---
 name: zul-writer
-description: Generate ZK Framework zul pages (.zul) through a structured workflow. Use when users want to create ZUL files, convert UI description/screenshots/mockups into ZUL code, build forms/grids/dashboards with ZK components. Triggers on requests involving ZUL, ZK pages, or UI-to-ZUL conversion from images.
-version: 1.0.0
+description: >
+  Generates ZK Framework ZUL pages (.zul) through a structured 4-step workflow: requirements clarification, ZUL generation, validation, and controller generation.
+  Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, and visual analysis for screenshot-to-ZUL conversion.
+  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), or convert an image/mockup to ZUL code.
+license: MIT
+compatibility: >
+  Designed for Claude Code, Gemini CLI, and GitHub Copilot/Cursor.
+  Requires access to local skills/zul-writer/assets/ and skills/zul-writer/references/ directories.
+metadata:
+  author: hawk
+  version: "1.0.0"
 ---
 # ZUL Writer
 

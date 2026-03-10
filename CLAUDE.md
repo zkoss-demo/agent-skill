@@ -10,8 +10,9 @@ This repository contains Claude Code agent skills. Each skill is a self-containe
 
 ```
 agent-skill/
-├── zul-writer/           # Skill for generating ZK Framework ZUL pages
-│   └── SKILL.md          # Skill definition with workflow and examples
+├── skills/               # Universal skill location
+│   └── zul-writer/       # Skill for generating ZK Framework ZUL pages
+│       └── SKILL.md      # Skill definition with workflow and examples
 ├── install-skill.sh      # Script to symlink skills to ~/.claude/skills/
 └── .claude/
     └── settings.local.json

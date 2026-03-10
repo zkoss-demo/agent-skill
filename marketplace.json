@@ -1,0 +1,27 @@
+{
+  "name": "ZK Framework Agent Skills",
+  "description": "AI agent skills for ZK Framework development. Compatible with Claude Code, Gemini CLI, and GitHub Copilot.",
+  "homepage": "https://github.com/your-org/agent-skill",
+  "license": "MIT",
+  "compatibility": {
+    "claude-code": true,
+    "gemini-cli": true,
+    "github-copilot": true
+  },
+  "skills": [
+    {
+      "id": "zul-writer",
+      "name": "ZUL Writer",
+      "version": "1.0.0",
+      "description": "Generates ZK Framework ZUL pages via a structured 3-step workflow.",
+      "path": "skills/zul-writer/SKILL.md",
+      "tags": ["zkoss", "zul", "ui-generation", "java", "mvvm", "mvc"],
+      "install": {
+        "claude-code-global": "~/.claude/skills/zul-writer",
+        "claude-code-project": ".agent/skills/zul-writer",
+        "gemini-cli": "gemini extension install .",
+        "github-copilot": ".github/skills/zul-writer"
+      }
+    }
+  ]
+}
