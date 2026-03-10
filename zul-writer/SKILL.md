@@ -67,7 +67,7 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 
 #### 5. ZK Charts (only when charts are needed)
 
-If the ZUL page requires a `<charts>` component, read [references/charts-guidelines.md](references/charts-guidelines.md) and follow the dependency-check steps before generating any chart code.
+If the ZUL page requires a `<charts>` component, follow [references/charts-guidelines.md](references/charts-guidelines.md) before generating any chart code.
 
 ---
 
