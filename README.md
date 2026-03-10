@@ -10,23 +10,10 @@ Generates ZK Framework ZUL pages through a structured 3-step workflow: clarify r
 
 **Contents:**
 
-```
-zul-writer/
-├── SKILL.md                              # Skill definition and workflow
-├── assets/                               # ZUL templates and examples
-│   ├── template.zul                      # Base XML structure
-│   ├── mvc-sample.zul                    # MVC pattern example
-│   ├── mvvm-pattern-structure.zul        # MVVM pattern example
-│   ├── example-simple-form-mvvm.zul      # Simple form (MVVM)
-│   ├── example-data-management-mvvm.zul  # Data management (MVVM)
-│   ├── example-simple-list-mvc.zul       # Simple list (MVC)
-│   ├── MyComposer.java                   # MVC Composer template
-│   └── MyViewModel.java                  # MVVM ViewModel template
-├── references/
-│   └── ui-to-component-mapping.md        # UI pattern → ZK component mapping
-└── scripts/
-    └── validate-zul.py                   # 4-layer ZUL validation script
-```
+- `SKILL.md`: The main agent skill definition and workflow instructions.
+- `assets/`: Contains various ZUL templates (both MVC and MVVM patterns) and Java source templates (Composer and ViewModel) used as references by the AI.
+- `references/`: Documentation and guidelines, such as UI pattern to ZK component mappings.
+- `scripts/`: Scripts for validating the generated ZUL files against structural and formatting rules.
 
 ## Showcase
 
