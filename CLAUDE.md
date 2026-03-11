@@ -2,23 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository Overview
+@README.md
 
-This repository contains Claude Code agent skills. Each skill is a self-contained directory with a `SKILL.md` file that defines the skill's behavior, workflow, and instructions.
-
-## Structure
-
-```
-agent-skill/
-├── skills/               # Universal skill location
-│   └── zul-writer/       # Skill for generating ZK Framework ZUL pages
-│       └── SKILL.md      # Skill definition with workflow and examples
-├── install-skill.sh      # Script to symlink skills to ~/.claude/skills/
-└── .claude/
-    └── settings.local.json
-```
-
-## Installing Skills
+## Installing Skills (Claude Code)
 
 Skills are installed by creating symlinks in `~/.claude/skills/`:
 
@@ -28,19 +14,22 @@ Skills are installed by creating symlinks in `~/.claude/skills/`:
 
 This creates a symlink from `./zul-writer` to `~/.claude/skills/zul-writer`.
 
+## Loading Skills (Gemini CLI)
+
+Gemini CLI automatically discovers skills in the `skills/` directory when this extension is installed.
+
+To install this repo as a Gemini extension:
+```bash
+gemini extension install .
+```
+
 ## Creating New Skills
 
-1. Create a new directory with the skill name
-2. Add a `SKILL.md` file with YAML frontmatter:
-   ```yaml
-   ---
-   name: skill-name
-   description: Brief description of what the skill does
-   context: fork
-   ---
-   ```
-3. Document the workflow, guidelines, and examples in the markdown body
-4. Update `install-skill.sh` or create a new install script for the skill
+1. Create a new directory in `skills/` (e.g., `skills/new-skill`)
+2. Add a `SKILL.md` file following the [Agent Skills specification](https://agentskills.io/specification)
+3. Document the workflow, guidelines, and examples in the markdown body.
+4. Update `marketplace.json` to include the new skill.
+5. Update `install-skill.sh` and `link-skill.sh` to support the new skill.
 
 ## Skill Anatomy (SKILL.md)
 
@@ -48,6 +37,16 @@ This creates a symlink from `./zul-writer` to `~/.claude/skills/zul-writer`.
 - **Workflow sections**: Step-by-step process the skill follows
 - **Code examples**: Reference patterns and templates
 - **Validation checklists**: Quality checks for generated output
+
+## General Development Guidelines
+
+- The user prefers to control the Python environment with `uv`.
+- JavaScript coding convention: [Google JavaScript Style Guide](https://google.github.io/styleguide/jsguide.html).
+- Commit every time a feature is complete and all tests pass.
+- Only commit files related to the current work.
+- Use markdown format as default for documentation.
+- Always read `CLAUDE.md` for an overview when starting a new conversation.
+- Don't push branches; the user will do it.
 
 # Reference
 * https://agentskills.io/home
