@@ -9,9 +9,9 @@ A cross-platform AI agent skill marketplace for ZK Framework development. Suppor
 - **Visual Analysis**: Convert UI screenshots or mockups directly into ZUL code.
 - **Automated Validation**: Integrated scripts to verify ZUL structural and formatting rules.
 
-## Marketplace Index
+## 📦 Marketplace Index
 
-The [marketplace.json](marketplace.json) file provides a machine-readable index of all available skills.
+The [marketplace.json](marketplace.json) file provides a machine-readable index of all available skills, including their versions, tags, and installation metadata. Use this if you need to manually configure agent skills in other environments.
 
 ### Current Skills:
 - **zul-writer**: Generates ZK Framework ZUL pages via a structured 4-step workflow.
@@ -31,26 +31,24 @@ agent-skill/
 
 ## Installation
 
-### Claude Code
-Symlink skills to Claude Code's global skill directory:
+This repository conforms to the [Agent Skills specification](https://agentskills.io/specification). You can install the agent skills using the following methods:
+
+### Agent Skills CLI
+The recommended way is using the universal Agent Skills CLI since it supports almost all AI tools (Gemini CLI, Claude Code, GitHub Copilot/Cursor). See [available agents](https://github.com/vercel-labs/skills?tab=readme-ov-file#available-agents) for more details. 
+
 ```bash
-./install-skill.sh
+npx skills add zkoss-demo/agent-skill
 ```
-Or link into a specific project:
-```bash
-./link-skill.sh
-```
+
 
 ### Gemini CLI
-Install the entire repo as a Gemini extension:
+
+The fastest way is to install directly from the repository URL:
+
 ```bash
-gemini extension install .
+gemini extension install https://github.com/zkoss-demo/agent-skill
 ```
 
-### GitHub Copilot / Cursor
-Skills are automatically discovered in the `.github/skills/` directory of this repository for project-local use.
-
----
 
 ## Development & Testing
 
