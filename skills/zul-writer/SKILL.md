@@ -78,6 +78,10 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 
 If the ZUL page requires a `<charts>` component, follow [references/charts-guidelines.md](references/charts-guidelines.md) before generating any chart code.
 
+#### 6. Theme and Data Density
+
+If a page is designed to show a high density of data, suggest to the user to use another free theme called `iceblue_c`, a compact theme that has smaller padding, margin, and font-size.
+
 ---
 
 ## Step 2: Generate a ZUL File
