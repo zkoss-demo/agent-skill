@@ -6,14 +6,15 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 
 | UI Pattern | ZK Component | Notes |
 |---|---|---|
-| Header / sidebar / content regions | `<borderlayout>` with `<north>`, `<west>`, `<center>` | Use for full-page layouts |
-| Vertical stack | `<vlayout>` | |
-| Horizontal row | `<hlayout>` | |
+| Vertical stack | `<vlayout>` | **Priority.** Use first for most layouts. For alignment, use CSS `text-align` in `style`. |
+| Horizontal row | `<hlayout>` | **Priority.** Use first for most layouts. For vertical alignment, use `z-valign-top`, `z-valign-middle`, or `z-valign-bottom`. |
+| Header / sidebar / content regions | `<borderlayout>` with `<north>`, `<west>`, `<center>` | Use for full-page or complex structural layouts |
 | Navigation tabs (tabs that switch visible content) | `<tabbox>` with `<tabs>` + `<tabpanels>` | All content below the tab strip belongs INSIDE `<tabpanel>` — never place it as siblings outside `<tabbox>` |
 | Accordion | `<tabbox mold="accordion">` | |
 | Splitter panels | `<splitlayout>`  | |
 | Card / panel | `<groupbox>` or `<panel>` | `<groupbox>` for titled sections |
-| Grid-aligned form | `<grid>` with `<columns>` + `<rows>` | Label + input pairs |
+| Column-based alignment | `<hbox>` or `<vbox>` | **Avoid.** Planned for deprecation. Use `<hlayout>`/`<vlayout>` with CSS instead. |
+| Grid-aligned form | `<grid>` with `<columns>` + `<rows>` | Label + input pairs requiring strict tabular alignment |
 
 ## Data Display
 
@@ -74,6 +75,7 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 - **Dropdown menus** → Use `<combobox>` or `<menubar>`, not `<n:select>`
 - **Data tables** → Use `<listbox>` or `<grid>`, not `<n:table>`
 - **Modal dialogs** → Use `<window mode="modal">`, not `<n:div class="modal">`
+- **Layout alignment** → Use `<vlayout>` with CSS `text-align` or `<hlayout>` with `z-valign-*`, not `<vbox>`/`<hbox>` or complex `<grid>` tables.
 
 ## Fallback Strategy: HTML + CSS
 
