@@ -1,0 +1,9 @@
+<selectbox>
+    <listbox>
+        <listitem label="All"/>
+        <listitem label="Junior"/>
+        <listitem label="Mid"/>
+        <listitem label="Senior"/>
+        <listitem label="Lead"/>
+    </listbox>
+</selectbox>
