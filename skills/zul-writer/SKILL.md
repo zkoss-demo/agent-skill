@@ -132,14 +132,7 @@ Run validation: `scripts/validate-zul.py`
 - Layer 4: ZK 10 compatibility checks (only if target ZK version is 10)
 
 ### Prerequisites
-Layer 2 and 3 require `lxml`. If missing:
-
-1. Check for `uv`: `which uv`
-2. If `uv` available: `uv pip install lxml`, run script via `uv run`
-3. If `uv` not available: ask user to install `uv` (https://docs.astral.sh/uv/getting-started/installation/)
-4. If user declines `uv`: fall back to `pip install lxml`
-
-Do NOT skip Layer 2 silently. Always inform the user and guide through installation.
+Layer 2 and 3 require `lxml`. **The script handles this automatically** — it will install `lxml` via `uv pip install` (preferred) or `pip install` if missing. No manual setup needed before running the script.
 
 ### Post-Validation Checklist
 

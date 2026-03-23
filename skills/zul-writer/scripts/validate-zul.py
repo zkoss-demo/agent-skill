@@ -16,9 +16,58 @@ revised local schema in ../assets/zul.xsd. Use --xsd to override it.
 import sys
 import argparse
 import re
+import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+
+def ensure_lxml() -> bool:
+    """
+    Ensure lxml is available, installing it automatically if needed.
+    Prefers `uv pip install` (fast, isolated); falls back to `pip install`.
+
+    Returns True if lxml is available after the attempt, False otherwise.
+    """
+    try:
+        import lxml  # noqa: F401
+        return True
+    except ImportError:
+        pass
+
+    print("  [dependency] lxml not found — attempting auto-install...")
+
+    # Prefer uv (user's preferred Python env manager)
+    try:
+        result = subprocess.run(
+            ["uv", "pip", "install", "lxml"],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            print("  [dependency] lxml installed via uv ✓")
+            return True
+        print(f"  [dependency] uv install failed: {result.stderr.strip()}")
+    except FileNotFoundError:
+        pass  # uv not found, try pip
+
+    # Fallback: pip
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "lxml"],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            print("  [dependency] lxml installed via pip ✓")
+            return True
+        print(f"  [dependency] pip install failed: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"  [dependency] Could not install lxml: {e}")
+
+    return False
+
+
+# Ensure lxml is available before any validation layers that need it
+_LXML_AVAILABLE = ensure_lxml()
 
 
 # Default to the revised local schema file
