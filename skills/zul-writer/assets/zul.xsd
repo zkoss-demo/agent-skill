@@ -3247,8 +3247,7 @@
 	<xs:element name="toolbar" type="toolbarType" />
 	<xs:complexType name="toolbarType">
 		<xs:sequence>
-			<xs:group ref="baseGroup" minOccurs="0" maxOccurs="unbounded" />
-			<xs:group ref="anyGroupSingle" minOccurs="0" maxOccurs="1" />
+			<xs:group ref="anyGroupSingle" minOccurs="0" maxOccurs="unbounded" />
 		</xs:sequence>
 		<xs:attributeGroup ref="xulElementAttrGroup" />
 		<xs:attribute name="orient" type="orientAttrType" use="optional" />
