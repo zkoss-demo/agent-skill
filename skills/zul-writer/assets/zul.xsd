@@ -717,6 +717,7 @@
 			<xs:element ref="drawer"/>
 			<xs:element ref="dropupload"/>
 			<xs:element ref="fckeditor" />
+			<xs:element ref="fileupload" />
 			<xs:element ref="fisheyebar" />
 			<xs:element ref="forEach" />
 			<xs:element ref="frozen" />
@@ -831,6 +832,7 @@
 				<xs:element ref="drawer"/>
 				<xs:element ref="dropupload"/>
 				<xs:element ref="fckeditor" />
+				<xs:element ref="fileupload" />
 				<xs:element ref="fisheyebar" />
 				<xs:element ref="forEach" />
 				<xs:element ref="frozen" />
