@@ -125,7 +125,16 @@ When generating the ZUL file, follow these technical guidelines:
 
 ## Step 3: Validate Generated ZUL
 
-Run validation: `scripts/validate-zul.py`
+Run validation using the script from this skill's base directory (provided as "Base directory for this skill:" in the skill context header):
+
+```bash
+python3 <skill-base-dir>/scripts/validate-zul.py <path-to-zul-file>
+```
+
+Example: if the skill base directory is `/Users/hawk/.claude/skills/zul-writer`, run:
+```bash
+python3 /Users/hawk/.claude/skills/zul-writer/scripts/validate-zul.py path/to/file.zul
+```
 - Layer 1: XML well-formedness (no dependencies)
 - Layer 2: XSD schema validation (requires `lxml`)
 - Layer 3: Attribute placement check (requires `lxml`) - catches misplaced attributes (e.g. `iconSclass` on `textbox`)
