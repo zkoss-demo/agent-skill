@@ -1,0 +1,40 @@
+name: Validate ZUL corpus
+
+# Regression net for finding F1: every push/PR re-runs the skill's own
+# validator over test/valid, test/wrong, the bundled assets, and the showcase
+# gallery, and fails on any drift from the committed baseline
+# (see test/run-regression.py and test/known-failures.txt).
+
+on:
+  push:
+    paths:
+      - "test/**"
+      - "skills/zul-writer/assets/**"
+      - "skills/zul-writer/scripts/**"
+      - "zulwriter-showcase/src/main/webapp/**.zul"
+      - ".github/workflows/validate-zul.yml"
+  pull_request:
+    paths:
+      - "test/**"
+      - "skills/zul-writer/assets/**"
+      - "skills/zul-writer/scripts/**"
+      - "zulwriter-showcase/src/main/webapp/**.zul"
+      - ".github/workflows/validate-zul.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DO_NOT_TRACK: "1"  # never emit usage telemetry from CI runs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lxml
+        run: python -m pip install --upgrade lxml
+
+      - name: Run ZUL regression net
+        run: python3 test/run-regression.py

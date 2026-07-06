@@ -130,7 +130,7 @@ The tracking feature (uncommitted: [track-usage.py](skills/zul-writer/scripts/tr
 
 ### F. Quality infrastructure — the biggest leverage (P1)
 
-**F1. CI regression net (small effort, immediately stops the P0 class from recurring).**
+**F1. CI regression net (small effort, immediately stops the P0 class from recurring). ✅ DONE (2026-07-06).**
 A GitHub Action that runs on every push:
 ```
 validate test/valid/**      → must all PASS
@@ -139,6 +139,7 @@ validate skills/zul-writer/assets/*.zul → must all PASS
 validate zulwriter-showcase/src/main/webapp/*.zul → must all PASS
 ```
 This makes assets/showcase a living regression corpus for both the validator and the XSD. Every finding in section A6 would have been caught at commit time.
+*Implemented:* [.github/workflows/validate-zul.yml](.github/workflows/validate-zul.yml) runs [test/run-regression.py](test/run-regression.py) on every push/PR touching the corpus, validator, or scripts. The runner enforces the four conventions above but as a **baseline diff, not an absolute gate** — it fails on *drift*: a regression (a non-quarantined file that breaks its convention) or a stale quarantine entry (a quarantined file that now passes, forcing the list to shrink). This respects the sequencing note below: the eight files that currently fail their convention (four `test/valid`, two assets, two showcase — all unfixed **B1** XSD/attribute false-positives) are quarantined in [test/known-failures.txt](test/known-failures.txt) with per-file reasons, so CI is green today while still catching any *new* breakage. As each B1 fix lands, removing its line makes CI enforce PASS for that file. Verified: clean run exits 0 over 45 files; injected regression, stale-quarantine, and orphan-path cases each exit 1. CI sets `DO_NOT_TRACK=1` so runs never emit telemetry.
 
 **F2. Skill-level evals.**
 There are validator tests but no evals of the *skill as a whole* (does the agent, given the skill, produce better pages than without it?). Create `skills/zul-writer/evals/evals.json` with 4–6 realistic prompts — e.g. MVVM form page, dashboard from a screenshot, ZK 9 project (checks `--zk-version` wiring), kanban board (checks shadow-element handling), chart page in a project *without* zkcharts (checks the decline path) — with assertions like "validator passes", "no `<zscript>`", "controller compiles", "correct file locations". The skill-creator tooling in this repo's toolchain can run with-skill vs. baseline comparisons and produce a review UI. This is the loop that turns user feedback into measured improvement instead of anecdote.

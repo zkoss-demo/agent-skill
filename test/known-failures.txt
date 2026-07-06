@@ -1,0 +1,33 @@
+# Quarantined ZUL files — known validator failures pending a fix.
+#
+# Each path below currently violates its corpus convention (files under
+# test/valid, skills/zul-writer/assets, and the showcase must PASS; files
+# under test/wrong must FAIL). They are listed here so the CI regression net
+# (test/run-regression.py) treats their *current* failure as expected instead
+# of blocking every push.
+#
+# This is a shrinking list, not a dumping ground:
+#   * When a fix lands (see finding B1 in tasks/zul-writer-improvement-proposal.md),
+#     the file starts passing — remove its line here and CI will enforce PASS.
+#   * If a quarantined file starts passing while still listed, CI FAILS with
+#     "stale quarantine" so the list never drifts out of date.
+#
+# Format: one repo-relative path per line. Blank lines and #-comments ignored.
+
+# --- B1: XSD false-positives on shadow elements (<if>, <forEach>) inside
+#         element-only content models ---
+test/valid/zk-5696.zul
+zulwriter-showcase/src/main/webapp/enterprise-kanban.zul
+skills/zul-writer/assets/kanban-board.zul
+
+# --- B1: XSD rejects <nodom> as a root/child element ---
+test/valid/zk-5721.zul
+
+# --- B1: XSD demands static children on model-driven components; a
+#         template-only <grid>/<listbox> (canonical MVVM) is flagged ---
+test/valid/zk-5751.zul
+skills/zul-writer/assets/example-data-management-mvvm.zul
+
+# --- B1: Layer 3 attribute-placement false-positives ---
+test/valid/zk-5793.zul
+zulwriter-showcase/src/main/webapp/event-management.zul
