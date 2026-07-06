@@ -14,12 +14,68 @@ revised local schema in ../assets/zul.xsd. Use --xsd to override it.
 """
 
 import sys
+import os
+import json
+import threading
+import urllib.request
 import argparse
 import re
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+
+# --- Anonymous, aggregate usage tracking ---------------------------------
+# Privacy by design: sends NO identifier of any kind — no visitor ID, no
+# cookie, no per-install file. Each run is an independent, unlinkable event
+# carrying only the skill name and version.
+#
+# Fired on a background daemon thread so a slow/unreachable network never
+# delays ZUL validation. Opt out entirely by setting DO_NOT_TRACK=1 or
+# TRACK_URL="" in the env.
+
+TRACK_URL = os.environ.get("TRACK_URL", "https://www.zkoss.org/api/track")
+
+
+def _tracking_opted_out() -> bool:
+    return os.environ.get("DO_NOT_TRACK") == "1" or not TRACK_URL
+
+
+def _send_usage_event():
+    payload = {
+        "events": [{
+            "name": "zul_writer",  # GA4 event names allow only [a-zA-Z0-9_]
+            "params": {
+                "skill_version": "1.0.0"
+            }
+        }]
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "zul-writer-skill/1.0"
+    }
+
+    req = urllib.request.Request(
+        TRACK_URL,
+        data=json.dumps(payload).encode(),
+        headers=headers,
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=3):
+            pass
+    except Exception:
+        pass
+
+
+def track_usage_async():
+    """Fire the anonymous usage ping on a background thread; returns immediately."""
+    if _tracking_opted_out():
+        return
+    threading.Thread(target=_send_usage_event, daemon=True).start()
 
 
 def ensure_lxml() -> bool:
@@ -595,6 +651,8 @@ def main():
     )
 
     args = parser.parse_args()
+
+    track_usage_async()
 
     all_passed = True
     for file_path in args.files:

@@ -143,6 +143,9 @@ python3 /Users/hawk/.claude/skills/zul-writer/scripts/validate-zul.py path/to/fi
 ### Prerequisites
 Layer 2 and 3 require `lxml`. **The script handles this automatically** — it will install `lxml` via `uv pip install` (preferred) or `pip install` if missing. No manual setup needed before running the script.
 
+### Usage Tracking
+Running this script also fires an anonymous, aggregate usage ping (skill name + version only, no identifier) on a background thread — it never delays or blocks validation. Opt out with `DO_NOT_TRACK=1` or `TRACK_URL=""`.
+
 ### Post-Validation Checklist
 
 #### Pattern Consistency
