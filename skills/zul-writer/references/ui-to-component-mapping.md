@@ -11,7 +11,7 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Header / sidebar / content regions | `<borderlayout>` with `<north>`, `<west>`, `<center>` | Use for full-page or complex structural layouts |
 | Navigation tabs (tabs that switch visible content) | `<tabbox>` with `<tabs>` + `<tabpanels>` | All content below the tab strip belongs INSIDE `<tabpanel>` — never place it as siblings outside `<tabbox>` |
 | Accordion | `<tabbox mold="accordion">` | |
-| Splitter panels | `<splitlayout>`  | |
+| Splitter panels | `<splitlayout>`  | Requires ZK PE/EE (`org.zkoss.zkmax.zul`) |
 | Card / panel | `<groupbox>` or `<panel>` | `<groupbox>` for titled sections |
 | Column-based alignment | `<hbox>` or `<vbox>` | **Avoid.** Planned for deprecation. Use `<hlayout>`/`<vlayout>` with CSS instead. |
 | Grid-aligned form | `<grid>` with `<columns>` + `<rows>` | Label + input pairs requiring strict tabular alignment |
@@ -42,7 +42,7 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Number input | `<intbox>`, `<decimalbox>`, `<doublebox>`, `<spinner>` | Choose by data type |
 | Slider | `<slider>` | |
 | File upload | `<button upload="true">` | |
-| Toggle switch | `<checkbox>` with `mold="toggle"` (ZK 10) or `<switch>` | Check ZK version |
+| Toggle switch | `<checkbox mold="switch">` or `<checkbox mold="toggle">` | `switch` and `toggle` are checkbox molds — there is no standalone switch component |
 | Rich text editor | `<ckeditor>` (requires ZK PE/EE) | |
 
 ## Actions & Navigation
@@ -65,7 +65,7 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Alert / notification | `Clients.showNotification()` (Java) | Not a ZUL element |
 | Tooltip | `tooltip` attribute or `<popup>` | |
 | Progress bar | `<progressmeter>` | |
-| Loading spinner | `<busyOverlay>` or custom CSS | |
+| Loading spinner | `Clients.showBusy()` (Java) or custom CSS | Not a ZUL element |
 | Badge / tag | No direct component | Use `<label sclass="...">` + CSS |
 | Popover | `<popup>` | |
 

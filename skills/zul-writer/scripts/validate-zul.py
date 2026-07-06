@@ -659,7 +659,7 @@ def main():
         "--zk-version",
         dest="zk_version",
         default="10",
-        help="ZK version to validate against (default: 10). Layer 3 checks only run for version 10.x."
+        help="ZK version to validate against (default: 10). Layer 4 checks only run for version 10.x."
     )
 
     args = parser.parse_args()

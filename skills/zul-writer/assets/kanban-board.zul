@@ -38,7 +38,7 @@
                 <vlayout hflex="1">
                     <label value="@load(item.taskDescription)"/>
                     <hlayout>
-                        <image src="@load(item.taskImage)" style="width:30px;height30px;border-radius:15px;"/>
+                        <image src="@load(item.taskImage)" style="width:30px;height:30px;border-radius:15px;"/>
                         <div hflex="1">
                             <forEach items="@init(item.tags)" var="tag">
                                 <label value="@load(tag.label)" sclass="kanbantag" style="@load(&quot;background-color:&quot;.concat(tag.color))"/>

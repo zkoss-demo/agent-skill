@@ -100,7 +100,7 @@ When generating the ZUL file, follow these technical guidelines:
    - Query `zk-doc-mcp-server` for detailed component info if available.
    - Use [ZK Javadoc](https://www.zkoss.org/javadoc/latest/zk/) for properties and event details.
 4. **Best Practices**:
-   - Don't specify `hflex="min"` on `<button>` (it's `display: inline-block` by default).
+   - Prefer `hflex`/`vflex` over fixed pixel widths for responsive layouts. `hflex="min"` sizes a component to fit its content — useful for a `<button>` sitting beside an `hflex="1"` field (see [assets/flexible-sizing.zul](assets/flexible-sizing.zul)).
    - Use meaningful IDs and follow the [assets/template.zul](assets/template.zul) structure.
 
 
