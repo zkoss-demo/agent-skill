@@ -146,8 +146,20 @@ def inject_default_namespace(file_path: Path) -> Path | None:
     if f'xmlns="{ZK_NS}"' in content:
         return None
 
-    # Find the first real element tag (skip PIs <?...?> and comments)
-    match = re.search(r'<([a-zA-Z][\w.-]*)', content)
+    # Find the first real element tag, skipping tag-like text inside comments
+    # (<!-- ... -->) and processing instructions (<?...?>). A naive search
+    # matches names such as <tabpanel inside a leading explanatory comment and
+    # injects the namespace there, leaving the real root un-namespaced.
+    skip_spans = [
+        (m.start(), m.end())
+        for m in re.finditer(r'<!--.*?-->|<\?.*?\?>', content, re.DOTALL)
+    ]
+
+    match = None
+    for m in re.finditer(r'<([a-zA-Z][\w.-]*)', content):
+        if not any(start <= m.start() < end for start, end in skip_spans):
+            match = m
+            break
     if not match:
         return None
 
