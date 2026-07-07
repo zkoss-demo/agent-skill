@@ -125,23 +125,28 @@ When generating the ZUL file, follow these technical guidelines:
 
 ## Step 3: Validate Generated ZUL
 
-Run validation using the script from this skill's base directory (provided as "Base directory for this skill:" in the skill context header):
+Run validation using the script from this skill's base directory (provided as "Base directory for this skill:" in the skill context header). Pass the ZK version detected in Step 1 via `--zk-version` so Layer 4 checks match the target:
 
 ```bash
-python3 <skill-base-dir>/scripts/validate-zul.py <path-to-zul-file>
+uv run <skill-base-dir>/scripts/validate-zul.py --zk-version <detected-version> <path-to-zul-file>
 ```
 
-Example: if the skill base directory is `/Users/hawk/.claude/skills/zul-writer`, run:
+Example: if the skill base directory is `~/.claude/skills/zul-writer` and the project targets ZK 10.3.0, run:
 ```bash
-python3 /Users/hawk/.claude/skills/zul-writer/scripts/validate-zul.py path/to/file.zul
+uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --zk-version 10.3.0 path/to/file.zul
 ```
-- Layer 1: XML well-formedness (no dependencies)
+- Layer 1: XML well-formedness (no dependencies). Multi-root fragments are auto-wrapped in `<zk>` before validating.
 - Layer 2: XSD schema validation (requires `lxml`)
 - Layer 3: Attribute placement check (requires `lxml`) - catches misplaced attributes (e.g. `iconSclass` on `textbox`)
-- Layer 4: ZK 10 compatibility checks (only if target ZK version is 10)
+- Layer 4: version compatibility checks for the target ZK version — removed/deprecated API for all targets, plus ZK-10-only API (e.g. dropped `<fragment>`, or new `accept`/`responsive` attributes) gated by `--zk-version`. Defaults to `10` if omitted.
 
 ### Prerequisites
-Layer 2 and 3 require `lxml`. **The script handles this automatically** — it will install `lxml` via `uv pip install` (preferred) or `pip install` if missing. No manual setup needed before running the script.
+Layer 2 and 3 require `lxml`. **`uv run` handles this automatically** via the script's PEP 723 inline metadata — it provisions `lxml` in an ephemeral environment, so no manual setup is needed. If `uv` is unavailable, run with a plain interpreter instead and the script self-installs `lxml` as a fallback:
+
+```bash
+python3 <skill-base-dir>/scripts/validate-zul.py --zk-version <detected-version> <path-to-zul-file>
+```
+(On Windows, use `python` instead of `python3`.)
 
 ### Usage Tracking
 Running this script also fires an anonymous, aggregate usage ping (skill name + version only, no identifier) on a background thread — it never delays or blocks validation. Opt out with `DO_NOT_TRACK=1` or `TRACK_URL=""`.

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["lxml"]
+# ///
 """
 ZUL File Validator
 
@@ -7,7 +11,13 @@ Validates ZUL files for:
   Layer 2: XSD schema validation (requires lxml)
   Layer 3: Attribute placement check (requires lxml) - catches misplaced
            attributes that XSD's anyAttribute wildcard allows through
-  Layer 4: ZK 10 compatibility checks (no dependencies)
+  Layer 4: Version compatibility checks for the target ZK version
+           (removed/deprecated API; ZK-10-only API on ZK 9 targets)
+
+Recommended invocation is `uv run validate-zul.py ...`: uv reads the PEP 723
+inline metadata above and provides `lxml` in an ephemeral environment, so no
+manual dependency setup is needed. When run with a plain interpreter,
+ensure_lxml() self-installs lxml as a fallback.
 
 Note: ZK's official XSD may have issues. This script defaults to using the
 revised local schema in ../assets/zul.xsd. Use --xsd to override it.
@@ -167,6 +177,46 @@ def inject_default_namespace(file_path: Path) -> Path | None:
 
     tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.zul', delete=False)
     tmp.write(modified)
+    tmp.close()
+    return Path(tmp.name)
+
+
+def wrap_fragment_in_zk(file_path: Path) -> Path | None:
+    """
+    Wrap a ZUL fragment in a namespaced <zk>...</zk> root.
+
+    Multi-root ZUL fragments (several top-level components, e.g. content loaded
+    via createComponents/<include>) are legal ZUL but not well-formed as a
+    standalone XML document, so Layer 1 rejects them. Wrapping the body in a
+    single <zk> root makes such fragments validatable without altering their
+    meaning (the <zk> content model accepts any components).
+
+    The <zk> open tag is inserted immediately before the first real element
+    (after any leading PIs/comments) with no newline, so body line numbers are
+    preserved in downstream error messages. Returns a temp file path, or None
+    if no element is found.
+    """
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    skip_spans = [
+        (m.start(), m.end())
+        for m in re.finditer(r'<!--.*?-->|<\?.*?\?>', content, re.DOTALL)
+    ]
+
+    first = None
+    for m in re.finditer(r'<([a-zA-Z][\w.-]*)', content):
+        if not any(start <= m.start() < end for start, end in skip_spans):
+            first = m
+            break
+    if first is None:
+        return None
+
+    pos = first.start()
+    wrapped = content[:pos] + f'<zk xmlns="{ZK_NS}">' + content[pos:] + '</zk>'
+
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.zul', delete=False)
+    tmp.write(wrapped)
     tmp.close()
     return Path(tmp.name)
 
@@ -491,15 +541,42 @@ REMOVED_ATTRIBUTES = {
     "src": (["a", "button", "caption", "checkbox", "comboitem", "fisheye", "footer", "listfooter", "treefooter", "auheader", "column", "listheader", "treecol", "listcell", "menu", "menuitem", "nav", "navitem", "orgnode", "tab", "treecell"], "Deprecated since 3.5.0, use \"image\" instead.")
 }
 
+# Components removed in a given ZK major version. The int is the earliest
+# major version in which the component no longer exists; it is only flagged
+# for targets at or above that version (e.g. <fragment> is valid in ZK 9).
 REMOVED_COMPONENTS = {
-    "fragment": "Removed since 10.2.0, use the new Client MVVM (client-bind.jar) library instead"
+    "fragment": (10, "Removed since 10.2.0, use the new Client MVVM (client-bind.jar) library instead")
+}
+
+# Attributes introduced in ZK 10.x that do NOT exist in ZK 9. Flagged only
+# when validating against a pre-10 target so ZK 9 pages don't silently use
+# ZK-10-only API against the bundled 10.x schema. Verified against the ZK
+# component reference (supported-since markers); component-gated to avoid
+# false positives on same-named attributes elsewhere.
+NEW_IN_ZK10_ATTRIBUTES = {
+    "accept": (["dropupload"], "Introduced in ZK 10.0.0; not available in ZK 9."),
+    "responsive": (["grid"], "Introduced in ZK 10.4.0 (EE); not available in ZK 9."),
+    "responsiveColumns": (["grid"], "Introduced in ZK 10.4.0 (EE); not available in ZK 9."),
+    "responsiveVisible": (["column"], "Introduced in ZK 10.4.0 (EE); not available in ZK 9."),
 }
 
 
-def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
+def parse_major_version(zk_version: str) -> int:
+    """Extract the leading major version integer (e.g. '10.3.0' -> 10,
+    '9 or before' -> 9). Defaults to 10 when no digit is present."""
+    m = re.match(r'\s*(\d+)', zk_version)
+    return int(m.group(1)) if m else 10
+
+
+def validate_version_compatibility(file_path: Path, major: int) -> tuple[bool, list[str]]:
     """
-    Layer 4: Check for ZK 10 compatibility issues.
-    (e.g., deprecated or removed attributes)
+    Layer 4: Check for API incompatible with the target ZK major version.
+
+    - Deprecated/removed attributes (all removed by ZK 8.x) are flagged for any
+      supported target.
+    - Components removed in ZK 10.x are flagged only for targets >= that version.
+    - Attributes introduced in ZK 10.x are flagged for pre-10 targets, since
+      they don't exist there.
 
     Returns:
         (True, []) if compatible
@@ -528,19 +605,28 @@ def validate_zk10_compatibility(file_path: Path) -> tuple[bool, list[str]]:
             tag_lower = tag.lower()
             
             line_str = f"Line {elem.sourceline}: " if use_lxml and hasattr(elem, 'sourceline') else ""
-            
-            # Check for removed components
+
+            # Check for removed components (only for targets at/above removal version)
             if tag_lower in REMOVED_COMPONENTS:
-                errors.append(f"{line_str}Component <{tag}> is removed. {REMOVED_COMPONENTS[tag_lower]}")
-            
-            # Check for removed attributes
+                removed_in, hint = REMOVED_COMPONENTS[tag_lower]
+                if major >= removed_in:
+                    errors.append(f"{line_str}Component <{tag}> is removed. {hint}")
+
+            # Check attributes
             for attr_name, attr_value in elem.attrib.items():
                 attr_name_local = attr_name.split('}')[-1] if '}' in attr_name else attr_name
-                
+
+                # Removed/deprecated attributes (relevant to all supported targets)
                 if attr_name_local in REMOVED_ATTRIBUTES:
                     components, hint = REMOVED_ATTRIBUTES[attr_name_local]
                     if tag_lower in components:
                         errors.append(f"{line_str}Attribute '{attr_name_local}' on <{tag}> is removed. {hint}")
+
+                # ZK-10-only attributes used against a pre-10 target
+                if major < 10 and attr_name_local in NEW_IN_ZK10_ATTRIBUTES:
+                    components, hint = NEW_IN_ZK10_ATTRIBUTES[attr_name_local]
+                    if tag_lower in components:
+                        errors.append(f"{line_str}Attribute '{attr_name_local}' on <{tag}> is not available in ZK {major}. {hint}")
 
         return len(errors) == 0, errors
 
@@ -560,22 +646,35 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
 
     all_valid = True
 
+    # active_path is what downstream layers validate. It becomes a <zk>-wrapped
+    # temp copy when the input is a legal-but-multi-root ZUL fragment.
+    active_path = file_path
+    wrapped_path = None
+
     # Layer 1: XML Well-formedness
     print("Layer 1: XML Well-formedness... ", end="")
     is_valid, error = validate_xml_wellformedness(file_path)
     if is_valid:
         print("✓ PASS")
     else:
-        print("✗ FAIL")
-        print(f"  {error}")
-        all_valid = False
-        # Skip Layer 2 if XML is malformed
-        return False
+        # A multi-root ZUL fragment isn't well-formed standalone but is legal
+        # ZUL; retry after wrapping it in a single <zk> root.
+        wrapped_path = wrap_fragment_in_zk(file_path)
+        if wrapped_path and validate_xml_wellformedness(wrapped_path)[0]:
+            print("✓ PASS (fragment wrapped in <zk> for validation)")
+            active_path = wrapped_path
+        else:
+            print("✗ FAIL")
+            print(f"  {error}")
+            if wrapped_path:
+                wrapped_path.unlink(missing_ok=True)
+            # Skip remaining layers if XML is malformed
+            return False
 
     # For Layer 2 & 3: inject default ZK namespace if not declared
     # (ZK treats http://www.zkoss.org/2005/zul as implicit default)
-    ns_injected_path = inject_default_namespace(file_path) if not skip_xsd else None
-    schema_file = ns_injected_path or file_path
+    ns_injected_path = inject_default_namespace(active_path) if not skip_xsd else None
+    schema_file = ns_injected_path or active_path
 
     try:
         # Layer 2: XSD Schema Validation
@@ -610,19 +709,20 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
         if ns_injected_path:
             ns_injected_path.unlink(missing_ok=True)
 
-    # Layer 4: ZK 10 Compatibility
-    if zk_version.startswith("10"):
-        print("Layer 4: ZK 10 Compatibility... ", end="")
-        is_valid, errors = validate_zk10_compatibility(file_path)
-        if is_valid:
-            print("✓ PASS")
-        else:
-            print("✗ FAIL")
-            for error in errors:
-                print(f"  {error}")
-            all_valid = False
+    # Layer 4: Version Compatibility (runs for every target ZK version)
+    major = parse_major_version(zk_version)
+    print(f"Layer 4: ZK {major} Compatibility... ", end="")
+    is_valid, errors = validate_version_compatibility(active_path, major)
+    if is_valid:
+        print("✓ PASS")
     else:
-        print(f"Layer 4: ZK 10 Compatibility... SKIPPED (Version {zk_version} specified)")
+        print("✗ FAIL")
+        for error in errors:
+            print(f"  {error}")
+        all_valid = False
+
+    if wrapped_path:
+        wrapped_path.unlink(missing_ok=True)
 
     print("-" * 50)
     if all_valid:
@@ -659,7 +759,9 @@ def main():
         "--zk-version",
         dest="zk_version",
         default="10",
-        help="ZK version to validate against (default: 10). Layer 4 checks only run for version 10.x."
+        help="Target ZK version, e.g. 9, 10, or 10.3.0 (default: 10). Layer 4 tailors "
+             "compatibility checks to this version: ZK-10-only API (e.g. dropped <fragment>) "
+             "is flagged only for 10+, while attributes introduced in ZK 10 are flagged for 9."
     )
 
     args = parser.parse_args()
