@@ -204,6 +204,22 @@ Example: if the skill base directory is `~/.claude/skills/zul-writer/` and the p
 uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --out /tmp/zul-preview.png src/main/webapp/index.zul
 ```
 
+If this session wrote the page's controller, append `--run-controllers` (read the next paragraph
+before you do — it executes project code):
+```bash
+uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --run-controllers --out /tmp/zul-preview.png src/main/webapp/index.zul
+```
+
+**When to pass `--run-controllers`.** Pass it when this session wrote the page's controller
+(Step 4's composer or ViewModel): the sample data in it is yours, running it is what turns a
+skeleton screenshot into a judgeable one, and the flag makes bound values, model-bound rows and
+composer-filled labels real. Do **not** pass it for a page whose controller you did not write —
+the flag **executes arbitrary project code** from the project's classpath (constructors, service
+calls, whatever `doAfterCompose` does), so it is opt-in per render and never a default. If the
+controller has not been compiled yet, build first (`mvn compile` / `gradle classes`); the script
+warns when no compiled classes are on the classpath. Add `--controller-timeout <seconds>` only if
+a legitimately slow page keeps degrading (the default budget is 10 s for the whole render).
+
 The script resolves the project's ZK jars (Maven, Gradle, or stock ZK when the file belongs to no project), renders the page through ZK's own engine, and writes a PNG. **Requires Java 17+ and Google Chrome or Microsoft Edge.** On first use it downloads the render helper (`zk-preview-launcher.jar`, ~500 KB), verifies its SHA-256, and caches it under `~/.cache/zul-writer/`; later runs need no network.
 
 Then **read the PNG** with your image-reading tool and compare it against the Step 1 answers. If the user started from a screenshot or mockup, re-read that image too and compare the two side by side.
@@ -216,6 +232,16 @@ Never describe a screenshot you did not see, and never let a skipped preview sta
 
 The `NEXT:` line says what would enable a preview. If that looks fixable from here, spend **one** retry on it — appending `--debug` prints the resolved classpath, every helper command line and the renderer's own output to stderr (stdout is unchanged), which is usually enough to see why. Then stop and report the skip either way.
 
+### Read the `CONTROLLERS:` line first
+
+It is one line in the output, and the judging rules below **invert** on it:
+
+| Line | What the image is | How to read it |
+|---|---|---|
+| `CONTROLLERS: executed` | controllers ran: real bound values, real model rows, real composer output | *What you cannot judge* shrinks — a blank bound field **is** a defect |
+| `CONTROLLERS: skipped (isolated)` | the default: no Composer, no ViewModel | dimmed expression text and placeholder rows are correct behaviour |
+| `CONTROLLERS: failed → isolated` | you asked for controllers; they failed and the isolated render was served instead | read it under the isolated rules, and see the new *What to fix* bullet below |
+
 ### What to fix
 
 Judge **structure**, not pixels and not data. Fix only these:
@@ -227,10 +253,18 @@ Judge **structure**, not pixels and not data. Fix only these:
 - **Wrong component choice** — a data table rendered as a plain stack of labels, a form field that isn't the input type requested.
 - **Broken layout** — content clipped or overflowing, a horizontal scrollbar on a page meant to fit, a region collapsed to zero height, widgets overlapping, an `hflex`/`vflex` that visibly did not take.
 - **Raw unstyled HTML** where a ZK component was intended.
+- **`CONTROLLERS: failed → isolated`** — read the `WARNINGS` entry: it names the failing class and
+  the first cause line. A controller exception, a missing class or a blown budget is a defect in the
+  **controller** (or a missing build), not in the ZUL. Fix it there and re-render, or report it —
+  never work around it by hard-coding values into the markup. The exit code is still 0 and the
+  screenshot is still valid; it just shows the isolated render.
 
 ### What you cannot judge from this image
 
-The preview renders the **first paint only, with no ViewModel and no Composer**. Everything below is the renderer behaving correctly. Do **not** "fix" it, do not report it as a flaw, and do not let it drive a re-render:
+The preview renders the **first paint only**. With `CONTROLLERS: skipped (isolated)` or
+`failed → isolated` it also runs **no ViewModel and no Composer**, and everything below is the
+renderer behaving correctly. Do **not** "fix" it, do not report it as a flaw, and do not let it
+drive a re-render:
 
 - **Bound values shown as dimmed expression text** (e.g. a literal `vm.customer` inside a textbox) — the ViewModel never runs.
 - **Placeholder rows** in a `<grid>`/`<listbox>`/`<tree>` whose `model` is bound (e.g. rows reading `each.product`) — dimmed sample rows keep the component's real geometry.
@@ -241,6 +275,13 @@ The preview renders the **first paint only, with no ViewModel and no Composer**.
 - **Theme-dependent colours and spacing** when the theme jar isn't a project dependency.
 - **Exact spacing, font rendering, sub-pixel alignment, or a colour that is merely close** to the mockup.
 - **Data content from the mockup** — sample data will differ. Compare the *shape* of the UI, not the values in it.
+
+**Under `CONTROLLERS: executed`, the first four bullets above no longer apply** — dimmed expression
+text, placeholder rows, the missing bound-`src` section and "anything a Composer or ViewModel would
+populate" are all real output now. There, a bound field rendered blank, a data table with no rows,
+or a section still missing **is a defect** — in the controller if it never supplied the value, in
+the ZUL if the binding names the wrong property. Everything from *"Anything requiring a server
+round-trip"* down still holds in both modes.
 
 ### How many rounds
 

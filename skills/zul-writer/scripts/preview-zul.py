@@ -37,6 +37,14 @@ OPTIONS worth knowing, and when to reach for one
                    the jakarta servlet variant, e.g. 10.1.0-jakarta)
   --java PATH      the JVM to render with, if the auto-detected one is wrong
   --refresh        ignore the cached classpath and resolve it again
+  --run-controllers
+                   run the project's real Composers and ViewModels, so bound values,
+                   model-bound rows and anything a composer fills are the real thing.
+                   This EXECUTES ARBITRARY PROJECT CODE from the resolved classpath, so
+                   it is off by default. Pass it for a page whose controller you wrote.
+  --controller-timeout N
+                   wall-clock budget for a --run-controllers render (default 10s); on
+                   expiry the page is rendered again isolated and the run still succeeds
   also: --launcher-jar --launcher-version --browser-channel --width --height
         --full-page --timeout
 
@@ -60,11 +68,25 @@ Exit codes:
 WHAT THE IMAGE SHOWS
 
 The rendering itself is done by ZK's own DHtmlLayoutServlet inside the launcher, so the
-image shows what ZK really produces — but only the FIRST PAINT, and with no ViewModel and
-no Composer. Bound values appear as dimmed placeholder text; a bound `src` is the
-exception, contributing nothing at all rather than a placeholder. That is correct
-behaviour, not a defect. The project's own classes DO load, so a <zscript> or use="..."
-naming one of them runs for real.
+image shows what ZK really produces — but only the FIRST PAINT. What fills that paint
+depends on the mode, which the `CONTROLLERS:` line always names:
+
+  CONTROLLERS: skipped (isolated)   the default. No ViewModel, no Composer. Bound values
+                                    appear as dimmed placeholder text and model-bound
+                                    grids/listboxes show placeholder rows; a bound `src`
+                                    is the exception, contributing nothing at all rather
+                                    than a placeholder. That is correct behaviour, not a
+                                    defect. The project's own classes DO load, so a
+                                    <zscript> or use="..." naming one of them runs for real.
+  CONTROLLERS: executed             --run-controllers, and the controllers ran. Real bound
+                                    values, real model rows, real composer output, no
+                                    placeholders anywhere — so a field left blank here is a
+                                    real gap in the page or its controller.
+  CONTROLLERS: failed → isolated    --run-controllers, but the controllers threw, could not
+                                    be loaded, or overran --controller-timeout. The page was
+                                    rendered again isolated, so read it under the first set
+                                    of rules; WARNINGS names the cause. The exit code stays 0
+                                    and the screenshot is still written.
 
 PIPELINE, in execution order. `main()` is this list, one call per step. The order is
 load-bearing: no step may do expensive work that a later step can prove unnecessary,
@@ -188,6 +210,7 @@ MIN_JDK = 17
 CACHE_SCHEMA = 2              # bump to invalidate every cached classpath; 2 added "output_roots"
 CLASSPATH_TTL_SECONDS = 7 * 24 * 3600
 STARTUP_TIMEOUT = 60          # seconds to wait for PREVIEW_PORT=
+CONTROLLER_TIMEOUT = 10       # --run-controllers: launcher-side budget, whole render
 BUILD_TIMEOUT = 240           # seconds for a mvn/gradle classpath resolution
 
 EXIT_OK, EXIT_RENDER_ERROR, EXIT_SKIPPED, EXIT_USAGE = 0, 1, 2, 3
@@ -1043,8 +1066,10 @@ PORT_RE = re.compile(r"PREVIEW_PORT=(\d+)")
 
 
 class Launcher:
-    def __init__(self, java: Path, jar: Path, entries, docroot: Path):
+    def __init__(self, java: Path, jar: Path, entries, docroot: Path,
+                 run_controllers=False, controller_timeout=CONTROLLER_TIMEOUT):
         self.java, self.jar, self.entries, self.docroot = java, jar, entries, docroot
+        self.run_controllers, self.controller_timeout = run_controllers, controller_timeout
         self.proc = None
         self.port = None
         self._stderr_tail = collections.deque(maxlen=200)
@@ -1054,6 +1079,10 @@ class Launcher:
         argv = [str(self.java), "-jar", str(self.jar),
                 "--classpath", os.pathsep.join(str(p) for p in self.entries),
                 "--webapp", str(self.docroot), "--port", "0"]
+        if self.run_controllers:
+            # Appended only in this mode, so the default invocation stays byte-identical to
+            # what every existing caller (and every captured baseline) already produces.
+            argv += ["--isolation", "off", "--controller-timeout", str(self.controller_timeout)]
         debug_lines("renderer argv", argv)
         # Own process group, so the whole tree can be killed rather than just the pid.
         spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
@@ -1140,8 +1169,12 @@ ZK_READY = """() => {
 }"""
 
 
-def capture(url, out_path: Path, args, warnings):
-    """Returns (http_status, error_details_or_None)."""
+def capture(url, out_path: Path, args, warnings, controllers):
+    """Returns (http_status, error_details_or_None).
+
+    `controllers` is mutated in place (same idiom as `warnings`) with what the launcher
+    reported for this render, because it is a property of the response rather than of the
+    process: one launcher can serve several pages."""
     from playwright.sync_api import sync_playwright, Error as PWError, TimeoutError as PWTimeout
 
     with sync_playwright() as pw:
@@ -1179,6 +1212,16 @@ def capture(url, out_path: Path, args, warnings):
             response = page.goto(url, wait_until="load", timeout=timeout_ms)
             status = response.status if response else 0
             debug("http status", status)
+
+            # The launcher states the controller mode per response (see its README). Absent
+            # on a pre-P0-2 jar, which is exactly the case controllers_line has to warn about.
+            if response is not None:
+                controllers["mode"] = response.header_value("x-zk-preview-controllers")
+                failure = response.header_value("x-zk-preview-controller-failure")
+                debug("controllers", f"{controllers['mode']} ({failure or 'no failure'})")
+                if failure:
+                    controllers["failure"] = failure
+                    warnings.append(f"controller failure: {failure}")
 
             try:
                 page.wait_for_function("() => typeof window.zk !== 'undefined'", timeout=5000)
@@ -1277,6 +1320,17 @@ def parse_args(argv):
     parser.add_argument("--browser-channel", help="chrome | msedge | chromium (default: chrome, then msedge)")
     parser.add_argument("--timeout", type=int, default=120, help="browser phase budget in seconds (default: 120)")
     parser.add_argument("--refresh", action="store_true", help="ignore the cached classpath and re-resolve")
+    parser.add_argument("--run-controllers", dest="run_controllers", action="store_true", default=False,
+                        help="run the project's real Composers/ViewModels, so bound values and "
+                             "model rows are the real thing. EXECUTES ARBITRARY PROJECT CODE from "
+                             "the resolved classpath; off by default. A controller that fails or "
+                             "hangs degrades the render to the isolated one instead of failing it.")
+    parser.add_argument("--no-run-controllers", dest="run_controllers", action="store_false",
+                        help="force the default isolated render (no Composer, no ViewModel)")
+    parser.add_argument("--controller-timeout", type=int, default=CONTROLLER_TIMEOUT,
+                        help=f"wall-clock budget for a --run-controllers render, in seconds "
+                             f"(default: {CONTROLLER_TIMEOUT}); on expiry the page is rendered "
+                             f"again isolated")
     parser.add_argument("--debug", action="store_true",
                         help="print diagnostics to stderr: the resolved classpath, every helper "
                              "command line, and the renderer's own output. stdout is unchanged.")
@@ -1335,14 +1389,40 @@ def resolve_request(zul: Path, args, resolved):
     return docroot, layout, "/" + urllib.parse.quote(zul.relative_to(docroot).as_posix())
 
 
-def render(target: Target, java: Path, jar: Path, args, warnings):
+def render(target: Target, java: Path, jar: Path, args, warnings, controllers):
     """Steps 5-7: the launcher lives exactly as long as the capture needs it."""
-    with Launcher(java, jar, launcher_classpath(target.resolved), target.docroot) as launcher:
+    with Launcher(java, jar, launcher_classpath(target.resolved), target.docroot,
+                  args.run_controllers, args.controller_timeout) as launcher:
         url = f"http://127.0.0.1:{launcher.port}{target.request_path}"
-        return capture(url, target.out_path, args, warnings)
+        return capture(url, target.out_path, args, warnings, controllers)
 
 
-def report_render_error(target: Target, details, warnings):
+# The three strings of the text contract (spec P0-2 item 4), keyed by the launcher's token.
+CONTROLLER_LINES = {"executed": "executed",
+                    "skipped": "skipped (isolated)",
+                    "failed": "failed \u2192 isolated"}
+
+
+def controllers_line(args, controllers, launcher: LauncherJar, warnings):
+    """The `CONTROLLERS:` value, and the one warning only this function can raise.
+
+    A launcher built before this feature accepts `--isolation off` and ignores it (its
+    argument parser stores unknown keys and never reads them), so it renders isolated and
+    says nothing. Silence therefore has to be reported: without this warning the reader
+    would judge a dimmed placeholder page under the rules for real data, and those rules
+    invert on exactly this line."""
+    token = controllers.get("mode")
+    if token is None:
+        if args.run_controllers:
+            warnings.append(
+                f"--run-controllers was requested but the renderer did not report a controller "
+                f"mode, so the page was rendered isolated (placeholders, no Composer): launcher "
+                f"{launcher.version} ({launcher.source}) predates this feature — use a newer one")
+        return CONTROLLER_LINES["skipped"]
+    return CONTROLLER_LINES.get(token, token)
+
+
+def report_render_error(target: Target, details, warnings, controllers_value):
     """A real defect in the .zul — the one non-zero exit the agent should act on."""
     emit("STATUS", "render-error")
     emit("PHASE", details["phase"])
@@ -1353,13 +1433,14 @@ def report_render_error(target: Target, details, warnings):
         first = details["trace"].splitlines()
         emit("TRACE", first[0] + (f"  (+{len(first) - 1} more lines)" if len(first) > 1 else ""))
         debug_lines("error page trace", first)
+    emit("CONTROLLERS", controllers_value)
     emit("SCREENSHOT", f"{target.out_path}   [ERROR PAGE — this is not your UI]")
     emit_warnings(warnings)
     print("NEXT: fix the .zul at the location above, then re-run this script.")
     return EXIT_RENDER_ERROR
 
 
-def report_success(target: Target, args, launcher: LauncherJar, warnings):
+def report_success(target: Target, args, launcher: LauncherJar, warnings, controllers_value):
     resolved = target.resolved
     zk_jars = [j.name for j in resolved["jars"] if re.match(r"zk-\d", j.name)]
     emit("STATUS", "ok")
@@ -1371,6 +1452,7 @@ def report_success(target: Target, args, launcher: LauncherJar, warnings):
                       f"{len(resolved['resource_roots'])} resource roots")
     emit("ZK", ", ".join(zk_jars) or "unknown")
     emit("LAUNCHER", f"{launcher.version} ({launcher.source})")
+    emit("CONTROLLERS", controllers_value)
     emit_warnings(warnings)
     return EXIT_OK
 
@@ -1380,23 +1462,33 @@ def main(argv=None):
     enable_debug(args)
     track_usage_async()
     warnings = []
+    controllers = {}
 
     zul = locate_zul(args.zul)
     resolved = resolve_classpath(zul, args, warnings)                       # 1
+    if args.run_controllers and not resolved["output_roots"]:
+        # Said now rather than surfaced later as a ClassNotFoundException from inside the
+        # render: the run still proceeds, because a page whose controller lives in a jar on
+        # the classpath is legitimate.
+        warnings.append("--run-controllers was requested but no compiled classes are on the "
+                        "classpath — run your build first (mvn compile / gradle classes)")
     docroot, layout, request_path = resolve_request(zul, args, resolved)    # 2
     target = Target(zul, screenshot_path(args, zul), resolved, docroot, layout, request_path)
 
     java = find_java(args.java)                                            # 3
     launcher = resolve_launcher(args.launcher_jar, args.launcher_version,   # 4
                                warnings)
-    status, details = render(target, java, launcher.path, args, warnings)   # 5-7
+    status, details = render(target, java, launcher.path, args, warnings,  # 5-7
+                             controllers)
 
+    # Computed once, before either report: it can append a warning of its own.
+    controllers_value = controllers_line(args, controllers, launcher, warnings)
     if details is not None:
-        return report_render_error(target, details, warnings)
+        return report_render_error(target, details, warnings, controllers_value)
     if status != 200:
         raise Skipped(f"the render server answered HTTP {status} for {request_path}",
                       "check that the .zul path is correct relative to the docroot")
-    return report_success(target, args, launcher, warnings)
+    return report_success(target, args, launcher, warnings, controllers_value)
 
 
 if __name__ == "__main__":

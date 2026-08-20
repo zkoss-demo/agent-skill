@@ -32,8 +32,9 @@ ever pass `--classpath` by hand:
    bootstrap; a ZK-only classpath dies with `NoClassDefFoundError`.
 2. **The compiled-output roots** (`target/classes`, `build/classes/java/main`), so a page's own
    `<zscript>`, `use="..."` or custom EL function can resolve the project's classes. Test output
-   (`target/test-classes`, `build/classes/java/test`) is excluded. ViewModels and Composers still do
-   not run — that is enforced by the renderer, not by withholding the classes.
+   (`target/test-classes`, `build/classes/java/test`) is excluded. In the default mode ViewModels and
+   Composers still do not run — that is enforced by the renderer, not by withholding the classes — and
+   `--run-controllers` is what turns them on (see *Running controllers* below).
 3. **Resource roots** such as `src/main/resources`, so ZK's `~./` pages resolve.
 
 Consequence worth remembering: **a `<zscript>` naming a project class needs the project to have been
@@ -149,6 +150,61 @@ produced — see *What you cannot judge* in SKILL.md before treating a missing s
 allowed inside a given parent) are raised without position information, so `LOCATION` may carry only
 the file name. Use the `MESSAGE` — it names the components involved.
 
+## Running controllers (`--run-controllers`)
+
+By default the renderer substitutes a no-op composer for every `apply="..."` and every
+`viewModel="..."`, so no project controller ever runs. `--run-controllers` turns that off for the
+run: the project's real Composers and ViewModels are constructed, the real ZK `Binder` resolves real
+values, and the placeholder injector stands down completely.
+
+**It executes arbitrary project code.** Constructors, `doAfterCompose`, `@Init` methods, whatever
+they call. It is opt-in per render, never a default, and it is not what the ZK IntelliJ plugin does —
+that pane stays isolated. Pass it for a page whose controller you wrote in this session; do not pass
+it for code you have not read.
+
+The mode is always reported, on success and on an error page alike:
+
+| Line | Meaning |
+|---|---|
+| `CONTROLLERS: skipped (isolated)` | default. No Composer, no ViewModel. |
+| `CONTROLLERS: executed` | controllers ran; every value in the image is real. |
+| `CONTROLLERS: failed → isolated` | controllers were attempted and could not deliver; the isolated render was served instead, and `WARNINGS` names the cause. |
+
+**Fail soft.** A controller that throws, cannot be loaded, or overruns its budget never destroys the
+preview: the page is rendered once more with isolation on, the exit code stays **0**, the screenshot
+is still written, and a `WARNINGS` entry carries the exception class, the first line of its message
+and — when the stack names one — the failing project class. Treat that entry as a defect report
+against the controller, not against the ZUL.
+
+**`failed → isolated` really does mean the controller.** The renderer never guesses from the
+exception type: it compares the two attempts. Only a failure that disappears when the controllers
+stand down is reported as theirs. A page that is broken on its own fails both attempts, so it is
+reported exactly as it is without the flag — `CONTROLLERS: skipped (isolated)`, no controller
+warning, exit **1** with `PHASE`/`MESSAGE`/`LOCATION` — and the defect is in the ZUL at that
+location.
+
+**`--controller-timeout <seconds>`** (default 10) bounds a `--run-controllers` render. The budget
+covers the **whole render**, not controller time alone: the renderer cannot separate a composer's
+work from ZK's own first-paint work (language and component definitions, page compile), and a cold
+JVM's first render is the expensive one. So a legitimately heavy page on a slow machine can time out
+and degrade with nothing wrong in it — the warning always says the budget covers the whole render and
+names this flag. It is ignored in the default mode, which therefore can never time out.
+
+**Two warnings worth knowing.** If `--run-controllers` is passed and the resolved classpath carries
+no compiled output roots, the run says so immediately (`no compiled classes are on the classpath`)
+instead of surfacing a `ClassNotFoundException` from inside the render — build first. And if the
+render helper is older than this feature, it accepts the flag, ignores it, and renders isolated; the
+script detects the silence and warns, naming the launcher version, because a placeholder page judged
+under the rules for real data is the worst possible outcome here.
+
+**The placeholder matrix**, which is what the judging rules in SKILL.md turn on:
+
+| | Bound value | `model`-bound grid/listbox | `apply=` label |
+|---|---|---|---|
+| isolated (default) | dimmed placeholder text (`vm.customer`) | 3 dimmed placeholder rows | empty |
+| `--run-controllers` | the real value | the real rows | the real value |
+| `--run-controllers`, controller failed | falls back to the isolated row | " | " |
+
 ## Previewing a `.zul` outside any project
 
 Works with no setup: the script falls back to stock ZK CE and uses the file's own directory as the
@@ -167,7 +223,9 @@ variant, e.g. `--zk-version 10.1.0-jakarta`). Add-ons are not available on this 
 
 Useful flags: `--debug` (see above), `--width`/`--height` (default 1280x900), `--full-page` for the
 whole scrollable page, `--timeout` for slow pages, `--browser-channel chrome|msedge|chromium`,
-`--launcher-version` to move off the pinned render helper.
+`--launcher-version` to move off the pinned render helper, `--run-controllers` /
+`--no-run-controllers` to run (or force off) the project's real controllers, and
+`--controller-timeout` for their budget.
 
 ## Where the renderer comes from
 
