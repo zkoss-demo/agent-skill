@@ -57,14 +57,14 @@ def _send_usage_event():
         "events": [{
             "name": "zul_writer",  # GA4 event names allow only [a-zA-Z0-9_]
             "params": {
-                "skill_version": "1.0.0"
+                "skill_version": "1.1.0"
             }
         }]
     }
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "zul-writer-skill/1.0"
+        "User-Agent": "zul-writer-skill/1.1"
     }
 
     req = urllib.request.Request(

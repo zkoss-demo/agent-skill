@@ -38,3 +38,58 @@ jobs:
 
       - name: Run ZUL regression net
         run: python3 test/run-regression.py
+
+      # `skills/zul-writer/scripts/**` is inside this workflow's path filter, so
+      # preview-zul.py changes already trigger this job -- but run-regression.py only
+      # exercises validate-zul.py, so without this the job would go green having tested
+      # nothing about the preview script.
+      #
+      # Deliberately NOT a real render: that needs a JDK, ZK jars from
+      # mavensync.zkoss.org, a launcher download from GitHub Releases and a headless
+      # browser -- minutes of runtime and several flaky network dependencies. What
+      # actually breaks in practice is the *skip* path (an import error, a crash where a
+      # clean exit 2 was expected, a bad argparse spec), so test exactly that: no
+      # playwright, no JDK, no network, ~2 seconds.
+      #
+      # An unusable --classpath is the right trigger rather than "a project with no ZK":
+      # this runner HAS Maven, so the no-project path would legitimately fall back to
+      # fetching stock ZK and succeed. It also pins the ordering that matters -- reject
+      # an unusable classpath BEFORE downloading a jar or starting a JVM.
+      - name: Smoke-test preview-zul.py
+        run: |
+          python3 skills/zul-writer/scripts/preview-zul.py --help > /dev/null
+          mkdir -p /tmp/nozk
+          printf '<zk><label value="hi"/></zk>\n' > /tmp/nozk/smoke.zul
+          set +e
+          out=$(python3 skills/zul-writer/scripts/preview-zul.py \
+                  --classpath /nonexistent/none.jar \
+                  --out /tmp/nozk/out.png /tmp/nozk/smoke.zul 2>&1)
+          code=$?
+          set -e
+          echo "$out"
+          if [ "$code" != "2" ]; then
+            echo "::error::expected exit 2 for an unusable classpath, got $code"; exit 1
+          fi
+          if ! echo "$out" | grep -q '^PREVIEW_SKIPPED:'; then
+            echo "::error::exit 2 without a PREVIEW_SKIPPED: reason"; exit 1
+          fi
+          if [ -e /tmp/nozk/out.png ]; then
+            echo "::error::wrote a PNG on the skip path"; exit 1
+          fi
+          # A crash now also exits 2 (it must not exit 1 -- that means "your ZUL is
+          # broken"), so the exit code alone no longer distinguishes one from a clean
+          # skip. The wording does.
+          if echo "$out" | grep -q 'internal error'; then
+            echo "::error::the script crashed instead of skipping cleanly"; exit 1
+          fi
+          # --debug must add nothing to stdout: the caller parses stdout, so turning
+          # diagnostics on must not change what it sees.
+          dbg=$(python3 skills/zul-writer/scripts/preview-zul.py --debug \
+                  --classpath /nonexistent/none.jar \
+                  --out /tmp/nozk/out.png /tmp/nozk/smoke.zul 2>/dev/null || true)
+          plain=$(python3 skills/zul-writer/scripts/preview-zul.py \
+                  --classpath /nonexistent/none.jar \
+                  --out /tmp/nozk/out.png /tmp/nozk/smoke.zul 2>/dev/null || true)
+          if [ "$dbg" != "$plain" ]; then
+            echo "::error::--debug changed stdout"; exit 1
+          fi

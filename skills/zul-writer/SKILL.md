@@ -1,29 +1,30 @@
 ---
 name: zul-writer
 description: >
-  Generates ZK Framework ZUL pages (.zul) through a structured 4-step workflow: requirements clarification, ZUL generation, validation, and controller generation.
-  Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, and visual analysis for screenshot-to-ZUL conversion.
-  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), or convert an image/mockup to ZUL code.
+  Generates ZK Framework ZUL pages (.zul) through a structured 5-step workflow: requirements clarification, ZUL generation, validation, controller generation, and a rendered-image self-review.
+  Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, visual analysis for screenshot-to-ZUL conversion, and rendering an existing .zul to a preview PNG.
+  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, or preview/screenshot/see what a ZUL page looks like.
 license: MIT
 compatibility: >
   Designed for Claude Code, Gemini CLI, and GitHub Copilot/Cursor.
   Requires access to local skills/zul-writer/assets/ and skills/zul-writer/references/ directories.
 metadata:
   author: hawk
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 # ZUL Writer
 
 ## Workflow Overview
 
-This skill creates well-structured zul pages through a 4-step process:
+This skill creates well-structured zul pages through a 5-step process:
 
 1. **Clarify Requirements** - Gather page purpose, pattern, and layout needs
 2. **Generate ZUL** - Create the ZUL file based on requirements
 3. **Validate ZUL** - Verify correctness of the generated ZUL
 4. **Generate Controller Class** - Create the corresponding Java class (ViewModel or Composer)
+5. **Preview & Self-Review** - Render the page to an image and check it against the requirements
 
-**Alternative entry**: When user provides a UI image (screenshot/mockup), perform the **Visual Analysis** below first, then proceed to the 4-step process.
+**Alternative entry**: When user provides a UI image (screenshot/mockup), perform the **Visual Analysis** below first, then proceed to the 5-step process.
 
 ---
 
@@ -185,3 +186,68 @@ Generate the corresponding Java controller class (ViewModel or Composer) for the
 ### Complete Examples & Patterns
 
 For complex UI patterns like Kanban Boards or Dashboards, and for complete template examples, refer to [references/use-case-guidelines.md](references/use-case-guidelines.md).
+
+---
+
+## Step 5: Preview & Self-Review
+
+Render the finished page to an image, **look at it**, and check it against the requirements gathered in Step 1. Steps 2–4 only ever see markup; this is the only step that sees what the page actually looks like.
+
+Run the preview script from this skill's base directory (same convention as Step 3):
+
+```bash
+uv run <skill-base-dir>/scripts/preview-zul.py --out <path-to-png> <path-to-zul-file>
+```
+
+Example: if the skill base directory is `~/.claude/skills/zul-writer/` and the page lives in a Maven webapp, run:
+```bash
+uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --out /tmp/zul-preview.png src/main/webapp/index.zul
+```
+
+The script resolves the project's ZK jars (Maven, Gradle, or stock ZK when the file belongs to no project), renders the page through ZK's own engine, and writes a PNG. **Requires Java 17+ and Google Chrome or Microsoft Edge.** On first use it downloads the render helper (`zk-preview-launcher.jar`, ~500 KB), verifies its SHA-256, and caches it under `~/.cache/zul-writer/`; later runs need no network.
+
+Then **read the PNG** with your image-reading tool and compare it against the Step 1 answers. If the user started from a screenshot or mockup, re-read that image too and compare the two side by side.
+
+### When there is no preview
+
+The script exits **2** and prints one line beginning `PREVIEW_SKIPPED:` — no ZK jars resolvable, no Java 17+, no browser, or the helper could not be downloaded. **This is not a defect in the ZUL.** Report it in one line — *"Skipped the rendered preview: &lt;reason&gt;"* — and finish the task normally.
+
+Never describe a screenshot you did not see, and never let a skipped preview stand in for a passed one.
+
+The `NEXT:` line says what would enable a preview. If that looks fixable from here, spend **one** retry on it — appending `--debug` prints the resolved classpath, every helper command line and the renderer's own output to stderr (stdout is unchanged), which is usually enough to see why. Then stop and report the skip either way.
+
+### What to fix
+
+Judge **structure**, not pixels and not data. Fix only these:
+
+- **An error page instead of the page** (the script exits 1 and prints `PHASE`, `MESSAGE` and `LOCATION`). A real ZUL bug — fix it at the reported location.
+- **"Unknown component `<x>`"** — the jar defining that component is not on the classpath. Either the tag is a typo, or an add-on dependency is missing; ask the user rather than deleting the component.
+- **Missing or extra sections** compared with what Step 1 asked for.
+- **Wrong region placement** — a sidebar rendered under the content, a missing header, tab content sitting outside its `<tabpanel>`.
+- **Wrong component choice** — a data table rendered as a plain stack of labels, a form field that isn't the input type requested.
+- **Broken layout** — content clipped or overflowing, a horizontal scrollbar on a page meant to fit, a region collapsed to zero height, widgets overlapping, an `hflex`/`vflex` that visibly did not take.
+- **Raw unstyled HTML** where a ZK component was intended.
+
+### What you cannot judge from this image
+
+The preview renders the **first paint only, with no ViewModel and no Composer**. Everything below is the renderer behaving correctly. Do **not** "fix" it, do not report it as a flaw, and do not let it drive a re-render:
+
+- **Bound values shown as dimmed expression text** (e.g. a literal `vm.customer` inside a textbox) — the ViewModel never runs.
+- **Placeholder rows** in a `<grid>`/`<listbox>`/`<tree>` whose `model` is bound (e.g. rows reading `each.product`) — dimmed sample rows keep the component's real geometry.
+- **A whole section missing where an `<include>` has a bound `src`** — this one is *not* placeholdered. A constant literal (`src="@load('~./page.zul')"`) is included for real; anything the ViewModel supplies (`src="@load(vm.page)"`) leaves `src` unset, so the include contributes **nothing** and you see a silent gap, not dimmed text. Adding a hard-coded `src` to "fix" the gap breaks the real page.
+- **Anything a Composer or ViewModel would populate** — default values, initial selections, computed labels, i18n text. `apply="..."` composers are no-ops here.
+- **Anything requiring a server round-trip** — button clicks, paging, sorting, tree expansion, selection highlighting, a `<window>` or popup opened by an event. Only the first-paint state exists. Client-side `w:` handlers *do* run, and so does `<zscript>`.
+- **Missing images, fonts or `~./` resources** — the docroot is inferred, so assets outside it 404 in the preview but load fine on a real server.
+- **Theme-dependent colours and spacing** when the theme jar isn't a project dependency.
+- **Exact spacing, font rendering, sub-pixel alignment, or a colour that is merely close** to the mockup.
+- **Data content from the mockup** — sample data will differ. Compare the *shape* of the UI, not the values in it.
+
+### How many rounds
+
+- **At most two fix rounds — three renders total.** Round 1: render, read, list defects from *What to fix*. Fix them, re-run Step 3 validation, re-render. Round 2: same. Then stop.
+- **Fix only whole defects from that list.** If your list is empty, or everything left on it is in *What you cannot judge*, the page is good enough — say so in one line and stop. "Good enough" means every requirement from Step 1 is visibly present, in the right region, in the right kind of component, and nothing is clipped or overlapping.
+- **Never edit the ZUL for a cosmetic difference alone.** Chasing pixels against a mockup costs rounds and regresses working markup.
+- If a defect survives both rounds, **stop and tell the user** what it is and what you tried. Do not keep rendering.
+- Report the final image path so the user can look at it themselves.
+
+For classpath resolution details, the docroot rules, and what each `PREVIEW_SKIPPED` reason means, see [references/preview-guidelines.md](references/preview-guidelines.md).

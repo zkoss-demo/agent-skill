@@ -1,467 +1,220 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<?page title="Application Review - GovPortal"?>
-<!-- Generated from: ui-screenshots/Application Review.png -->
-<zk xmlns="http://www.zkoss.org/2005/zul"
-    xmlns:n="native">
+<?page title="Application Review | GovPortal"?>
+<zk>
+	<style>
+		.gp-page { background: #f4f6f9; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #16202c; }
+		.gp-shell { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
 
-    <style><![CDATA[
-        /* === Base === */
-        .gov-page {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            background: #f3f4f6;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
+		/* --- top navigation --- */
+		.gp-nav { background: #fff; border-bottom: 1px solid #e6eaf0; padding: 14px 0; }
+		.gp-page .gp-flex-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+		.gp-page .gp-nav-link, .gp-page .gp-footer-link, .gp-brand-name,
+		.gp-crumb-current, .gp-field-value, .gp-page button.gp-btn { white-space: nowrap; }
+		.gp-page .gp-logo { width: 34px; height: 34px; border-radius: 9px; background: #e8f1fe; color: #1877f2;
+			display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+		.gp-brand-name { font-size: 19px; font-weight: 700; }
+		.gp-page a.gp-nav-link { color: #55637a; font-size: 15px; text-decoration: none; }
+		.gp-page a.gp-nav-link-active { color: #1877f2; font-weight: 600; }
+		.gp-search { position: relative; width: 320px; }
+		.gp-page .gp-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+			color: #9aa7b8; font-size: 14px; z-index: 1; }
+		.gp-page input.gp-search-input { width: 100%; height: 42px; box-sizing: border-box; padding: 0 14px 0 40px;
+			border: 1px solid #e2e7ee; border-radius: 10px; background: #f7f9fc; font-size: 14px; }
+		.gp-page a.gp-icon-btn { color: #33415c; font-size: 17px; text-decoration: none; }
+		.gp-page .gp-avatar { width: 34px; height: 34px; border-radius: 50%; background: #dfe5ee; color: #5a6a80;
+			display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
 
-        /* === Navbar === */
-        .gov-navbar {
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
-            padding: 0 24px;
-            display: flex;
-            align-items: center;
-            height: 60px;
-            gap: 32px;
-        }
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 18px;
-            font-weight: 700;
-            color: #1f2937;
-        }
-        .nav-brand-icon {
-            color: #3b82f6;
-            font-size: 22px;
-        }
-        .nav-links {
-            display: flex;
-            gap: 4px;
-            flex: 1;
-        }
-        .nav-link {
-            padding: 6px 12px;
-            border-radius: 6px;
-            color: #6b7280;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        .nav-link:hover { color: #1f2937; background: #f9fafb; }
-        .nav-link.active { color: #3b82f6; }
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .nav-icon-btn .z-button {
-            background: none;
-            border: none;
-            color: #6b7280;
-            font-size: 18px;
-            cursor: pointer;
-        }
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: #374151;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            font-weight: 600;
-        }
+		/* --- breadcrumb --- */
+		.gp-crumbs { padding: 20px 0 4px; }
+		.gp-page a.gp-crumb-link { color: #5b6b82; font-size: 14px; text-decoration: none; }
+		.gp-crumb-sep { color: #a7b2c2; font-size: 14px; }
+		.gp-crumb-current { color: #16202c; font-size: 14px; }
 
-        /* === Content === */
-        .gov-content {
-            flex: 1;
-            max-width: 900px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 28px 16px;
-            box-sizing: border-box;
-        }
+		/* --- success banner --- */
+		.gp-banner { background: #ecfaf1; border: 1px solid #cfeddc; border-radius: 12px; padding: 22px 26px; margin-top: 14px; }
+		.gp-page .gp-banner-icon { width: 40px; height: 40px; border-radius: 50%; background: #d6f2e0; color: #12a150;
+			display: inline-flex; align-items: center; justify-content: center; font-size: 20px; }
+		.gp-banner-title { font-size: 25px; font-weight: 700; }
+		.gp-banner-sub { color: #55637a; font-size: 14px; }
+		.gp-page .gp-chip { background: #dcecf6; border-radius: 6px; padding: 3px 9px; font-family: monospace;
+			font-size: 13px; font-weight: 600; letter-spacing: .5px; }
 
-        /* === Breadcrumb === */
-        .breadcrumb {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            color: #6b7280;
-            margin-bottom: 20px;
-        }
-        .breadcrumb-link {
-            color: #6b7280;
-            text-decoration: none;
-        }
-        .breadcrumb-link:hover { color: #3b82f6; }
-        .breadcrumb-sep { color: #d1d5db; }
-        .breadcrumb-current { color: #374151; }
+		/* --- summary card --- */
+		.gp-card { background: #fff; border: 1px solid #e6eaf0; border-radius: 12px; margin: 28px 0; }
+		.gp-card-head { padding: 24px 30px; border-bottom: 1px solid #eef1f5; }
+		.gp-card-title { font-size: 20px; font-weight: 700; }
+		.gp-card-subtitle { color: #6b7a8d; font-size: 14px; }
+		.gp-page .gp-badge { background: #e6f0fd; color: #1a6fd4; border-radius: 6px; padding: 5px 11px;
+			font-size: 11px; font-weight: 700; letter-spacing: .8px; }
+		.gp-card-body { padding: 28px 30px 30px; }
+		.gp-hr { border-top: 1px solid #eef1f5; margin: 26px 0; }
+		.gp-section-head { margin-bottom: 20px; }
+		.gp-page .gp-section-icon { color: #1877f2; font-size: 14px; }
+		.gp-section-title { color: #1877f2; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+		.gp-fieldrow { margin-bottom: 22px; }
+		.gp-field-label { color: #8794a6; font-size: 11px; font-weight: 700; letter-spacing: .9px; }
+		.gp-field-value { font-size: 15px; min-height: 20px; display: inline-block; }
+		.gp-field-value-strong { font-weight: 600; }
+		.gp-page .gp-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+		.gp-page .gp-dot-high { background: #ef4444; }
+		.gp-page .gp-dot-normal { background: #f59e0b; }
+		.gp-page .gp-dot-low { background: #10b981; }
+		.gp-card-foot { background: #f8fafc; border-top: 1px solid #eef1f5; border-radius: 0 0 12px 12px; padding: 18px 30px; }
 
-        /* === Success Banner === */
-        .success-banner {
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 12px;
-            padding: 20px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-        }
-        .success-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        .success-icon-circle {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: #22c55e;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            flex-shrink: 0;
-        }
-        .success-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #14532d;
-            margin: 0 0 4px 0;
-        }
-        .success-ref {
-            font-size: 13px;
-            color: #166534;
-            margin: 0;
-        }
-        .ref-badge {
-            background: #dcfce7;
-            border: 1px solid #86efac;
-            color: #15803d;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 12px;
-        }
-        .btn-track-progress .z-button {
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 18px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-track-progress .z-button:hover { background: #2563eb; }
+		/* --- buttons --- */
+		.gp-page button.gp-btn { height: 44px; padding: 0 20px; border-radius: 9px; font-size: 15px; font-weight: 600;
+			background-image: none; box-shadow: none; cursor: pointer; }
+		.gp-page button.gp-btn-primary { background: #1877f2; border: 1px solid #1877f2; color: #fff; }
+		.gp-page button.gp-btn-ghost { background: #fff; border: 1px solid #dde3ec; color: #24324a; }
+		.gp-page button.gp-btn-dark { background: #101b2d; border: 1px solid #101b2d; color: #fff; }
 
-        /* === Application Card === */
-        .app-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-            padding: 24px;
-            margin-bottom: 20px;
-        }
-        .card-header-row {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-        }
-        .card-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #111827;
-            margin: 0;
-        }
-        .card-subtitle {
-            font-size: 13px;
-            color: #9ca3af;
-            margin: 4px 0 0 0;
-        }
-        .badge-finalized {
-            background: #eff6ff;
-            color: #3b82f6;
-            border: 1px solid #bfdbfe;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-        .card-divider {
-            border: none;
-            border-top: 1px solid #f3f4f6;
-            margin: 20px 0;
-        }
+		/* --- page footer --- */
+		.gp-footer { border-top: 1px solid #e6eaf0; padding: 22px 0 30px; }
+		.gp-footer-text { color: #77859a; font-size: 13px; }
+		.gp-page a.gp-footer-link { color: #77859a; font-size: 13px; text-decoration: none; }
+	</style>
 
-        /* === Section Headers === */
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        .section-icon {
-            color: #3b82f6;
-            font-size: 14px;
-        }
-        .section-label {
-            font-size: 11px;
-            font-weight: 700;
-            color: #3b82f6;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-        }
+	<div sclass="gp-page" hflex="1" vflex="1" apply="zwriter.ApplicationReviewComposer">
 
-        /* === Detail Grids === */
-        .detail-grid-3 {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        .detail-grid-2 {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-        }
-        .detail-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .detail-label {
-            font-size: 10px;
-            font-weight: 600;
-            color: #9ca3af;
-            letter-spacing: 0.6px;
-            text-transform: uppercase;
-        }
-        .detail-value {
-            font-size: 14px;
-            color: #111827;
-            font-weight: 500;
-            line-height: 1.4;
-        }
-        .priority-high {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-weight: 600;
-        }
-        .priority-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ef4444;
-            display: inline-block;
-            flex-shrink: 0;
-        }
+		<!-- top navigation -->
+		<div sclass="gp-nav">
+			<div sclass="gp-shell gp-flex-row">
+				<hlayout valign="middle" spacing="34px">
+						<hlayout valign="middle" spacing="11px">
+						<span sclass="gp-logo z-icon-university"/>
+						<label value="GovPortal" sclass="gp-brand-name"/>
+					</hlayout>
+					<hlayout valign="middle" spacing="30px">
+						<a label="Dashboard" sclass="gp-nav-link"/>
+						<a label="Applications" sclass="gp-nav-link gp-nav-link-active"/>
+						<a label="Documents" sclass="gp-nav-link"/>
+						<a label="Settings" sclass="gp-nav-link"/>
+					</hlayout>
+				</hlayout>
+				<hlayout valign="middle" spacing="20px">
+					<div sclass="gp-search">
+						<span sclass="gp-search-icon z-icon-search"/>
+						<textbox id="searchBox" sclass="gp-search-input" placeholder="Search applications..."/>
+					</div>
+					<a id="notificationsBtn" iconSclass="z-icon-bell" sclass="gp-icon-btn" tooltiptext="Notifications"/>
+					<span sclass="gp-avatar z-icon-user"/>
+				</hlayout>
+			</div>
+		</div>
 
-        /* === Action Buttons === */
-        .action-buttons {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .btn-outline .z-button {
-            background: white;
-            border: 1px solid #d1d5db;
-            color: #374151;
-            border-radius: 8px;
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-outline .z-button:hover { background: #f9fafb; }
-        .btn-primary-dark .z-button {
-            background: #111827;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 18px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-primary-dark .z-button:hover { background: #1f2937; }
+		<div sclass="gp-shell">
 
-        /* === Footer === */
-        .gov-footer {
-            background: white;
-            border-top: 1px solid #e5e7eb;
-            padding: 16px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #9ca3af;
-        }
-        .footer-links {
-            display: flex;
-            gap: 20px;
-        }
-        .footer-link {
-            color: #9ca3af;
-            text-decoration: none;
-        }
-        .footer-link:hover { color: #374151; }
-    ]]></style>
+			<!-- breadcrumb -->
+			<hlayout sclass="gp-crumbs" valign="middle" spacing="9px">
+				<a label="Applications" sclass="gp-crumb-link"/>
+				<label value="/" sclass="gp-crumb-sep"/>
+				<label id="breadcrumbCurrent" sclass="gp-crumb-current"/>
+			</hlayout>
 
-    <div apply="zwriter.ApplicationReviewComposer" sclass="gov-page">
+			<!-- submission confirmation banner -->
+			<div sclass="gp-banner">
+				<hlayout valign="middle" spacing="18px" hflex="1">
+					<span sclass="gp-banner-icon z-icon-check-circle"/>
+					<vlayout spacing="6px" hflex="1">
+						<label value="Application Submitted Successfully" sclass="gp-banner-title"/>
+						<hlayout valign="middle" spacing="10px">
+							<label value="Reference Number:" sclass="gp-banner-sub"/>
+							<label id="referenceChip" sclass="gp-chip"/>
+						</hlayout>
+					</vlayout>
+					<button id="trackProgressBtn" label="Track Progress" iconSclass="z-icon-eye"
+							sclass="gp-btn gp-btn-primary"/>
+				</hlayout>
+			</div>
 
-        <!-- Navigation Header -->
-        <n:header class="gov-navbar">
-            <n:div class="nav-brand">
-                <n:span class="z-icon-building nav-brand-icon"/>
-                <n:span>GovPortal</n:span>
-            </n:div>
-            <n:nav class="nav-links">
-                <n:a href="#" class="nav-link">Dashboard</n:a>
-                <n:a href="#" class="nav-link active">Applications</n:a>
-                <n:a href="#" class="nav-link">Documents</n:a>
-                <n:a href="#" class="nav-link">Settings</n:a>
-            </n:nav>
-            <n:div class="nav-right">
-                <textbox id="searchBox" placeholder="Search applications..." width="200px"/>
-                <button id="bellBtn" iconSclass="z-icon-bell" sclass="nav-icon-btn"/>
-                <n:div class="user-avatar">JD</n:div>
-            </n:div>
-        </n:header>
+			<!-- application summary card -->
+			<div sclass="gp-card">
+				<div sclass="gp-card-head">
+					<hlayout valign="middle" hflex="1">
+						<vlayout spacing="5px" hflex="1">
+							<label value="Application Summary" sclass="gp-card-title"/>
+							<label value="Variant 1: Comprehensive Detail View" sclass="gp-card-subtitle"/>
+						</vlayout>
+						<label id="statusBadge" sclass="gp-badge"/>
+					</hlayout>
+				</div>
 
-        <!-- Main Content -->
-        <n:main class="gov-content">
+				<div sclass="gp-card-body">
+					<hlayout sclass="gp-section-head" valign="middle" spacing="9px">
+						<span sclass="gp-section-icon z-icon-user"/>
+						<label value="PERSONAL INFORMATION" sclass="gp-section-title"/>
+					</hlayout>
+					<hlayout sclass="gp-fieldrow" valign="top" hflex="1" spacing="24px">
+						<vlayout hflex="1" spacing="7px">
+							<label value="FULL NAME" sclass="gp-field-label"/>
+							<label id="fullName" sclass="gp-field-value"/>
+						</vlayout>
+						<vlayout hflex="1" spacing="7px">
+							<label value="DATE OF BIRTH" sclass="gp-field-label"/>
+							<label id="dateOfBirth" sclass="gp-field-value"/>
+						</vlayout>
+						<vlayout hflex="1" spacing="7px">
+							<label value="RESIDENTIAL ADDRESS" sclass="gp-field-label"/>
+							<label id="residentialAddress" sclass="gp-field-value"/>
+						</vlayout>
+					</hlayout>
 
-            <!-- Breadcrumb -->
-            <n:nav class="breadcrumb">
-                <n:a href="#" class="breadcrumb-link">Applications</n:a>
-                <n:span class="breadcrumb-sep"> / </n:span>
-                <n:span class="breadcrumb-current">Review REF-2023-0892</n:span>
-            </n:nav>
+					<div sclass="gp-hr"/>
 
-            <!-- Success Banner -->
-            <n:div class="success-banner">
-                <n:div class="success-left">
-                    <n:div class="success-icon-circle">
-                        <n:span class="z-icon-check"/>
-                    </n:div>
-                    <n:div>
-                        <n:h2 class="success-title">Application Submitted Successfully</n:h2>
-                        <n:p class="success-ref">
-                            Reference Number:&#160;<n:span class="ref-badge">REF-2023-0892</n:span>
-                        </n:p>
-                    </n:div>
-                </n:div>
-                <button id="trackProgressBtn" label="Track Progress" iconSclass="z-icon-eye" sclass="btn-track-progress"/>
-            </n:div>
+					<hlayout sclass="gp-section-head" valign="middle" spacing="9px">
+						<span sclass="gp-section-icon z-icon-file-alt"/>
+						<label value="APPLICATION DETAILS" sclass="gp-section-title"/>
+					</hlayout>
+					<hlayout sclass="gp-fieldrow" valign="top" hflex="1" spacing="24px">
+						<vlayout hflex="1" spacing="7px">
+							<label value="APPLICATION TYPE" sclass="gp-field-label"/>
+							<label id="applicationType" sclass="gp-field-value"/>
+						</vlayout>
+						<vlayout hflex="1" spacing="7px">
+							<label value="SUBMISSION DATE" sclass="gp-field-label"/>
+							<label id="submissionDate" sclass="gp-field-value"/>
+						</vlayout>
+						<vlayout hflex="1" spacing="7px">
+							<label value="PRIORITY LEVEL" sclass="gp-field-label"/>
+							<hlayout valign="middle" spacing="9px">
+								<span id="priorityDot" sclass="gp-dot"/>
+								<label id="priorityLevel" sclass="gp-field-value gp-field-value-strong"/>
+							</hlayout>
+						</vlayout>
+					</hlayout>
+					<hlayout sclass="gp-fieldrow" valign="top" hflex="1" spacing="24px">
+						<vlayout hflex="1" spacing="7px">
+							<label value="REVIEWING OFFICE" sclass="gp-field-label"/>
+							<label id="reviewingOffice" sclass="gp-field-value"/>
+						</vlayout>
+						<vlayout hflex="1" spacing="7px">
+							<label value="VERIFICATION ID" sclass="gp-field-label"/>
+							<label id="verificationId" sclass="gp-field-value"/>
+						</vlayout>
+						<div hflex="1"/>
+					</hlayout>
+				</div>
 
-            <!-- Application Summary Card -->
-            <n:div class="app-card">
-                <!-- Card Header -->
-                <n:div class="card-header-row">
-                    <n:div>
-                        <n:h3 class="card-title">Application Summary</n:h3>
-                        <n:p class="card-subtitle">Variant 1: Comprehensive Detail View</n:p>
-                    </n:div>
-                    <n:span class="badge-finalized">FINALIZED</n:span>
-                </n:div>
+				<div sclass="gp-card-foot gp-flex-row">
+					<hlayout valign="middle" spacing="13px">
+						<button id="printBtn" label="Print Summary" iconSclass="z-icon-print"
+								sclass="gp-btn gp-btn-ghost"/>
+						<button id="downloadPdfBtn" label="Download PDF" iconSclass="z-icon-file-pdf"
+								sclass="gp-btn gp-btn-ghost"/>
+					</hlayout>
+					<button id="homeBtn" label="Return to Home" iconSclass="z-icon-home"
+							sclass="gp-btn gp-btn-dark"/>
+				</div>
+			</div>
 
-                <n:hr class="card-divider"/>
-
-                <!-- Personal Information -->
-                <n:div class="section-header">
-                    <n:span class="z-icon-user section-icon"/>
-                    <n:span class="section-label">Personal Information</n:span>
-                </n:div>
-                <n:div class="detail-grid-3">
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Full Name</n:span>
-                        <n:span class="detail-value">John Quincy Doe</n:span>
-                    </n:div>
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Date of Birth</n:span>
-                        <n:span class="detail-value">January 15, 1985</n:span>
-                    </n:div>
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Residential Address</n:span>
-                        <n:span class="detail-value">123 Maple Avenue, Springfield, IL 62704</n:span>
-                    </n:div>
-                </n:div>
-
-                <n:hr class="card-divider"/>
-
-                <!-- Application Details -->
-                <n:div class="section-header">
-                    <n:span class="z-icon-file-alt section-icon"/>
-                    <n:span class="section-label">Application Details</n:span>
-                </n:div>
-                <n:div class="detail-grid-3">
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Application Type</n:span>
-                        <n:span class="detail-value">Corporate License Renewal</n:span>
-                    </n:div>
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Submission Date</n:span>
-                        <n:span class="detail-value">August 24, 2023 • 14:32 EST</n:span>
-                    </n:div>
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Priority Level</n:span>
-                        <n:span class="detail-value priority-high">
-                            <n:span class="priority-dot"/>High Priority
-                        </n:span>
-                    </n:div>
-                </n:div>
-                <n:div class="detail-grid-2" style="margin-top: 20px">
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Reviewing Office</n:span>
-                        <n:span class="detail-value">Dept. of Commerce Central</n:span>
-                    </n:div>
-                    <n:div class="detail-item">
-                        <n:span class="detail-label">Verification ID</n:span>
-                        <n:span class="detail-value">VID-00981-XYZ</n:span>
-                    </n:div>
-                </n:div>
-            </n:div>
-
-            <!-- Action Buttons -->
-            <n:div class="action-buttons">
-                <button id="printBtn" label="Print Summary" iconSclass="z-icon-print" sclass="btn-outline"/>
-                <button id="downloadBtn" label="Download PDF" iconSclass="z-icon-download" sclass="btn-outline"/>
-                <space hflex="1"/>
-                <button id="returnHomeBtn" label="Return to Home" iconSclass="z-icon-home" sclass="btn-primary-dark"/>
-            </n:div>
-
-        </n:main>
-
-        <!-- Footer -->
-        <n:footer class="gov-footer">
-            <n:span>© 2023 GovPortal Services. All rights reserved.</n:span>
-            <n:nav class="footer-links">
-                <n:a href="#" class="footer-link">Privacy Policy</n:a>
-                <n:a href="#" class="footer-link">Terms of Service</n:a>
-                <n:a href="#" class="footer-link">Contact Support</n:a>
-            </n:nav>
-        </n:footer>
-
-    </div>
-
+			<!-- page footer -->
+			<div sclass="gp-footer gp-flex-row">
+				<label value="© 2023 GovPortal Services. All rights reserved." sclass="gp-footer-text"/>
+				<hlayout valign="middle" spacing="30px">
+					<a label="Privacy Policy" sclass="gp-footer-link"/>
+					<a label="Terms of Service" sclass="gp-footer-link"/>
+					<a label="Contact Support" sclass="gp-footer-link"/>
+				</hlayout>
+			</div>
+		</div>
+	</div>
 </zk>
