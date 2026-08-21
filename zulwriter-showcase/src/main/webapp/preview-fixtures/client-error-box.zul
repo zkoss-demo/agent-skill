@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- P1-4 fixture: ZK client error box. zk.error() is called directly because that is the
+     honest AC-2 case: the SERVER renders this page happily (STATUS: ok, exit 0) while the
+     CLIENT engine complains, which is the failure shape a missing add-on jar produces. It
+     cannot be reproduced with an unknown component NAME — that fails at server PARSE with
+     HTTP 500 and no client engine ever boots. ZK does not console.error these, so the tool
+     has to read them out of the on-page box. Two distinct messages plus a verbatim repeat:
+     the repeat proves the dedupe, the second message proves the multi-message walk over
+     `.messages` (the first is its text, the rest are element children). -->
+<zk xmlns:n="native">
+	<vlayout>
+		<label value="ZK client error fixture"/>
+		<n:script>
+			zk.afterMount(function () {
+				zk.error('Unknown widget: com.acme.Missing');
+				zk.error('Failed to mount: com.acme.Missing');
+				zk.error('Unknown widget: com.acme.Missing');
+			});
+		</n:script>
+	</vlayout>
+</zk>

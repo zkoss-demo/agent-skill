@@ -58,6 +58,10 @@ READING THE RESULT — stdout is one `KEY: value` per line. Branch on the first 
 
 WARNINGS: entries are advisory. A 404 on a ZK asset usually means an add-on jar is missing
 from the classpath, so the image can look plausible and still be wrong.
+`console error:` / `console warning:` entries are what the page's own JavaScript logged.
+`ZK client error:` entries are what ZK's client engine put in its on-page error box — it
+uses that box rather than the console, so those complaints are only visible there. Both
+kinds are deduped and capped; --debug lists every console level, on stderr only.
 
 LAYOUT: entries are what the browser measured, so they are facts rather than opinions —
 read them before opening the PNG. The block covers the WHOLE document, not just the
@@ -1190,6 +1194,11 @@ ZK_READY = """() => {
 
 LAYOUT_PRINT_CAP = 25       # spec P1-3: cap the printed list, never truncate silently
 LAYOUT_COLLECT_CAP = 200    # bounds the payload crossing the CDP boundary; `total` stays truthful
+CONSOLE_WARNING_CAP = 10    # spec P1-4: console findings are "deduped, capped at 10"
+# Deliberately no collect cap beside it. LAYOUT_COLLECT_CAP bounds one payload crossing the
+# CDP boundary in a single page.evaluate; console messages arrive one at a time and are
+# snipped to one line on arrival, so the dedupe alone bounds memory and the "and N more"
+# count stays exactly truthful.
 
 # The rules run in precedence order and a node that produced a finding is `claimed`,
 # so one defect yields one line: without that, a width-0 link reports as zero-size AND
@@ -1484,6 +1493,43 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
 }"""
 
 
+# --- ZK client error box -------------------------------------------------
+# ZK's client engine does NOT log to the console: zk.error() hands the message to
+# zk.debugLog (which reaches the console only under zk.debugJS) and then to
+# zk.errorPush -> zk._Erbx, which appends a box to document.body
+# (zk-10.3.0.1-Eval.jar web/js/zk/index.src.js:35803-35816, :36487-36500). So every
+# ZK client complaint — "Unknown widget: ...", "Failed to mount: ...", a missing mold —
+# is reachable from the DOM and from nowhere else. This is a read of ZK-internal markup
+# with no API contract behind it; treat it as best-effort.
+ZK_ERROR_BOX_JS = """() => {
+  const out = [];
+  document.querySelectorAll('div.z-error > .messagecontent > .messages').forEach((box) => {
+    // _Erbx builds the FIRST message as the direct text of .messages and appends each
+    // further one as an element child - div.message, or div.newmessage while the
+    // slideDown is still in flight (index.src.js:36532-36537). Hence the two reads:
+    // box.textContent alone would glue every message into one string.
+    const first = Array.prototype.filter.call(box.childNodes, (n) => n.nodeType === 3)
+                       .map((n) => n.textContent).join('').trim();
+    if (first) out.push(first);
+    Array.prototype.forEach.call(box.children, (child) => {
+      const text = (child.textContent || '').trim();
+      if (text) out.push(text);
+    });
+  });
+  return out;
+}"""
+
+
+def _one_line(text, limit=200):
+    """One line, bounded width — the shape every console / client-error entry prints in.
+    `str(e).splitlines()[0]` (the pageerror handler in capture()) is the established idiom
+    here, but a console message is frequently one enormous serialized object on a single
+    line, so the width bound has to come with it."""
+    lines = (text or "").splitlines()
+    first = lines[0].strip() if lines else ""
+    return first if len(first) <= limit else first[:limit] + "\u2026"
+
+
 def capture(url, out_path: Path, args, warnings, controllers, layout):
     """Returns (http_status, error_details_or_None).
 
@@ -1519,6 +1565,37 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
         try:
             page = browser.new_page(viewport={"width": args.width, "height": args.height})
             page.on("pageerror", lambda e: warnings.append(f"page error: {str(e).splitlines()[0]}"))
+
+            # The console carries what the page's own JavaScript logged — ZK's client engine
+            # is not on it (see ZK_ERROR_BOX_JS), which is why there are two collectors.
+            # An insertion-ordered dict keyed (level, one-lined text) is both the dedupe and
+            # the print order.
+            console_seen = {}
+            client_errors = []
+
+            def _on_console(msg):
+                # Suppressed whole: a malformed console message must never fail a good render.
+                with contextlib.suppress(Exception):
+                    text = _one_line(msg.text)
+                    location = msg.location or {}
+                    origin = location.get("url") or ""
+                    # The --debug dump is unconditional and covers EVERY level, including the
+                    # ones filtered out below — stderr only, so stdout's contract is untouched.
+                    debug("console", f"[{msg.type}] {text}"
+                          + (f"  ({origin}:{location.get('lineNumber')})" if origin else ""))
+                    if msg.type not in ("error", "warning"):
+                        return
+                    # Chromium reports its own network failures on the console, and they are
+                    # not the page complaining: measured, EVERY page emits exactly one of
+                    # these — a 404 for /favicon.ico — whose text carries no URL at all, so
+                    # keeping them would put a false finding on every clean page. The ones
+                    # that matter, ZK's own /zkau/web/ assets, are already reported by the
+                    # page.on("response") handler below, with the real URL and advice.
+                    if text.startswith("Failed to load resource:"):
+                        return
+                    console_seen[(msg.type, text)] = None
+
+            page.on("console", _on_console)
             missing = []
             page.on("response", lambda r: missing.append(r.url) if r.status >= 400
                     and "/zkau/web/" in r.url else None)
@@ -1585,9 +1662,40 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
                     debug("layout viewport",
                           f"{audited['viewport']['w']}x{audited['viewport']['h']}")
 
+                # After the screenshot for the same reason as the audit above — the PNG is
+                # already on disk, so nothing evaluated here can alter the image it explains.
+                # Skipped on the launcher's error page: that box would be our own diagnostic
+                # UI, not the user's. Suppressed wholesale, because a bug in the read must
+                # never fail a good render.
+                with contextlib.suppress(Exception):
+                    client_errors.extend(_one_line(m) for m in page.evaluate(ZK_ERROR_BOX_JS))
+                    debug("client error box", f"{len(client_errors)} message(s)")
+
             for url_404 in dict.fromkeys(missing):
                 warnings.append(f"ZK resource not served: {url_404} — an add-on jar may be "
                                 "missing from the classpath, so the image may be misleading")
+
+            # P1-4 feeds the EXISTING WARNINGS block: the block order is a contract, so no
+            # new block and no new exit code. Ungated on `details`, because on the launcher's
+            # error page both collectors are empty by construction — no ZK client engine
+            # boots there and the page runs no script of the user's.
+            def _append_capped(entry_fn, items, tail_noun):
+                for item in items[:CONSOLE_WARNING_CAP]:
+                    warnings.append(entry_fn(item))
+                # Never a silent truncation (same rule as the LAYOUT: block): whatever the
+                # cap dropped is counted on a line of its own.
+                dropped = len(items) - CONSOLE_WARNING_CAP
+                if dropped > 0:
+                    warnings.append(f"... and {dropped} more {tail_noun}")
+
+            # ZK client errors first: a complaint from the client engine outranks a page log
+            # line, because it names something that did not render at all.
+            _append_capped(lambda msg: f"ZK client error: {msg}",
+                           list(dict.fromkeys(client_errors)),
+                           "in ZK's on-page error box")
+            _append_capped(lambda entry: f"console {entry[0]}: {entry[1]}",
+                           list(console_seen),
+                           "console message(s) (re-run with --debug to see every level)")
             return status, details
         finally:
             browser.close()

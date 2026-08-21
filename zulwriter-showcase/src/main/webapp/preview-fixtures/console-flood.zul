@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- P1-4 fixture: caps, dedupe and the one-line snip. 12 DISTINCT console.error messages
+     plus a verbatim repeat of the first, so WARNINGS must print exactly 10 of them and then
+     account for the rest on a `... and 2 more` line rather than truncating silently. One
+     message carries an embedded newline (only its first line may print) and one is ~400
+     characters (it must be snipped at 200 with a trailing ellipsis). -->
+<zk xmlns:n="native">
+	<vlayout>
+		<label value="console flood fixture"/>
+		<n:script>
+			console.error('flood 01 first');
+			console.error('flood 02');
+			console.error('flood 03');
+			console.error('flood 04');
+			console.error('flood 05 visible line\nflood 05 hidden second line');
+			console.error('flood 06');
+			console.error('flood 07');
+			console.error('flood 08');
+			console.error('flood 09 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+			console.error('flood 10');
+			console.error('flood 11');
+			console.error('flood 12');
+			console.error('flood 01 first');   // verbatim repeat: proves the dedupe
+		</n:script>
+	</vlayout>
+</zk>

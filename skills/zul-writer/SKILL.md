@@ -281,6 +281,36 @@ Under `CONTROLLERS: skipped (isolated)`, a `clipped-text` finding on placeholder
 in a narrow column) is measured against the placeholder, not against your real data — check it
 against a `--run-controllers` render before widening a column for it.
 
+### `WARNINGS:` — console and client errors
+
+Three entry shapes in the `WARNINGS:` block come from the browser rather than from the launcher:
+
+| Entry | What it means |
+|---|---|
+| `console error: <text>` | the page's own JavaScript called `console.error` — a `<zscript>`, an `n:script`, or a widget's client code |
+| `console warning: <text>` | the same for `console.warn`. ZK's client engine does emit a few real ones (an unloaded locale, an unexpectedly large AU batch) |
+| `ZK client error: <text>` | ZK's **client engine** complained — an unknown widget, a failed mount, a missing mold. The server was happy: `STATUS: ok`, exit 0 |
+
+A `ZK client error:` entry is the one to take seriously. It is the only signal that the page the
+server rendered did not actually come up in the browser, and it is invisible in the exit code.
+
+Three limits worth knowing:
+
+- **It covers first paint only** — everything up to just after the screenshot. A complaint raised by
+  a later AU round-trip is never seen, so an empty block is not proof of a clean session.
+- **ZK's client complaints come from its on-page error box**, which the script reads out of the DOM
+  because ZK does not put them on the console. That box is a real element appended to the page — a
+  pale red panel headed `N Errors`, top-centre, with a reload and a close icon — so it usually
+  appears **in the PNG**. An unexplained red panel in the image is this same finding, not markup of
+  yours to fix. Its own `N` counts every raised message, while the `WARNINGS` entries are deduped,
+  so the two numbers legitimately differ when one complaint repeats.
+- **Browser `Failed to load resource:` lines are deliberately not reported here.** Every page emits
+  one for its missing favicon. A ZK asset that really failed gets its own `WARNINGS` entry, naming
+  the URL.
+
+`--debug` prints every console level to stderr, including the levels this block filters out — reach
+for it when a page misbehaves and the block is empty.
+
 ### What to fix
 
 Judge **structure**, not pixels and not data. Fix only these:
@@ -292,6 +322,10 @@ Judge **structure**, not pixels and not data. Fix only these:
 - **Wrong component choice** — a data table rendered as a plain stack of labels, a form field that isn't the input type requested.
 - **Broken layout** — content clipped or overflowing, a horizontal scrollbar on a page meant to fit, a region collapsed to zero height, widgets overlapping, an `hflex`/`vflex` that visibly did not take. The `LAYOUT:` block names all of these precisely, with the component and the measurement — fix those first, before anything you are judging by eye.
 - **Raw unstyled HTML** where a ZK component was intended.
+- **A `ZK client error:` entry naming an unknown widget or a failed mount** — the add-on jar's
+  CLIENT-side JS package is absent even though the server-side class resolved, which is why the page
+  parsed and then came up wrong. Check the `WARNINGS` 404 entries and the classpath, and ask the user
+  about the dependency — never rewrite working markup for it.
 - **`CONTROLLERS: failed → isolated`** — read the `WARNINGS` entry: it names the failing class and
   the first cause line. A controller exception, a missing class or a blown budget is a defect in the
   **controller** (or a missing build), not in the ZUL. Fix it there and re-render, or report it —

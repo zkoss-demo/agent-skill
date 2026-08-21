@@ -262,6 +262,55 @@ when there are more, a final `  ... and N more` line accounts for the rest. The 
 nothing else: the same findings are reported without it, and `STATUS: ok` still prints with it — exit
 1 stays reserved for a real defect in the .zul.
 
+## Console and client-error warnings
+
+Two browser-side channels feed the existing `WARNINGS:` block. Neither adds a block and neither
+changes the exit code — console findings are advisory, exactly like the 404 entries beside them.
+
+| Entry | Source | Captured how |
+|---|---|---|
+| `console error: <text>` | the page's own JavaScript at `console.error` | `page.on("console")`, level `error` |
+| `console warning: <text>` | the same at `console.warn` | `page.on("console")`, level `warning` |
+| `ZK client error: <text>` | ZK's client engine — `zk.error()` | a DOM read of the on-page error box, after the screenshot |
+
+**Only `error` and `warning` are collected.** `log`, `info`, `debug` and `trace` never reach stdout.
+`--debug` dumps *every* level to stderr, with the originating URL and line, including the levels
+this block filters out — stdout's contract is identical with and without it.
+
+**What is dropped, and why.** A console entry whose text starts with `Failed to load resource:` is
+discarded. Those come from Chromium's network stack rather than from page JavaScript, and every page
+emits at least one: a 404 for `/favicon.ico`, which the launcher does not serve. Their text carries
+no URL at all — the URL is only in the message's `location` — so they would read as an unattributable
+finding on every clean page. The asset failures that matter, ZK's own `/zkau/web/` resources, are
+reported separately by the `page.on("response")` handler with the real URL and the classpath advice.
+The cost is deliberate under-reporting in two places: a page whose own JS logs a message beginning
+with that exact string is dropped too, and a 404 on an asset *outside* `/zkau/web/` (a project CSS
+file, an app image) is now reported by neither channel. Widening the 404 detector is a separate job.
+
+**Why ZK's complaints need a DOM read.** ZK 10.3's client engine does not use the console.
+`zk.error()` passes the message to `zk.debugLog` — which only reaches the console when `zk.debugJS`
+is on — and then to `zk.errorPush` → `zk._Erbx`, which appends a box to `document.body`
+(`zk-10.3.0.1-Eval.jar`, `web/js/zk/index.src.js:35803-35816` and `:36487-36500`). A `page.on(
+"console")` subscription therefore sees *nothing* of "Unknown widget: …", "Failed to mount: …" or a
+missing mold. So the script reads `div.z-error > .messagecontent > .messages` after the screenshot:
+its direct text nodes are the first message and each element child is one more, which is how
+`_Erbx.push` builds it. This is a read of ZK-internal markup with no API contract behind it — a
+future ZK that renames the box breaks the capture **silently**, because the read is
+exception-suppressed so that a bug in it can never fail a good render. Treat it as best-effort.
+
+**Caps and dedupe.** Each channel prints at most 10 entries, deduped — console by `(level, text)`,
+client errors by text — and when there are more, a final `  ... and N more …` line accounts for the
+rest rather than truncating silently. Every entry is one line: the first line only, snipped at 200
+characters with a trailing `…`, because a console message is frequently one enormous serialized
+object.
+
+**Limits.** The window closes just after the screenshot: a `zk.error` raised by a later AU response,
+or a console message emitted after the last Playwright wait, is never delivered, so an empty block is
+not proof of a clean session. A box the page dismissed itself is invisible. `zk.debugJS` stack traces
+are not captured. And the error box is a real visible overlay, so on a page that raises a client
+error it may show up in the PNG — possibly mid-animation, since `animations="disabled"` applies to
+the screenshot and not to a jQuery `slideDown` already in flight.
+
 ## Previewing a `.zul` outside any project
 
 Works with no setup: the script falls back to stock ZK CE and uses the file's own directory as the

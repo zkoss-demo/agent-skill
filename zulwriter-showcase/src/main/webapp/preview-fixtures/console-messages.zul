@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- P1-4 fixture: console capture. console.error/console.warn MUST reach WARNINGS as
+     `console error: boom` / `console warning: careful`; console.log/console.info MUST NOT
+     reach stdout at all, yet MUST still appear in the debug dump on stderr. `n:script` and
+     not `<script>`: the latter is ZK's script COMPONENT, this needs raw HTML. -->
+<zk xmlns:n="native">
+	<vlayout>
+		<label value="console message fixture"/>
+		<n:script>
+			console.error('boom');
+			console.warn('careful');
+			console.log('chatter');
+			console.info('fyi');
+		</n:script>
+	</vlayout>
+</zk>
