@@ -242,6 +242,45 @@ It is one line in the output, and the judging rules below **invert** on it:
 | `CONTROLLERS: skipped (isolated)` | the default: no Composer, no ViewModel | dimmed expression text and placeholder rows are correct behaviour |
 | `CONTROLLERS: failed → isolated` | you asked for controllers; they failed and the isolated render was served instead | read it under the isolated rules, and see the new *What to fix* bullet below |
 
+### Read the `LAYOUT:` block first
+
+A browser *measured* these, so they are facts, not opinions — read them before you open the PNG.
+Each line is `rule | locator | measurement`:
+
+```
+LAYOUT: 3 findings
+  - zero-size         | a[label="Settings"] | 0x0 with text but no box
+  - clipped-text      | a[label="Documents"] | text needs 77px, box is 48px
+  - viewport-overflow | grid.gp-wide | page scrollWidth 2005 > viewport 1280; widest offender 2000px
+```
+
+The locator is the ZUL id when the component has one (`label#breadcrumbCurrent`), otherwise the
+component plus a distinguishing attribute (`a[label="Settings"]`) or its style class
+(`grid.gp-wide`). It never names a generated id, so it is always something you can find in your own
+markup.
+
+| Rule | What it means | What fixes it |
+|---|---|---|
+| `clipped-text` | the text does not fit the box that clips it, so part of it is cut off | widen the box (`width`/`hflex`), let it wrap, or shorten the text |
+| `zero-size` | the component occupies no space at all, and its content is invisible | a missing `height`/`vflex` on it or an ancestor, or a `width: 0` style rule |
+| `escapes-parent` | the component's box sticks out of an ancestor that clips, so the overhang is cut | give the parent room, or stop the child overflowing it |
+| `viewport-overflow` | the page is wider than the viewport, so it needs a horizontal scrollbar; the line names the widest offender | remove the fixed width on the named element, or make it `hflex`/percentage |
+
+Three things to know before you act on the block:
+
+- **It is omitted entirely when there is nothing to report.** No `LAYOUT:` line means the audit ran
+  and found nothing.
+- **It never changes the exit code in this loop.** Findings are reported, not enforced; `STATUS: ok`
+  still means the page rendered. Only CI's `--fail-on-layout` turns findings into exit 4, and even
+  then `STATUS: ok` prints first.
+- **It covers the whole document, not just the captured image** — including everything below the
+  fold, with or without `--full-page`. So a finding may name something the screenshot does not show.
+  Trust the measurement, and re-render with `--full-page` if you want to see it.
+
+Under `CONTROLLERS: skipped (isolated)`, a `clipped-text` finding on placeholder text (`prod.price`
+in a narrow column) is measured against the placeholder, not against your real data — check it
+against a `--run-controllers` render before widening a column for it.
+
 ### What to fix
 
 Judge **structure**, not pixels and not data. Fix only these:
@@ -251,7 +290,7 @@ Judge **structure**, not pixels and not data. Fix only these:
 - **Missing or extra sections** compared with what Step 1 asked for.
 - **Wrong region placement** — a sidebar rendered under the content, a missing header, tab content sitting outside its `<tabpanel>`.
 - **Wrong component choice** — a data table rendered as a plain stack of labels, a form field that isn't the input type requested.
-- **Broken layout** — content clipped or overflowing, a horizontal scrollbar on a page meant to fit, a region collapsed to zero height, widgets overlapping, an `hflex`/`vflex` that visibly did not take.
+- **Broken layout** — content clipped or overflowing, a horizontal scrollbar on a page meant to fit, a region collapsed to zero height, widgets overlapping, an `hflex`/`vflex` that visibly did not take. The `LAYOUT:` block names all of these precisely, with the component and the measurement — fix those first, before anything you are judging by eye.
 - **Raw unstyled HTML** where a ZK component was intended.
 - **`CONTROLLERS: failed → isolated`** — read the `WARNINGS` entry: it names the failing class and
   the first cause line. A controller exception, a missing class or a blown budget is a defect in the

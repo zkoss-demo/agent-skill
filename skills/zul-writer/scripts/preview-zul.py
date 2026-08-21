@@ -46,7 +46,7 @@ OPTIONS worth knowing, and when to reach for one
                    wall-clock budget for a --run-controllers render (default 10s); on
                    expiry the page is rendered again isolated and the run still succeeds
   also: --launcher-jar --launcher-version --browser-channel --width --height
-        --full-page --timeout
+        --full-page --timeout --fail-on-layout
 
 READING THE RESULT — stdout is one `KEY: value` per line. Branch on the first line:
 
@@ -59,11 +59,18 @@ READING THE RESULT — stdout is one `KEY: value` per line. Branch on the first 
 WARNINGS: entries are advisory. A 404 on a ZK asset usually means an add-on jar is missing
 from the classpath, so the image can look plausible and still be wrong.
 
+LAYOUT: entries are what the browser measured, so they are facts rather than opinions —
+read them before opening the PNG. The block covers the WHOLE document, not just the
+captured region, so a finding may name something the screenshot does not show. It is
+omitted when there is nothing to report, and it never changes the exit code unless
+--fail-on-layout is passed.
+
 Exit codes:
   0  rendered            STATUS: ok           + SCREENSHOT: <path>
   1  render error        STATUS: render-error — a real defect in the .zul
   2  no preview possible PREVIEW_SKIPPED: <reason> — NOT a defect in the .zul
   3  usage error
+  4  layout findings, with --fail-on-layout (never without it)
 
 WHAT THE IMAGE SHOWS
 
@@ -214,6 +221,11 @@ CONTROLLER_TIMEOUT = 10       # --run-controllers: launcher-side budget, whole r
 BUILD_TIMEOUT = 240           # seconds for a mvn/gradle classpath resolution
 
 EXIT_OK, EXIT_RENDER_ERROR, EXIT_SKIPPED, EXIT_USAGE = 0, 1, 2, 3
+# Additive on purpose. Exit 1 means "a real defect in the .zul" everywhere in this
+# script and in SKILL.md, and a clipped label is not that; reusing 1 would make CI
+# report a syntax-error-shaped failure for a cosmetic overflow. 4 is unreachable for
+# every existing caller, because it needs --fail-on-layout, which nobody passes today.
+EXIT_LAYOUT = 4               # only with --fail-on-layout; STATUS: ok still prints
 
 # Where a failure *of this script* is reported. Deliberately not TRACK_URL above:
 # that is an anonymous counter, this is the human issue tracker.
@@ -1169,12 +1181,316 @@ ZK_READY = """() => {
 }"""
 
 
-def capture(url, out_path: Path, args, warnings, controllers):
+# --- Layout audit --------------------------------------------------------
+# What the browser knows exactly and a reader of the PNG has to guess: whether a
+# label is one character short, whether a link collapsed to nothing, whether the
+# page needs a horizontal scrollbar. Same shape as ZK_READY above — one script
+# handed to page.evaluate — and it runs AFTER the screenshot (see capture()), so
+# it can never influence the image it is explaining.
+
+LAYOUT_PRINT_CAP = 25       # spec P1-3: cap the printed list, never truncate silently
+LAYOUT_COLLECT_CAP = 200    # bounds the payload crossing the CDP boundary; `total` stays truthful
+
+# The rules run in precedence order and a node that produced a finding is `claimed`,
+# so one defect yields one line: without that, a width-0 link reports as zero-size AND
+# as clipped-text. viewport-overflow is exempt because it is a document-level rule —
+# suppressing it because its widest offender was already claimed would throw away the
+# one finding that explains a horizontal scrollbar.
+LAYOUT_AUDIT_JS = """(collectCap) => {
+  const zk = window.zk;
+  const findings = [], seen = new Set(), claimed = new Set();
+  let total = 0;
+  const px = (v) => Math.round(v);
+  const all = Array.prototype.slice.call(document.querySelectorAll('body *'));
+  // getComputedStyle is the audit's hot call and the ancestor walks re-ask for the same
+  // elements over and over; memoizing it is what keeps a 12-finding page inside the budget.
+  const styles = new WeakMap();
+  const style = (el) => {
+    if (styles.has(el)) return styles.get(el);
+    let cs = null;
+    try { cs = getComputedStyle(el); } catch (e) { cs = null; }
+    styles.set(el, cs);
+    return cs;
+  };
+
+  // display:none gives a subtree no boxes at all, so every descendant would measure
+  // 0x0. A deliberately hidden region is not a layout defect.
+  const hiddenCache = new WeakMap();
+  const hiddenSomewhere = (el) => {
+    if (hiddenCache.has(el)) return hiddenCache.get(el);
+    let hidden = false;
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      if (n.hasAttribute && n.hasAttribute('hidden')) { hidden = true; break; }
+      const cs = style(n);
+      if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) { hidden = true; break; }
+    }
+    hiddenCache.set(el, hidden);
+    return hidden;
+  };
+
+  const ownTextNodes = (el) => {
+    const out = [];
+    for (let i = 0; i < el.childNodes.length; i++) {
+      const n = el.childNodes[i];
+      if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) out.push(n);
+    }
+    return out;
+  };
+  const ownText = (el) => ownTextNodes(el).map((n) => n.nodeValue).join(' ')
+                                          .replace(/\\s+/g, ' ').trim();
+
+  // --- locator -----------------------------------------------------------
+  // `div#zk_comp_37` is useless to whoever has to fix the page, so every finding is
+  // resolved back to the ZK widget that OWNS the node. No $n()===el test here on
+  // purpose: the text-bearing node is often ZK's inner chrome, and the owning widget
+  // is the answer the reader needs (`listheader[label="Done"]`, not `div "Done"`).
+  const widgetOf = (el) => {
+    try { return (zk && zk.Widget && zk.Widget.$) ? zk.Widget.$(el) : null; } catch (e) { return null; }
+  };
+  const isWidgetRoot = (el, w) => { try { return !!w && w.$n() === el; } catch (e) { return false; } };
+  const zulTag = (w) => {
+    const cls = String(w.className || w.widgetName || '');
+    const last = cls.substring(cls.lastIndexOf('.') + 1);
+    return last ? last.toLowerCase() : 'widget';
+  };
+  // Client-side widget state lives behind a generated getter with the value in `_name`,
+  // so both are tried before giving up on an attribute.
+  const prop = (w, name) => {
+    const getter = 'get' + name.charAt(0).toUpperCase() + name.slice(1);
+    try {
+      if (typeof w[getter] === 'function') {
+        const v = w[getter]();
+        if (v != null && String(v) !== '') return String(v);
+      }
+      const f = w['_' + name];
+      if (f != null && String(f) !== '') return String(f);
+    } catch (e) {}
+    return '';
+  };
+  const snip = (s, n) => (s.length > n ? s.slice(0, n - 1) + '\\u2026' : s);
+  const cssClass = (el) => {
+    const list = (el.className && el.className.split) ? el.className.split(/\\s+/).filter(Boolean) : [];
+    for (const c of list) if (c.indexOf('z-') !== 0) return '.' + c;
+    return list.length ? '.' + list[0] : '';
+  };
+  const locator = (el) => {
+    const w = widgetOf(el);
+    if (w) {
+      const tag = zulTag(w);
+      // w.id is the ZUL id and stays empty unless the author wrote one; the generated
+      // id lives in w.uuid, and ZK copies it into id for a few widgets — hence the
+      // inequality test. `label#pQr51` would be worse than no locator at all.
+      if (w.id && w.id !== w.uuid) return tag + '#' + w.id;
+      const attrs = ['label', 'value', 'title', 'placeholder'];
+      for (let i = 0; i < attrs.length; i++) {
+        const v = prop(w, attrs[i]);
+        if (v) return tag + '[' + attrs[i] + '="' + snip(v, 40) + '"]';
+      }
+      const t = ownText(el);
+      return tag + cssClass(el) + (t ? ' "' + snip(t, 30) + '"' : '');
+    }
+    const t = ownText(el);
+    return el.tagName.toLowerCase() + cssClass(el) + (t ? ' "' + snip(t, 30) + '"' : '');
+  };
+
+  const record = (rule, el, detail, measured) => {
+    const loc = locator(el);
+    // Claim the node BEFORE the dedupe return: a second element sharing a locator is
+    // still a node this rule matched, so it must not fall through to a later rule.
+    // Two identical collapsed <a label="Settings"/> otherwise print one zero-size line
+    // and one clipped-text line for what is one defect repeated.
+    claimed.add(el);
+    const key = rule + '|' + loc;
+    if (seen.has(key)) return;      // dedupe by (rule, locator), insertion order kept
+    seen.add(key);
+    total += 1;
+    if (findings.length < collectCap) {
+      findings.push({rule: rule, locator: loc, detail: detail, measured: measured || {}});
+    }
+  };
+
+  // Only `hidden` and `clip` count as clipping.
+  // `auto` and `scroll` are deliberately NOT clippers: a scrollable region reaches
+  // its content, so it is not a layout defect — and ZK's Grid/Listbox bodies are
+  // overflow:auto, so the spec's literal "overflow is not visible" would fire on
+  // every row of every data table in the corpus.
+  const HARD = {hidden: 1, clip: 1};
+  const clipperOf = (el) => {
+    for (let n = el; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
+      const cs = style(n);
+      if (!cs) continue;
+      // Not text-overflow:ellipsis on its own: CSS gives that property no effect at all
+      // while overflow is visible, so a box that really elides its text is already a
+      // hidden|clip box and is caught here.
+      if (HARD[cs.overflowX] || HARD[cs.overflowY]) return {el: n, cs: cs};
+    }
+    return null;
+  };
+  const hasBoxInside = (el) => {
+    const kids = el.querySelectorAll('*');
+    for (let i = 0; i < kids.length; i++) {
+      const r = kids[i].getBoundingClientRect();
+      if (r.width > 0.5 && r.height > 0.5) return true;
+    }
+    return false;
+  };
+  // The PADDING box, and this is the single most important measurement in the audit:
+  // `overflow: hidden` clips to the padding box, not to the content box, so text may
+  // spill out of the content box into the padding and still be fully visible. Measured:
+  // ZK's div.z-listheader-content is 60px wide with 16px padding either side, so a 38px
+  // "Done" overflows its 28px content box while the browser clips at 60px and the header
+  // renders in full. Comparing against the content box reported it as truncated.
+  // It is also what spec P1-3 asks escapes-parent to compare against.
+  const paddingBox = (el, cs) => {
+    const r = el.getBoundingClientRect();
+    const n = (k) => parseFloat(cs.getPropertyValue(k)) || 0;
+    return {
+      left: r.left + n('border-left-width'),
+      right: r.right - n('border-right-width'),
+      top: r.top + n('border-top-width'),
+      bottom: r.bottom - n('border-bottom-width'),
+    };
+  };
+
+  // --- rule 1: zero-size -------------------------------------------------
+  // ZK WIDGET ROOTS ONLY. ZK's own chrome legitimately measures 0x0 — div.z-hlayout-inner
+  // around an empty label does — and without this restriction a correct page reports
+  // that chrome as a defect.
+  // Rect-based, not clientWidth-based: clientWidth is 0 by CSS definition on
+  // display:inline boxes, which is exactly what ZK renders <label> and <a> as, so the
+  // spec's literal `clientWidth === 0` reported a plainly visible 14.9x20 icon link.
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    // Cheapest test first: zk.Widget.$() walks the DOM upwards, so it is only worth
+    // asking about the handful of elements that actually measure zero.
+    const r = el.getBoundingClientRect();
+    if (r.width > 0.5 && r.height > 0.5) continue;
+    if (hiddenSomewhere(el)) continue;
+    if (!isWidgetRoot(el, widgetOf(el))) continue;
+    const text = ownText(el);
+    // Renderable content is text OR children, not the spec's `childElementCount > 0`:
+    // a collapsed <a label="Settings"/> has zero element children, and it is the very
+    // defect this rule is cited for.
+    if (!text && el.childElementCount === 0) continue;
+    // A widget root that does not clip and whose subtree still has a real box has not
+    // vanished — the box simply lives one level down. Measured: every ZK borderlayout
+    // region root (zul.layout.North and friends) is a class-less wrapper at 1270x0 whose
+    // child div.z-north is 1270x60 and plainly visible. Without this test a correct
+    // borderlayout page reports four findings. The clipping case is kept, because a
+    // 0x0 overflow:hidden box really does erase whatever measures inside it.
+    const cs = style(el);
+    if (!(cs && (HARD[cs.overflowX] || HARD[cs.overflowY])) && hasBoxInside(el)) continue;
+    record('zero-size', el,
+           px(r.width) + 'x' + px(r.height) +
+             (text ? ' with text but no box' : ' with ' + el.childElementCount + ' children'),
+           {width: r.width, height: r.height, textLength: text.length,
+            children: el.childElementCount});
+  }
+
+  // --- rule 2: clipped-text ----------------------------------------------
+  // Measured on the nearest CLIPPING box, not on the text element itself: ZK renders
+  // <label> and <a> as display:inline, where clientWidth and scrollWidth are both 0,
+  // so the spec's `scrollWidth > clientWidth + 1` can never fire on a clipped brand
+  // name (measured: label[value="GovPortal"] at clientWidth 0, rect 90x23). CSS
+  // overflow does not apply to inline non-replaced boxes either, so the clipping box
+  // always has real scrollWidth/clientWidth numbers — both are carried in `measured`.
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (claimed.has(el)) continue;
+    const nodes = ownTextNodes(el);
+    if (!nodes.length || hiddenSomewhere(el)) continue;
+    const clip = clipperOf(el);
+    if (!clip) continue;
+    // A Range measures the text run exactly where it already is — no node inserted,
+    // no style written. That is what keeps the audit non-mutating.
+    const range = document.createRange();
+    range.setStartBefore(nodes[0]);
+    range.setEndAfter(nodes[nodes.length - 1]);
+    const t = range.getBoundingClientRect();
+    if (t.width <= 0.5 && t.height <= 0.5) continue;
+    const box = paddingBox(clip.el, clip.cs);
+    const boxW = box.right - box.left, boxH = box.bottom - box.top;
+    // Edge by edge against the clip rectangle, with a 1px tolerance for sub-pixel text
+    // metrics. Position matters as much as size: a run narrower than the box is still cut
+    // when it starts inside the padding and ends past the far edge, which is exactly how
+    // a listcell truncates its own label.
+    const past = {left: box.left - t.left, right: t.right - box.right,
+                  top: box.top - t.top, bottom: t.bottom - box.bottom};
+    let side = '', cut = 0;
+    for (const edge in past) if (past[edge] > cut) { side = edge; cut = past[edge]; }
+    if (cut <= 1) continue;
+    const vertical = (side === 'top' || side === 'bottom');
+    const need = vertical ? t.height : t.width;
+    const boxSize = vertical ? boxH : boxW;
+    record('clipped-text', el,
+           need > boxSize + 1
+             ? 'text needs ' + px(need) + 'px, box is ' + px(boxSize) + 'px'
+             : 'text is ' + px(cut) + 'px past the ' + side + ' edge of the ' +
+               px(boxSize) + 'px box',
+           {axis: vertical ? 'y' : 'x', side: side, cut: cut,
+            textWidth: t.width, textHeight: t.height, boxWidth: boxW, boxHeight: boxH,
+            clipperScrollWidth: clip.el.scrollWidth, clipperClientWidth: clip.el.clientWidth});
+  }
+
+  // --- rule 3: escapes-parent --------------------------------------------
+  // offsetParent skips statically-positioned ancestors, so this rule systematically
+  // under-reports rather than over-reports. Under-reporting is the safe direction for
+  // a list an agent is told to trust.
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (claimed.has(el) || hiddenSomewhere(el)) continue;
+    let op = null;
+    try { op = el.offsetParent; } catch (e) { op = null; }
+    if (!op || op === document.body || op === document.documentElement) continue;
+    const cs = style(op);
+    if (!cs || !(HARD[cs.overflowX] || HARD[cs.overflowY])) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0.5 && r.height <= 0.5) continue;
+    const box = paddingBox(op, cs);
+    const sides = [['left', box.left - r.left], ['right', r.right - box.right],
+                   ['top', box.top - r.top], ['bottom', r.bottom - box.bottom]];
+    let side = '', over = 0;
+    for (let k = 0; k < sides.length; k++) if (sides[k][1] > over) { side = sides[k][0]; over = sides[k][1]; }
+    if (over <= 2) continue;
+    record('escapes-parent', el,
+           'escapes clipping parent ' + locator(op) + ' by ' + px(over) + 'px on the ' + side,
+           {side: side, overflow: over, parent: locator(op)});
+  }
+
+  // --- rule 4: viewport-overflow -----------------------------------------
+  // One finding for the whole document, naming the widest element whose right edge
+  // passes the viewport — that is the element to fix, and it is what turns "there is a
+  // horizontal scrollbar" into an address.
+  const de = document.documentElement;
+  if (de.scrollWidth > window.innerWidth + 1) {
+    let widest = null, widestW = 0;
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      if (hiddenSomewhere(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.right <= window.innerWidth + 1) continue;
+      if (r.width > widestW) { widestW = r.width; widest = el; }
+    }
+    if (widest) {
+      record('viewport-overflow', widest,
+             'page scrollWidth ' + de.scrollWidth + ' > viewport ' + window.innerWidth +
+               '; widest offender ' + px(widestW) + 'px',
+             {scrollWidth: de.scrollWidth, viewportWidth: window.innerWidth, widest: widestW});
+    }
+  }
+
+  return {total: total, findings: findings,
+          viewport: {w: window.innerWidth, h: window.innerHeight}};
+}"""
+
+
+def capture(url, out_path: Path, args, warnings, controllers, layout):
     """Returns (http_status, error_details_or_None).
 
     `controllers` is mutated in place (same idiom as `warnings`) with what the launcher
     reported for this render, because it is a property of the response rather than of the
-    process: one launcher can serve several pages."""
+    process: one launcher can serve several pages. `layout` is mutated the same way with
+    the DOM audit's result."""
     from playwright.sync_api import sync_playwright, Error as PWError, TimeoutError as PWTimeout
 
     with sync_playwright() as pw:
@@ -1250,6 +1566,25 @@ def capture(url, out_path: Path, args, warnings, controllers):
                             animations="disabled", caret="hide")
             debug("screenshot", f"{out_path} ({out_path.stat().st_size} bytes)")
 
+            # Deliberately AFTER the screenshot: the PNG is already on disk before
+            # anything evaluates in the page, so the audit cannot alter the image it
+            # describes. Skipped on the launcher's error page — that is not the user's
+            # UI, and measuring it would report defects in our own diagnostic markup.
+            # Suppressed wholesale: a bug in the audit must never fail a good render.
+            if details is None:
+                with contextlib.suppress(Exception):
+                    started = time.monotonic()
+                    audited = page.evaluate(LAYOUT_AUDIT_JS, LAYOUT_COLLECT_CAP)
+                    layout["total"] = audited["total"]
+                    layout["findings"] = audited["findings"]
+                    debug("layout", f"{audited['total']} findings in "
+                                    f"{(time.monotonic() - started) * 1000:.0f} ms")
+                    # page.screenshot(full_page=True) stitches; it does not resize the
+                    # browsing context. So this always equals --width x --height, which
+                    # is what the SIZE: line reports and what the findings are read against.
+                    debug("layout viewport",
+                          f"{audited['viewport']['w']}x{audited['viewport']['h']}")
+
             for url_404 in dict.fromkeys(missing):
                 warnings.append(f"ZK resource not served: {url_404} — an add-on jar may be "
                                 "missing from the classpath, so the image may be misleading")
@@ -1288,6 +1623,25 @@ def emit_warnings(warnings):
         emit("WARNINGS", len(warnings))
         for warning in warnings:
             print(f"  - {warning}")
+
+
+def emit_layout(layout):
+    """Omitted entirely when there is nothing to report, so a clean page prints exactly
+    what it printed before this block existed."""
+    findings = layout.get("findings") or []
+    if not findings:
+        return
+    total = layout.get("total", len(findings))
+    emit("LAYOUT", f"{total} findings")
+    shown = findings[:LAYOUT_PRINT_CAP]
+    rule_width = max(len(f["rule"]) for f in shown)
+    for finding in shown:
+        print(f"  - {finding['rule'].ljust(rule_width)} | {finding['locator']} | "
+              f"{finding['detail']}")
+    # Never a silent truncation: the header counts every finding, so the difference
+    # has to be accounted for on its own line.
+    if total > len(shown):
+        print(f"  ... and {total - len(shown)} more")
 
 
 class _Parser(argparse.ArgumentParser):
@@ -1331,6 +1685,10 @@ def parse_args(argv):
                         help=f"wall-clock budget for a --run-controllers render, in seconds "
                              f"(default: {CONTROLLER_TIMEOUT}); on expiry the page is rendered "
                              f"again isolated")
+    parser.add_argument("--fail-on-layout", dest="fail_on_layout", action="store_true",
+                        help="exit 4 when the LAYOUT block has any finding, for CI use. It's "
+                             "the exit code and nothing else that changes: the findings are "
+                             "reported either way, and STATUS: ok still prints.")
     parser.add_argument("--debug", action="store_true",
                         help="print diagnostics to stderr: the resolved classpath, every helper "
                              "command line, and the renderer's own output. stdout is unchanged.")
@@ -1389,12 +1747,12 @@ def resolve_request(zul: Path, args, resolved):
     return docroot, layout, "/" + urllib.parse.quote(zul.relative_to(docroot).as_posix())
 
 
-def render(target: Target, java: Path, jar: Path, args, warnings, controllers):
+def render(target: Target, java: Path, jar: Path, args, warnings, controllers, layout):
     """Steps 5-7: the launcher lives exactly as long as the capture needs it."""
     with Launcher(java, jar, launcher_classpath(target.resolved), target.docroot,
                   args.run_controllers, args.controller_timeout) as launcher:
         url = f"http://127.0.0.1:{launcher.port}{target.request_path}"
-        return capture(url, target.out_path, args, warnings, controllers)
+        return capture(url, target.out_path, args, warnings, controllers, layout)
 
 
 # The three strings of the text contract (spec P0-2 item 4), keyed by the launcher's token.
@@ -1440,7 +1798,8 @@ def report_render_error(target: Target, details, warnings, controllers_value):
     return EXIT_RENDER_ERROR
 
 
-def report_success(target: Target, args, launcher: LauncherJar, warnings, controllers_value):
+def report_success(target: Target, args, launcher: LauncherJar, warnings, controllers_value,
+                   layout):
     resolved = target.resolved
     zk_jars = [j.name for j in resolved["jars"] if re.match(r"zk-\d", j.name)]
     emit("STATUS", "ok")
@@ -1453,7 +1812,10 @@ def report_success(target: Target, args, launcher: LauncherJar, warnings, contro
     emit("ZK", ", ".join(zk_jars) or "unknown")
     emit("LAUNCHER", f"{launcher.version} ({launcher.source})")
     emit("CONTROLLERS", controllers_value)
+    emit_layout(layout)
     emit_warnings(warnings)
+    if args.fail_on_layout and (layout.get("findings") or []):
+        return EXIT_LAYOUT
     return EXIT_OK
 
 
@@ -1463,6 +1825,9 @@ def main(argv=None):
     track_usage_async()
     warnings = []
     controllers = {}
+    # Not `layout`: Target.layout is the docroot RULE STRING printed on the DOCROOT:
+    # line, and a second meaning for that name would read as correct and be wrong.
+    layout_findings = {"total": 0, "findings": []}
 
     zul = locate_zul(args.zul)
     resolved = resolve_classpath(zul, args, warnings)                       # 1
@@ -1479,7 +1844,7 @@ def main(argv=None):
     launcher = resolve_launcher(args.launcher_jar, args.launcher_version,   # 4
                                warnings)
     status, details = render(target, java, launcher.path, args, warnings,  # 5-7
-                             controllers)
+                             controllers, layout_findings)
 
     # Computed once, before either report: it can append a warning of its own.
     controllers_value = controllers_line(args, controllers, launcher, warnings)
@@ -1488,7 +1853,8 @@ def main(argv=None):
     if status != 200:
         raise Skipped(f"the render server answered HTTP {status} for {request_path}",
                       "check that the .zul path is correct relative to the docroot")
-    return report_success(target, args, launcher, warnings, controllers_value)
+    return report_success(target, args, launcher, warnings, controllers_value,
+                          layout_findings)
 
 
 if __name__ == "__main__":

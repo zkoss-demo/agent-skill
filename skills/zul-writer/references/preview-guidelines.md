@@ -205,6 +205,63 @@ under the rules for real data is the worst possible outcome here.
 | `--run-controllers` | the real value | the real rows | the real value |
 | `--run-controllers`, controller failed | falls back to the isolated row | " | " |
 
+## Layout findings (the `LAYOUT:` block)
+
+After the screenshot is written, the renderer runs a DOM audit in the same browser and reports what
+it measured. The block is appended between `CONTROLLERS:` and `WARNINGS:`, and it is **omitted
+entirely when there is nothing to report** — so a clean page prints exactly what it printed before
+the audit existed.
+
+| Rule | Fires when | Remedy |
+|---|---|---|
+| `clipped-text` | an element's own text run does not fit inside the nearest ancestor that clips (`overflow: hidden` or `clip`), measured against that ancestor's **padding box** | widen the box, allow wrapping, or shorten the text |
+| `zero-size` | a ZK widget root measures 0 in width or height while it has text or children, and nothing inside it has a box either | a missing `height`/`vflex`, or a `width: 0` rule |
+| `escapes-parent` | an element's border box exceeds its `offsetParent`'s padding box by more than 2px while that parent clips | give the parent room, or stop the child overflowing |
+| `viewport-overflow` | `documentElement.scrollWidth` exceeds the viewport width; one finding for the page, naming the widest element whose right edge passes the viewport | drop the fixed width on the named element |
+
+The padding box is the measurement that matters: `overflow: hidden` clips there, not at the content
+box, so text may spill out of the content box into the padding and still be perfectly visible. ZK's
+own `div.z-listheader-content` is 60px wide with 16px of padding either side — comparing a 38px
+header label against its 28px content box reports a truncation that a reader can plainly see is not
+there.
+
+**Locators.** Every finding is resolved back to the ZK widget that *owns* the node, through
+`zk.Widget.$()`, because the node carrying the text is often ZK's own chrome. The locator is the ZUL
+id when the author wrote one (`label#breadcrumbCurrent`), otherwise the widget plus the first
+distinguishing attribute (`a[label="Settings"]`, `label[value="GovPortal"]`,
+`textbox[placeholder="Search applications..."]`), otherwise the widget plus a style class,
+preferring an author class (`grid.gp-wide`) but falling back to ZK's own theme class when the node
+carries nothing else (`div.z-div`). That last form is the weakest one the audit prints — it still
+names the widget type, and for `escapes-parent` the line also names the clipping parent. A generated ZK uuid is never printed: a locator reading `label#pQr51` names
+nothing anyone can search for, so the id is used only when it differs from the uuid.
+
+**What the audit deliberately does not flag.**
+
+- **`overflow: auto` and `overflow: scroll` regions.** A scrollable region reaches its content, so it
+  is not a layout defect — and ZK's Grid, Listbox and Tree bodies are `overflow: auto`, so treating
+  them as clippers would report every row of every data table. The cost is that a page which clips
+  through `auto` on an axis that cannot actually scroll goes unreported: the audit under-reports
+  rather than over-reports, deliberately.
+- **Overlapping widgets.** Dropped for v1 — the rule was too noisy to be worth an agent's attention.
+- **ZK chrome that legitimately measures nothing.** Only widget *roots* can raise `zero-size`, and
+  only when nothing inside them has a box: a ZK borderlayout region root is a class-less wrapper at
+  1270x0 whose visible child is 1270x60, and `div.z-hlayout-inner` measures 0x0 around an empty
+  label. Both render correctly, so neither is reported.
+
+**Viewport.** Findings are measured against the viewport on the `SIZE:` line — 1280x900 by default —
+including under `--full-page`, because a full-page capture stitches the image without ever resizing
+the browsing context. What `--full-page` does *not* change is which findings appear: the audit
+queries the whole document either way, so it reports things below the captured fold in both modes.
+That is the point of it, and it means a finding can name something the PNG does not show.
+
+**Caps.** At most 25 findings are printed, deduped by `(rule, locator)` so one defect is one line;
+when there are more, a final `  ... and N more` line accounts for the rest. The count on the
+`LAYOUT:` header is always the true total.
+
+**`--fail-on-layout`** makes a run with any finding exit **4** instead of 0, for CI. It changes
+nothing else: the same findings are reported without it, and `STATUS: ok` still prints with it — exit
+1 stays reserved for a real defect in the .zul.
+
 ## Previewing a `.zul` outside any project
 
 Works with no setup: the script falls back to stock ZK CE and uses the file's own directory as the
@@ -224,8 +281,9 @@ variant, e.g. `--zk-version 10.1.0-jakarta`). Add-ons are not available on this 
 Useful flags: `--debug` (see above), `--width`/`--height` (default 1280x900), `--full-page` for the
 whole scrollable page, `--timeout` for slow pages, `--browser-channel chrome|msedge|chromium`,
 `--launcher-version` to move off the pinned render helper, `--run-controllers` /
-`--no-run-controllers` to run (or force off) the project's real controllers, and
-`--controller-timeout` for their budget.
+`--no-run-controllers` to run (or force off) the project's real controllers,
+`--controller-timeout` for their budget, and `--fail-on-layout` to exit 4 when the `LAYOUT:`
+block has any finding.
 
 ## Where the renderer comes from
 

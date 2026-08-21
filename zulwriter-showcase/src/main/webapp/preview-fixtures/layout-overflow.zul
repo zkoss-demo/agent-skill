@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <!--
+        Preview fixture: below-the-fold findings and a page wider than its viewport.
+        The spacer pushes the next two blocks past the default 900px fold, so the two
+        element-level findings under it prove the audit is fold-independent; the wide
+        grid proves the document-level viewport-overflow rule and that the finding
+        names a real ZK component. No apply, no composer, no id attribute.
+    -->
+    <style>
+        .gp-spacer { height: 1400px; background: #f4f6f9; }
+        .gp-clipped { display: inline-block; width: 70px; overflow: hidden; white-space: nowrap;
+            font-size: 15px; }
+        .gp-card { position: relative; width: 300px; height: 90px; overflow: hidden;
+            border: 1px solid #e6eaf0; background: #fff; }
+        .gp-spill { position: absolute; left: 240px; top: 20px; width: 180px; height: 40px;
+            background: #ecfaf1; }
+        .gp-wide { width: 2000px; }
+    </style>
+
+    <div sclass="gp-spacer">
+        <label value="Above the fold"/>
+    </div>
+
+    <div>
+        <label value="Truncated below the fold" sclass="gp-clipped"/>
+    </div>
+
+    <div sclass="gp-card">
+        <div sclass="gp-spill"/>
+    </div>
+
+    <grid sclass="gp-wide" width="2000px">
+        <columns>
+            <column label="Reference"/>
+            <column label="Applicant"/>
+            <column label="Status"/>
+        </columns>
+        <rows>
+            <row>
+                <label value="REF-2023-0892"/>
+                <label value="Sarah Mitchell"/>
+                <label value="Under review"/>
+            </row>
+        </rows>
+    </grid>
+</zk>

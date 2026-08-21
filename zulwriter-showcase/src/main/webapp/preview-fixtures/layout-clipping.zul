@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <!--
+        Preview fixture: the clipped/collapsed nav. Mirrors application-review.zul's own
+        nav block component for component and class for class, with no id attribute
+        anywhere, so the LAYOUT locators are the realistic "author wrote no id" case. No
+        apply, no composer: it renders identically with and without the run-controllers flag.
+
+        The clipping is applied to each element, not to the container, because that is what
+        an under-measuring hflex="min" does to a box.
+    -->
+    <style>
+        .gp-nav { background: #fff; border-bottom: 1px solid #e6eaf0; padding: 14px 0; }
+        .gp-shell { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+        .gp-flex-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+        .gp-brand-name { display: inline-block; width: 60px; overflow: hidden; white-space: nowrap;
+            font-size: 15px; font-weight: 700; }
+        .gp-nav-link { display: inline-block; max-width: 48px; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; color: #55637a; font-size: 15px;
+            text-decoration: none; }
+        .gp-nav-link-collapsed { display: inline-block; width: 0; height: 0; overflow: hidden; }
+        /* Negative control: a link whose box fits its text must produce no finding. */
+        .gp-nav-link-fits { max-width: 140px; }
+    </style>
+
+    <div sclass="gp-nav">
+        <div sclass="gp-shell gp-flex-row">
+            <hlayout valign="middle" spacing="34px">
+                <hlayout valign="middle" spacing="11px">
+                    <span sclass="gp-logo z-icon-university"/>
+                    <label value="GovPortal" sclass="gp-brand-name"/>
+                </hlayout>
+                <hlayout valign="middle" spacing="30px">
+                    <a label="Dashboard" sclass="gp-nav-link gp-nav-link-fits"/>
+                    <a label="Documents" sclass="gp-nav-link"/>
+                    <a label="Contact Support" sclass="gp-nav-link"/>
+                    <a label="Settings" sclass="gp-nav-link gp-nav-link-collapsed"/>
+                </hlayout>
+            </hlayout>
+        </div>
+    </div>
+</zk>
