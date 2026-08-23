@@ -220,6 +220,25 @@ controller has not been compiled yet, build first (`mvn compile` / `gradle class
 warns when no compiled classes are on the classpath. Add `--controller-timeout <seconds>` only if
 a legitimately slow page keeps degrading (the default budget is 10 s for the whole render).
 
+**Viewport: `--width`, `--height`, `--full-page`.** The default viewport is 1280x900; the `SIZE:`
+line in the output always says which viewport the render actually used.
+
+- **Match the mockup's width.** When the user supplied a screenshot or mockup, pass `--width` at
+  approximately that image's pixel width, clamped to 1024-1920, so the two images compare like for
+  like — a 1600 px mockup means `--width 1600`. Rendering the 1280 default against a wider mockup
+  adds differences that are yours, not the page's, and you will spend fix rounds on them.
+- **`--full-page` when the page flows past the fold** — long forms, stacked reports, anything meant
+  to scroll. It stitches the whole scrollable page into the PNG.
+- **`--height` when the page is a vertical flex shell.** A page whose root region is `vflex` is
+  exactly viewport-tall by construction, so `--full-page` cannot show more of it: raise `--height`
+  instead. `hflex` is a width and does not do this — an `hflex` page flows past the fold like any
+  other, and there `--full-page` is the right flag. A `--full-page` capture that comes back exactly
+  as tall as the `SIZE:` viewport is telling you the page is flex-sized, not truncated.
+
+```bash
+uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --width 1600 --full-page --run-controllers --out /tmp/zul-preview.png src/main/webapp/index.zul
+```
+
 The script resolves the project's ZK jars (Maven, Gradle, or stock ZK when the file belongs to no project), renders the page through ZK's own engine, and writes a PNG. **Requires Java 17+ and Google Chrome or Microsoft Edge.** On first use it downloads the render helper (`zk-preview-launcher.jar`, ~500 KB), verifies its SHA-256, and caches it under `~/.cache/zul-writer/`; later runs need no network.
 
 Then **read the PNG** with your image-reading tool and compare it against the Step 1 answers. If the user started from a screenshot or mockup, re-read that image too and compare the two side by side.
@@ -311,6 +330,16 @@ Three limits worth knowing:
 `--debug` prints every console level to stderr, including the levels this block filters out — reach
 for it when a page misbehaves and the block is empty.
 
+### If you are scripting this, not reading it
+
+`--report json[:<path>]` writes this same run as one JSON object — by default beside the PNG, with a
+`.json` suffix — so a CI or corpus job can diff structured runs instead of parsing these lines.
+stdout gains only `REPORT: <path>`; every block above is unchanged. The full schema, and which keys
+are populated per exit code, is in `references/preview-guidelines.md`.
+
+**Doing Step 5 by hand, do not pass it.** You already have this stdout in the same tool call that
+ran the script, so the file is an extra round trip for identical information.
+
 ### What to fix
 
 Judge **structure**, not pixels and not data. Fix only these:
@@ -348,6 +377,7 @@ drive a re-render:
 - **Theme-dependent colours and spacing** when the theme jar isn't a project dependency.
 - **Exact spacing, font rendering, sub-pixel alignment, or a colour that is merely close** to the mockup.
 - **Data content from the mockup** — sample data will differ. Compare the *shape* of the UI, not the values in it.
+- **How tall a `--full-page` image is.** `--full-page` never resizes the browsing context — Playwright stitches a taller PNG afterwards — so the `LAYOUT:` findings and every `hflex`/`vflex` measurement refer to the `SIZE:` viewport, not to the image height. See *Viewport* in [references/preview-guidelines.md](references/preview-guidelines.md).
 
 **Under `CONTROLLERS: executed`, the first four bullets above no longer apply** — dimmed expression
 text, placeholder rows, the missing bound-`src` section and "anything a Composer or ViewModel would

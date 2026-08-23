@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- P2-5 fixture: the exit-1 path (STATUS: render-error, PHASE: PARSE). The `<label` below is
+     deliberately unclosed. It MUST stay under preview-fixtures/: test/run-regression.py's corpus
+     entry ("zulwriter-showcase/src/main/webapp", "*.zul", "pass") is a NON-recursive glob, so a
+     deliberately broken file at the webapp root would become a 32nd corpus file expected to pass. -->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <label value="this page never parses"
+</zk>

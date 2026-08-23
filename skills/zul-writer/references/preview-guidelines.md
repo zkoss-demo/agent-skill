@@ -252,7 +252,10 @@ nothing anyone can search for, so the id is used only when it differs from the u
 including under `--full-page`, because a full-page capture stitches the image without ever resizing
 the browsing context. What `--full-page` does *not* change is which findings appear: the audit
 queries the whole document either way, so it reports things below the captured fold in both modes.
-That is the point of it, and it means a finding can name something the PNG does not show.
+That is the point of it, and it means a finding can name something the PNG does not show. A page
+whose root region is `vflex` is therefore exactly viewport-tall in both modes, and `--height` — not
+`--full-page` — is what reveals more of it. `hflex` sizes a width and has no such effect: an
+`hflex`-only root page flows to its content height and stitches normally.
 
 **Caps.** At most 25 findings are printed, deduped by `(rule, locator)` so one defect is one line;
 when there are more, a final `  ... and N more` line accounts for the rest. The count on the
@@ -311,6 +314,86 @@ are not captured. And the error box is a real visible overlay, so on a page that
 error it may show up in the PNG — possibly mid-animation, since `animations="disabled"` applies to
 the screenshot and not to a jQuery `slideDown` already in flight.
 
+## The JSON report (`--report json`)
+
+`--report json` writes the whole run as one JSON object beside the PNG — the screenshot's path with
+a `.json` suffix, so `--out /tmp/page.png` gives `/tmp/page.json` and a run with no `--out` gives
+`<tmpdir>/zul-preview/<name>.json`. `--report json:<path>` puts it exactly where you say, creating
+missing parent directories. Any other value (`--report yaml`, `--report json:`) is a usage error:
+exit 3 with the usage block, like any other bad flag.
+
+**The text lines stay the contract.** The report adds no information the text block lacks; it exists
+so a script does not have to parse prefixed lines. stdout gains exactly one line — `REPORT: <path>` —
+and it is always the last line printed.
+
+```jsonc
+{
+  "status": "ok",              // ok | render-error | skipped | usage-error
+  "exitCode": 0,               // 0 rendered, 1 render error, 2 skipped, 3 usage, 4 --fail-on-layout
+  "zul": "/abs/page.zul",      // always absolute, on every exit code
+  "screenshot": "/abs/page.png",
+  "size":     {"width": 1280, "height": 900, "fullPage": false},
+  "docroot":  {"path": "/abs/webapp", "rule": "WAR webapp"},          // the DOCROOT: line, split
+  "classpath": {"source": "maven", "cached": true,                    // the CLASSPATH: line, split
+                "jars": 31, "outputRoots": 1, "resourceRoots": 1},
+  "zk": "zk-10.3.0.1-Eval.jar",                                       // null when none — the line says "unknown"
+  "launcher": {"version": "1.0.2", "source": "--launcher-jar"},
+  "controllers": {"mode": "executed", "failures": []},                // mode: executed|skipped|failed
+  "layout": {"total": 4, "findings": [                                // every finding, not the printed 25
+    {"rule": "clipped-text", "locator": "a[label=\"Documents\"]",
+     "detail": "text needs 77px, box is 48px",
+     "measured": {"axis": "x", "textWidth": 76.98, "boxWidth": 48}}   // shape varies by rule
+  ]},
+  "warnings": ["console error: boom"],                                // the WARNINGS: entries, verbatim
+  "error": null                                                       // see the table below
+}
+```
+
+**Which keys are populated, per exit code.**
+
+| Exit | `status` | Populated | `error` |
+|---|---|---|---|
+| 0 | `ok` | everything | `null` |
+| 4 | `ok` | everything, and `layout.total` > 0 | `null` |
+| 1 | `render-error` | everything, but `layout` is `{"total": 0, "findings": []}` — the audit is skipped on the launcher's error page, which is not your UI | `{"phase", "message", "location", "trace"}` — the `PHASE:` / `MESSAGE:` / `LOCATION:` / `TRACE:` lines, each `null` when the error page carried nothing for it |
+| 2 | `skipped` | only `status`, `exitCode`, `zul` and `error`; every pipeline key is `null` | `{"reason", "next"}` — the `PREVIEW_SKIPPED:` and `NEXT:` text, verbatim |
+| 3 | `usage-error` | the same four | `{"reason", "next"}` — `next` is `null`: the only exit-3 report is a missing file, and its one-line reason says everything |
+
+A skip resolved nothing it could promise, so its report is the all-`null` skeleton rather than a
+sometimes-present set of keys — a consumer forced to test whether a key exists is back to scraping.
+The argparse half of exit 3 (a malformed flag) writes **no** report at all: argparse fails before
+`--report` is a value, so there is nothing to write it to.
+
+**Three limits worth knowing before you parse it.**
+
+- `warnings` is a flat array of the same prefixed strings the text block prints, in the order the
+  block prints them — there is no structure to filter on, by design. The caps and the
+  `... and N more` tail lines were already applied when the entries were appended, so what the
+  report carries is exactly what the block prints; nothing richer is available here.
+- `screenshot` is the bare path even on exit 1. The text line's
+  `[ERROR PAGE — this is not your UI]` suffix is a warning to a human reader, not part of the name.
+- A run that could not write the report prints **no** `REPORT:` line and warns on stderr
+  (`warning: could not write the JSON report to …`). The exit code, and every other line of stdout,
+  is unchanged — a report is a sidecar, never a reason to fail a render that worked.
+
+**Why it differs from the sketch in the requirements.** Four keys are shaped by what the script
+actually holds rather than by the hand-written example:
+
+- **`layout` is an object with `total`, not a flat array.** Findings are collected up to 200 and
+  printed up to 25. A flat array would have to be one or the other, and either choice drops findings
+  with no way for the reader to tell — a silent truncation, which nothing else in this tool does. The
+  array carries the collected set; `total` is the true count from the audit, exactly as on the
+  `LAYOUT:` header.
+- **`classpath.cached` is derived, not reported.** The resolver appends `" (cached)"` to its own kind
+  string, which is what `CLASSPATH: maven (cached), …` prints; `source` is that string with the
+  suffix removed and `cached` is whether it was there.
+- **`controllers.failures` holds at most one entry.** The launcher reports one
+  `x-zk-preview-controller-failure` header per response, so the plural key is a 0-or-1 array. Making
+  it truly plural is launcher-side work, not a change here.
+- **`controllers.mode` is the raw launcher token** — `executed`, `skipped` or `failed` — not the
+  `CONTROLLERS:` line's presentation string (`skipped (isolated)`, `failed → isolated`). Branch on
+  the token; read the line.
+
 ## Previewing a `.zul` outside any project
 
 Works with no setup: the script falls back to stock ZK CE and uses the file's own directory as the
@@ -331,8 +414,9 @@ Useful flags: `--debug` (see above), `--width`/`--height` (default 1280x900), `-
 whole scrollable page, `--timeout` for slow pages, `--browser-channel chrome|msedge|chromium`,
 `--launcher-version` to move off the pinned render helper, `--run-controllers` /
 `--no-run-controllers` to run (or force off) the project's real controllers,
-`--controller-timeout` for their budget, and `--fail-on-layout` to exit 4 when the `LAYOUT:`
-block has any finding.
+`--controller-timeout` for their budget, `--fail-on-layout` to exit 4 when the `LAYOUT:`
+block has any finding, and `--report json[:<path>]` to write the run as one JSON object as well
+(see *The JSON report* above).
 
 ## Where the renderer comes from
 

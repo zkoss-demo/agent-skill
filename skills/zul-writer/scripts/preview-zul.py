@@ -45,6 +45,10 @@ OPTIONS worth knowing, and when to reach for one
   --controller-timeout N
                    wall-clock budget for a --run-controllers render (default 10s); on
                    expiry the page is rendered again isolated and the run still succeeds
+  --report json[:<path>]
+                   also write this whole run as one JSON object, for a caller that parses
+                   rather than reads (default path: the PNG's, with a .json suffix). The
+                   text lines below do not change; stdout gains one line, REPORT: <path>.
   also: --launcher-jar --launcher-version --browser-channel --width --height
         --full-page --timeout --fail-on-layout
 
@@ -68,6 +72,11 @@ read them before opening the PNG. The block covers the WHOLE document, not just 
 captured region, so a finding may name something the screenshot does not show. It is
 omitted when there is nothing to report, and it never changes the exit code unless
 --fail-on-layout is passed.
+
+The text lines are the contract, with or without --report. `REPORT: <path>` names a
+sidecar file carrying this same run as one JSON object — the same facts, no more — for a
+caller that parses rather than reads. It is printed only under --report, and it is the
+last line printed when it is.
 
 Exit codes:
   0  rendered            STATUS: ok           + SCREENSHOT: <path>
@@ -1752,6 +1761,128 @@ def emit_layout(layout):
         print(f"  ... and {total - len(shown)} more")
 
 
+# --- The JSON report -----------------------------------------------------
+# Everything below serializes state the pipeline already holds; it measures nothing of its
+# own, so the text block and the JSON cannot disagree about a run.
+
+REPORT_TARGET = None   # set once in main(); exits 2 and 3 happen outside it (see report_for_skip)
+REPORT_ZUL = None      # the RAW zul argument, for the same two paths: nothing is resolved there
+
+
+def report_target(args, zul_like: Path):
+    """None when --report was not passed. `json` alone lands the file beside the PNG, which
+    is the only place a caller can predict without being told. Takes the caller's own argument
+    rather than the pipeline-resolved .zul: on the exit-2 and exit-3 paths nothing has been
+    resolved yet, and only the stem is used, so a path that does not exist still yields a
+    usable destination."""
+    if not args.report:
+        return None
+    _, _, explicit = args.report.partition(":")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    return screenshot_path(args, zul_like).with_suffix(".json")
+
+
+def report_skeleton():
+    """Every key on every path, in the order of the text block it mirrors. A consumer must be
+    able to read report["controllers"] without first branching on the exit code — that
+    branching is exactly what this flag exists to remove. A key is non-null only when the work
+    it describes actually happened; `zul` is the exception, because it is the request rather
+    than the work, and `warnings` is always an array."""
+    return {"status": None, "exitCode": None, "zul": None, "screenshot": None, "size": None,
+            "docroot": None, "classpath": None, "zk": None, "launcher": None,
+            "controllers": None, "layout": None, "warnings": [], "error": None}
+
+
+def write_report(obj):
+    """The one new stdout line, and it is always the last one printed. Suppressed wholesale,
+    like the layout audit and the error-box read: a report that cannot be written must not
+    change the exit code (0/1/2/3/4 are frozen) nor fail a render that succeeded. No REPORT:
+    line therefore means no report — the diagnostic goes to stderr, where every diagnostic goes."""
+    if REPORT_TARGET is None:
+        return
+    try:
+        write_json_atomic(REPORT_TARGET, obj)     # mkdir + tmp file + os.replace, already here
+    except Exception as failure:
+        print(f"warning: could not write the JSON report to {REPORT_TARGET}: {failure}",
+              file=sys.stderr)
+        return
+    emit("REPORT", REPORT_TARGET)
+
+
+def report_for_run(exit_code, args, target: "Target", launcher, warnings, controllers,
+                   layout, details):
+    """Exits 0, 1 and 4 — every one of them a render that reached the browser. Built from the
+    same objects report_success/report_render_error print from, so text and JSON cannot drift.
+    Called from main() and not from those two, because exit 4 is only known after the LAYOUT
+    findings are counted, i.e. at report_success's last line."""
+    resolved = target.resolved
+    kind = resolved["kind"]
+    # `cached` is not a dict key: _load_cached_classpath appends " (cached)" to `kind` and the
+    # CLASSPATH: line prints it verbatim. Derived here rather than threaded through the six
+    # {"kind": ...} literals, which is the smaller change and keeps one source of truth.
+    suffix = " (cached)"
+    cached = kind.endswith(suffix)
+    report = report_skeleton()
+    report.update(
+        status="render-error" if details else "ok",
+        exitCode=exit_code,
+        zul=str(target.zul),
+        # The bare path. The text line's "   [ERROR PAGE - this is not your UI]" suffix is a
+        # warning to a human reader, not part of the filename.
+        screenshot=str(target.out_path),
+        size={"width": args.width, "height": args.height, "fullPage": bool(args.full_page)},
+        docroot={"path": str(target.docroot), "rule": target.layout},
+        classpath={"source": kind[:-len(suffix)] if cached else kind, "cached": cached,
+                   "jars": len(resolved["jars"]),
+                   "outputRoots": len(resolved["output_roots"]),
+                   "resourceRoots": len(resolved["resource_roots"])},
+        zk=", ".join(j.name for j in resolved["jars"] if re.match(r"zk-\d", j.name)) or None,
+        launcher={"version": launcher.version, "source": launcher.source},
+        # The RAW launcher token, not the CONTROLLER_LINES presentation string. "skipped" when
+        # the launcher reported no mode at all, because that is the claim the CONTROLLERS: line
+        # then makes, and the warning controllers_line raised is already in `warnings`.
+        # `failures` is the spec's plural key over a singular header, so 0 or 1 element: the
+        # launcher reports one x-zk-preview-controller-failure and no more.
+        controllers={"mode": controllers.get("mode") or "skipped",
+                     "failures": [controllers["failure"]] if controllers.get("failure") else []},
+        # The COLLECT cap (200), not the print cap (25): a JSON consumer that got the printed
+        # 25 with no way to tell would be reading a silent truncation, which nothing here does.
+        layout={"total": layout.get("total", 0), "findings": layout.get("findings") or []},
+        warnings=list(warnings),
+    )
+    if details:
+        report["error"] = {"phase": details["phase"] or None,
+                           "message": details["message"] or None,
+                           "location": details["location"] or None,
+                           "trace": details["trace"] or None}
+    return report
+
+
+def report_for_skip(exit_code, status, raw_zul, reason, next_step=None):
+    """Exits 2 and 3, which are raised where none of the above exists: `Skipped` is caught in
+    the __main__ block and locate_zul exits 3 before step 1 has run. A skipped run resolved
+    nothing it can promise, so every key stays null rather than being sometimes-present -- a
+    consumer that has to test for a key is back to scraping. The reason text is the payload,
+    and it is the same string the PREVIEW_SKIPPED:/NEXT: lines carry, internal-error wording
+    included, so grepping `error.reason` tells a crash from a clean skip exactly as grepping
+    stdout does today."""
+    report = report_skeleton()
+    report.update(status=status, exitCode=exit_code, zul=str(raw_zul),
+                  error={"reason": reason, "next": next_step})
+    return report
+
+
+def _report_spec(value):
+    """`json` or `json:<path>`. Routed through argparse's own `type=` so a malformed value
+    exits 3 with the usage block, exactly like any other bad flag (see _Parser.error) --
+    which also means no report can exist for it: argparse fails before --report is a value."""
+    fmt, sep, path = value.partition(":")
+    if fmt != "json" or (sep and not path):
+        raise argparse.ArgumentTypeError(f"expected json or json:<path>, not {value!r}")
+    return value
+
+
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         # argparse exits 2 by default, which is this script's "skipped" code.
@@ -1797,6 +1928,11 @@ def parse_args(argv):
                         help="exit 4 when the LAYOUT block has any finding, for CI use. It's "
                              "the exit code and nothing else that changes: the findings are "
                              "reported either way, and STATUS: ok still prints.")
+    parser.add_argument("--report", type=_report_spec, metavar="json[:<path>]",
+                        help="also write the whole result as one JSON object, for a caller "
+                             "that parses rather than reads (default path: the PNG's, with a "
+                             ".json suffix). stdout gains exactly one line, REPORT: <path>, "
+                             "and nothing else changes.")
     parser.add_argument("--debug", action="store_true",
                         help="print diagnostics to stderr: the resolved classpath, every helper "
                              "command line, and the renderer's own output. stdout is unchanged.")
@@ -1818,6 +1954,10 @@ def locate_zul(raw_path):
     if not zul.is_file():
         # Same exit and shape as an argparse failure (see _Parser.error).
         emit("STATUS", "usage-error")
+        # REPORT_ZUL, not `zul`: the field is the absolute path, while the message keeps the
+        # path as typed -- it is echoing the caller's own argument back at them.
+        write_report(report_for_skip(EXIT_USAGE, "usage-error", REPORT_ZUL,
+                                     f"No such file: {zul}"))
         print(f"No such file: {zul}", file=sys.stderr)
         raise SystemExit(EXIT_USAGE)
     zul = zul.resolve()
@@ -1930,6 +2070,13 @@ def report_success(target: Target, args, launcher: LauncherJar, warnings, contro
 def main(argv=None):
     args = parse_args(argv)
     enable_debug(args)
+    global REPORT_TARGET, REPORT_ZUL
+    # Before locate_zul, so its exit-3 branch and every later failure can still write one.
+    # Resolved even though nothing has validated it yet: a skip report whose `zul` is whatever
+    # the caller happened to type is not comparable across working directories, and comparing
+    # runs is what the report is for. resolve() is happy with a path that does not exist.
+    REPORT_ZUL = Path(args.zul).expanduser().resolve()
+    REPORT_TARGET = report_target(args, REPORT_ZUL)
     track_usage_async()
     warnings = []
     controllers = {}
@@ -1957,12 +2104,18 @@ def main(argv=None):
     # Computed once, before either report: it can append a warning of its own.
     controllers_value = controllers_line(args, controllers, launcher, warnings)
     if details is not None:
-        return report_render_error(target, details, warnings, controllers_value)
-    if status != 200:
-        raise Skipped(f"the render server answered HTTP {status} for {request_path}",
-                      "check that the .zul path is correct relative to the docroot")
-    return report_success(target, args, launcher, warnings, controllers_value,
-                          layout_findings)
+        code = report_render_error(target, details, warnings, controllers_value)
+    else:
+        if status != 200:
+            raise Skipped(f"the render server answered HTTP {status} for {request_path}",
+                          "check that the .zul path is correct relative to the docroot")
+        code = report_success(target, args, launcher, warnings, controllers_value,
+                             layout_findings)
+    # Last, and after the exit code exists: --fail-on-layout's 4 is decided on
+    # report_success's final line, and REPORT: is the only line allowed after WARNINGS.
+    write_report(report_for_run(code, args, target, launcher, warnings, controllers,
+                                layout_findings, details))
+    return code
 
 
 if __name__ == "__main__":
@@ -1976,6 +2129,8 @@ if __name__ == "__main__":
         print(f"PREVIEW_SKIPPED: {skipped.reason}")
         if skipped.next_step:
             print(f"NEXT: {skipped.next_step}")
+        write_report(report_for_skip(EXIT_SKIPPED, "skipped", REPORT_ZUL, skipped.reason,
+                                     skipped.next_step))
         if not DEBUG:
             print("hint: re-run with --debug to see the resolved classpath, every helper "
                   "command line and the renderer's own output.", file=sys.stderr)
@@ -1991,4 +2146,12 @@ if __name__ == "__main__":
               f"{type(unexpected).__name__}: {unexpected}")
         print(f"NEXT: re-run with --debug and report the output (plus the traceback above) "
               f"at {ISSUE_URL}")
+        # Suppressed on top of write_report's own guard: this path exists to print a
+        # traceback, and a fault in the report must not become the crash it reports.
+        with contextlib.suppress(Exception):
+            write_report(report_for_skip(
+                EXIT_SKIPPED, "skipped", REPORT_ZUL,
+                f"internal error in preview-zul.py — {type(unexpected).__name__}: {unexpected}",
+                f"re-run with --debug and report the output (plus the traceback above) "
+                f"at {ISSUE_URL}"))
         sys.exit(EXIT_SKIPPED)
