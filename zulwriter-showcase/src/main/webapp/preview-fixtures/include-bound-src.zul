@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The other half of the rule SKILL.md states: an include whose src comes from the ViewModel is
+  NOT placeholdered. Isolated, the binder never runs, so src is never set, the include
+  contributes nothing, and you see a silent gap rather than dimmed expression text. The host
+  page must still render, and the run must be exit 0 with no warning, because a gap is correct
+  behaviour here rather than a defect. Adding a hard-coded src to "fix" it breaks the real page.
+
+  With the run-controllers flag on, the ViewModel does run and this same page includes it for
+  real, which is the mode inversion SKILL.md documents.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <vlayout viewModel="@id('vm') @init('zwriter.previewfixtures.IncludeViewModel')">
+        <label value="include host marker"/>
+        <include src="@load(vm.page)"/>
+    </vlayout>
+</zk>

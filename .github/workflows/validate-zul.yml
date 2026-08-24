@@ -93,3 +93,20 @@ jobs:
           if [ "$dbg" != "$plain" ]; then
             echo "::error::--debug changed stdout"; exit 1
           fi
+          # The JSON sidecar (P2-5) must also be written -- and be valid JSON -- on the
+          # skip path, which is the one path a caller cannot learn anything else from.
+          # Removed first so the assertion cannot pass on a leftover file: a stale but
+          # parseable /tmp/r.json would hide exactly the regression this checks for.
+          rm -f /tmp/r.json
+          set +e
+          python3 skills/zul-writer/scripts/preview-zul.py \
+            --classpath /nonexistent/none.jar --report json:/tmp/r.json \
+            --out /tmp/nozk/out.png /tmp/nozk/smoke.zul > /dev/null 2>&1
+          code=$?
+          set -e
+          if [ "$code" != "2" ]; then
+            echo "::error::--report json changed the skip exit code: got $code, expected 2"; exit 1
+          fi
+          if ! python3 -c 'import json,sys; json.load(open("/tmp/r.json"))'; then
+            echo "::error::--report json did not write parseable JSON on the skip path"; exit 1
+          fi

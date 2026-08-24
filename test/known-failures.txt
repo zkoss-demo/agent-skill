@@ -17,7 +17,6 @@
 # --- B1: XSD false-positives on shadow elements (<if>, <forEach>) inside
 #         element-only content models ---
 test/valid/zk-5696.zul
-zulwriter-showcase/src/main/webapp/enterprise-kanban.zul
 skills/zul-writer/assets/kanban-board.zul
 
 # --- B1: XSD rejects <nodom> as a root/child element ---
@@ -30,4 +29,3 @@ skills/zul-writer/assets/example-data-management-mvvm.zul
 
 # --- B1: Layer 3 attribute-placement false-positives ---
 test/valid/zk-5793.zul
-zulwriter-showcase/src/main/webapp/event-management.zul

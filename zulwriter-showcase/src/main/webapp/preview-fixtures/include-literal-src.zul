@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The issue #69 shape, and the regression guard for commit 9b81416: the include's src is a data
+  binding whose expression is a CONSTANT path literal. The path is real, so the preview must
+  resolve it and include the fragment for REAL, in both render modes.
+
+  Writing the binding's raw text into src instead makes ZK treat the quoted expression, quotes
+  included, as the path. It then no longer ends in ".zul", so it stops being an instant ZUL
+  include and routes through a RequestDispatcher the headless preview does not have.
+
+  Same directory rule as the other preview fixtures: preview-fixtures/ sits outside the corpus
+  glob in test/run-regression.py.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <vlayout>
+        <label value="include host marker"/>
+        <include src="@load('/preview-fixtures/include-fragment.zul')"/>
+    </vlayout>
+</zk>

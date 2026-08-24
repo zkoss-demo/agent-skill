@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  P2-8 end-to-end fixture: prints the request headers ZK's server side actually saw, so a
+  real browser run shows the browser's own User-Agent and Accept-Language rather than the
+  empty values the mock request used to hand ZK. Rendered through preview-zul.py, the
+  screenshot must read UA=[Mozilla/5.0 ... HeadlessChrome/...], not UA=[].
+
+  Lives in preview-fixtures/ because test/run-regression.py globs src/main/webapp for
+  *.zul non-recursively, so a file at the webapp root would become a corpus member.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <zscript><![CDATA[
+        String ua = org.zkoss.zk.ui.Executions.getCurrent().getHeader("user-agent");
+        String al = org.zkoss.zk.ui.Executions.getCurrent().getHeader("accept-language");
+    ]]></zscript>
+    <label value="UA=[${ua}]"/>
+    <label value="AL=[${al}]"/>
+</zk>

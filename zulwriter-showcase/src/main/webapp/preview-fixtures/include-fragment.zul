@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The page included by include-literal-src.zul and include-bound-src.zul.
+
+  The CLI cannot show you the DOM, so this fragment carries a PROBE instead: a label with an
+  explicit id whose text is deliberately clipped. The layout audit resolves a finding back to the
+  ZK widget that owns the node and prefers `tag#id` when the author wrote an id, so a page that
+  really includes this fragment reports a finding located at exactly `label#includeProbe`, and a
+  page where the include contributed nothing does not. That makes "did the include happen" a
+  named, deterministic signal rather than a pixel comparison.
+
+  Exactly one finding on purpose. A second one here would make the host pages' assertions
+  ambiguous.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <label id="includeProbe"
+           value="this fragment was included for real, and this text is clipped on purpose"
+           width="40px"
+           style="white-space:nowrap;overflow:hidden;display:inline-block"/>
+</zk>

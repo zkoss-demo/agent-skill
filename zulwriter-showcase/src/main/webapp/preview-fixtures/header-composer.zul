@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  P2-8 AC-2: a Composer (not a zscript) reading a request header, rendered with the
+  controllers on. It must report CONTROLLERS: executed, never "failed then isolated",
+  and paint the forwarded User-Agent into the label below.
+
+  Same directory rule as the other preview fixtures: preview-fixtures/ is outside the
+  corpus glob in test/run-regression.py.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <div apply="zwriter.previewfixtures.HeaderComposer" hflex="1">
+        <label value="Preview fixture: composer reading a request header"/>
+        <label id="filledByComposer" value=""/>
+    </div>
+</zk>
