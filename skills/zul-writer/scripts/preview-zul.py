@@ -11,7 +11,7 @@ USAGE
   uv run preview-zul.py [options] <file.zul>
 
   uv run preview-zul.py src/main/webapp/index.zul             # simplest form: detect everything
-  uv run preview-zul.py --out /tmp/page.png page.zul          # choose where the PNG lands
+  uv run preview-zul.py --out shots/page.png page.zul         # somewhere other than ./page-preview.png
   uv run preview-zul.py --debug page.zul                      # diagnostics on stderr; try this on ANY failure
   uv run preview-zul.py --webapp src/main/webapp page.zul     # the docroot was guessed wrong
   uv run preview-zul.py --classpath "$(cat cp.txt)" page.zul  # skip Maven/Gradle resolution entirely
@@ -24,7 +24,8 @@ one. Plain `python3 preview-zul.py` also works where playwright is already insta
 
 OPTIONS worth knowing, and when to reach for one
 
-  -o/--out PNG     where to write the image (default: <tmpdir>/zul-preview/<name>.png)
+  -o/--out PNG     where to write the image (default: ./<name>-preview.png, in the
+                   current directory)
   --debug          dump the resolved classpath entry by entry, every helper command line
                    with its exit code and output, and the renderer's own stdout/stderr —
                    all on stderr. stdout stays exactly the same contract either way, so
@@ -1894,7 +1895,7 @@ class _Parser(argparse.ArgumentParser):
 def parse_args(argv):
     parser = _Parser(description="Render a ZK .zul file to a PNG screenshot.")
     parser.add_argument("zul", help="the .zul file to render")
-    parser.add_argument("-o", "--out", help="output PNG (default: a per-file path under the system temp dir)")
+    parser.add_argument("-o", "--out", help="output PNG (default: ./<name>-preview.png)")
     parser.add_argument("--width", type=int, default=1280, help="viewport width (default: 1280)")
     parser.add_argument("--height", type=int, default=900, help="viewport height (default: 900)")
     parser.add_argument("--full-page", action="store_true", help="capture the whole scrollable page")
@@ -1968,9 +1969,13 @@ def locate_zul(raw_path):
 
 
 def screenshot_path(args, zul: Path) -> Path:
+    """The default lands in the *current directory*, not a temp dir: the caller is normally
+    about to open this image, and a path they can see beside their work is one they can
+    open, keep and delete. `-preview` in the name says it is generated, and the name is
+    stable across re-renders so successive rounds overwrite one file instead of littering."""
     if args.out:
         return Path(args.out).expanduser().resolve()
-    return Path(tempfile.gettempdir()) / "zul-preview" / f"{zul.stem}.png"
+    return Path.cwd() / f"{zul.stem}-preview.png"
 
 
 def resolve_request(zul: Path, args, resolved):

@@ -14,7 +14,7 @@ A cross-platform AI agent skill marketplace for ZK Framework development. Suppor
 The [marketplace.json](marketplace.json) file provides a machine-readable index of all available skills, including their versions, tags, and installation metadata. Use this if you need to manually configure agent skills in other environments.
 
 ### Current Skills:
-- **zul-writer**: Generates ZK Framework ZUL pages via a structured 4-step workflow. It records **anonymous, aggregate** usage counts (only the skill name and version) to gauge how often the skill is used. No identifier is created or stored — there is no visitor ID, cookie, or per-install file — and your IP address is not logged, so events cannot be linked to you or your machine. Opt out entirely by setting `DO_NOT_TRACK=1` (or `TRACK_URL=`) in your environment.
+- **zul-writer**: Generates ZK Framework ZUL pages via a structured 5-step workflow, any step of which can be run on its own. It records **anonymous, aggregate** usage counts (only the skill name and version) to gauge how often the skill is used. No identifier is created or stored — there is no visitor ID, cookie, or per-install file — and your IP address is not logged, so events cannot be linked to you or your machine. Opt out entirely by setting `DO_NOT_TRACK=1` (or `TRACK_URL=`) in your environment.
 
 ## Repository Structure
 

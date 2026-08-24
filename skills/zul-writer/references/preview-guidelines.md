@@ -318,7 +318,7 @@ the screenshot and not to a jQuery `slideDown` already in flight.
 
 `--report json` writes the whole run as one JSON object beside the PNG — the screenshot's path with
 a `.json` suffix, so `--out /tmp/page.png` gives `/tmp/page.json` and a run with no `--out` gives
-`<tmpdir>/zul-preview/<name>.json`. `--report json:<path>` puts it exactly where you say, creating
+`./<name>-preview.json` in the current directory. `--report json:<path>` puts it exactly where you say, creating
 missing parent directories. Any other value (`--report yaml`, `--report json:`) is a usage error:
 exit 3 with the usage block, like any other bad flag.
 

@@ -107,7 +107,10 @@ Common fallback scenarios:
 - **Badges/tags**: `<n:span class="badge">` or `<label>` with sclass
 - **Cards with custom layouts**: `<n:div class="card">`
 - **Hero/banner sections**: `<n:section>` with CSS
-- **Custom grid layouts**: `<n:div style="display: grid; ...">` when `<hlayout>`/`<vlayout>` insufficient
+- **Custom grid layouts**: `<n:div class="card-grid">` with `display: grid` in the `<style>` block, when `<hlayout>`/`<vlayout>` are insufficient
 - **Progress steps / wizard indicators**: `<n:ol class="steps">`
 
-Always include the companion CSS with `<style>` element when using fallback components. Do not use `<?style ?>` processing instruction.
+Always include the companion CSS in a `<style>` element when using fallback components, and attach
+it by class name (`class` on `n:` elements, `sclass` on ZK components) rather than by a `style`
+attribute — an inline style outranks every stylesheet rule, so it cannot be themed or overridden
+later. Do not use the `<?style ?>` processing instruction.

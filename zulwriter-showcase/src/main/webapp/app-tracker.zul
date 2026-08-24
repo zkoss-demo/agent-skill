@@ -1,0 +1,310 @@
+<?page title="Application Overview | AppTracker Pro"?>
+<zk>
+	<style>
+		html, body { background: #0f1622; margin: 0; }
+		.at-page { background: #0f1622; color: #e9eef7; padding-bottom: 60px;
+			font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+		.at-shell { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+		.at-page .at-flex-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+
+		/* --- top navigation --- */
+		.at-nav { background: #131c29; border-bottom: 1px solid #1f2938; padding: 14px 0; }
+		.at-page .at-logo { width: 32px; height: 32px; border-radius: 8px; background: #1570ef; color: #fff;
+			display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
+		.at-brand { font-size: 20px; font-weight: 700; color: #fff; white-space: nowrap; }
+		.at-page a.at-nav-link { color: #93a2b8; font-size: 15px; text-decoration: none; white-space: nowrap; }
+		.at-page a.at-nav-link-active { color: #2e90fa; font-weight: 600; border-bottom: 2px solid #2e90fa; padding-bottom: 4px; }
+		.at-search { position: relative; width: 300px; }
+		.at-page .at-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+			color: #7b8aa0; font-size: 14px; z-index: 1; }
+		.at-page input.at-search-input { width: 100%; height: 40px; box-sizing: border-box; padding: 0 14px 0 40px;
+			border: 1px solid #263243; border-radius: 10px; background: #1b2534; color: #e9eef7; font-size: 14px; }
+		.at-page button.at-icon-btn { width: 42px; height: 42px; border: 1px solid #263243; border-radius: 10px;
+			background: #1b2534; color: #cdd8e6; font-size: 16px; padding: 0; cursor: pointer; }
+		.at-page .at-avatar { width: 42px; height: 42px; border-radius: 50%; background: #34405270;
+			border: 2px solid #2e90fa; color: #b9c7d9; display: inline-flex; align-items: center;
+			justify-content: center; font-size: 17px; }
+
+		/* --- page header --- */
+		.at-head { padding: 40px 0 28px; }
+		.at-title { font-size: 40px; font-weight: 800; color: #fff; letter-spacing: -.5px; }
+		.at-subtitle { color: #93a2b8; font-size: 17px; }
+		.at-page button.at-btn { height: 46px; padding: 0 22px; border-radius: 10px; font-size: 15px;
+			font-weight: 600; cursor: pointer; white-space: nowrap; }
+		.at-page button.at-btn-ghost { background: #1e2836; border: 1px solid #2b3747; color: #e9eef7; }
+		.at-page button.at-btn-primary { background: #1570ef; border: 1px solid #1570ef; color: #fff;
+			box-shadow: 0 6px 18px rgba(21,112,239,.35); }
+
+		/* --- stat cards --- */
+		.at-stat { background: #1a2432; border: 1px solid #26313f; border-radius: 12px; padding: 22px 24px; }
+		.at-stat-label { color: #8c9bb1; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+		.at-stat-value { font-size: 25px; font-weight: 700; color: #fff; white-space: nowrap; }
+		.at-stat-value-blue { color: #2e90fa; }
+		.at-page .at-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #e8a33d; }
+
+		.at-page .at-body-cols { margin-top: 28px; }
+
+		/* --- cards --- */
+		.at-card { background: #1a2432; border: 1px solid #26313f; border-radius: 14px; }
+		.at-card-pad { padding: 26px 28px; }
+		.at-card-title { font-size: 21px; font-weight: 700; color: #fff; }
+		.at-page .at-pill { background: #16375c; color: #4aa3ff; border-radius: 8px; padding: 6px 12px;
+			font-size: 14px; font-weight: 700; white-space: nowrap; }
+		.at-page a.at-link { color: #2e90fa; font-size: 15px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+
+		/* --- progress --- */
+		.at-page .at-progress { height: 11px; border: 0; border-radius: 999px; background: #2b3648; overflow: hidden; }
+		.at-page .at-progress > div { background: #2e90fa; height: 100%; border-radius: 999px; }
+		.at-progress-caption { color: #8c9bb1; font-size: 15px; }
+		.at-progress-step { color: #e9eef7; font-size: 15px; font-weight: 600; }
+
+		/* --- checklist --- */
+		.at-page .at-row { padding: 16px 18px; border-radius: 10px; border-left: 3px solid transparent; }
+		.at-page .at-row-active { background: #1b2c44; border-left-color: #2e90fa; }
+		.at-page .at-ico { width: 26px; height: 26px; border-radius: 50%; display: inline-flex;
+			align-items: center; justify-content: center; font-size: 13px; color: #fff; }
+		.at-page .at-ico-done { background: #12b76a; }
+		.at-page .at-ico-active { background: #1570ef; }
+		.at-page .at-ico-todo { background: transparent; border: 2px solid #3b4757; box-sizing: border-box; }
+		.at-row-title { font-size: 17px; font-weight: 700; color: #fff; }
+		.at-row-desc { color: #8c9bb1; font-size: 14px; white-space: normal; }
+		.at-row-title-muted { color: #7d8b9f; }
+		.at-row-meta { color: #93a2b8; font-size: 14px; white-space: nowrap; }
+		.at-row-meta-active { color: #4aa3ff; font-style: italic; font-weight: 700; }
+
+		/* --- messages --- */
+		.at-card-head { padding: 22px 26px; border-bottom: 1px solid #232e3d; }
+		.at-msg-row { padding: 16px 26px; border-bottom: 1px solid #202b39; }
+		.at-page .at-msg-avatar { width: 40px; height: 40px; border-radius: 50%; background: #344052;
+			color: #c3d0e0; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+		.at-page .at-msg-avatar-bot { background: #16375c; color: #4aa3ff; }
+		.at-msg-name { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
+		.at-msg-time { color: #7d8b9f; font-size: 13px; white-space: nowrap; }
+		.at-msg-text { color: #9aa8bd; font-size: 14px; white-space: normal; }
+		.at-msg-foot { padding: 20px 26px; }
+
+		/* --- help card --- */
+		.at-help { background: linear-gradient(180deg, #1f7fe8 0%, #1570ef 100%); border-radius: 14px;
+			padding: 26px 28px; box-shadow: 0 10px 34px rgba(21,112,239,.4); }
+		.at-page .at-help-icon { width: 34px; height: 34px; border-radius: 9px; background: #ffffff2e;
+			color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+		.at-help-title { font-size: 22px; font-weight: 700; color: #fff; }
+		.at-help-text { color: #dce9fb; font-size: 15px; white-space: normal; }
+		.at-page button.at-btn-help { background: #5aa9fb; border: 1px solid #77bbff; color: #fff; }
+		.at-page button.at-btn-soft { background: #2b3747; border: 1px solid #35424f; color: #e9eef7; }
+	</style>
+
+	<div sclass="at-page" apply="zwriter.AppTrackerComposer" hflex="1">
+
+		<!-- ===== top navigation ===== -->
+		<div sclass="at-nav">
+			<div sclass="at-shell at-flex-row">
+				<hlayout valign="middle" spacing="12px">
+					<span sclass="at-logo z-icon-th-large"/>
+					<label value="AppTracker Pro" sclass="at-brand"/>
+				</hlayout>
+
+				<div sclass="at-search">
+					<span sclass="at-search-icon z-icon-search"/>
+					<textbox id="searchBox" placeholder="Search applications" sclass="at-search-input"/>
+				</div>
+
+				<hlayout valign="middle" spacing="30px">
+					<a label="Dashboard" sclass="at-nav-link at-nav-link-active"/>
+					<a label="Applications" sclass="at-nav-link"/>
+					<a label="Documents" sclass="at-nav-link"/>
+					<a label="Messages" sclass="at-nav-link"/>
+				</hlayout>
+
+				<hlayout valign="middle" spacing="12px">
+					<button id="notificationsBtn" iconSclass="z-icon-bell" sclass="at-icon-btn"/>
+					<button id="settingsBtn" iconSclass="z-icon-cog" sclass="at-icon-btn"/>
+					<span sclass="at-avatar z-icon-user"/>
+				</hlayout>
+			</div>
+		</div>
+
+		<div sclass="at-shell">
+
+			<!-- ===== page header ===== -->
+			<div sclass="at-head at-flex-row">
+				<vlayout spacing="8px">
+					<label value="Application Overview" sclass="at-title"/>
+					<label value="Track your progress and respond to inquiries in real-time."
+						   sclass="at-subtitle"/>
+				</vlayout>
+				<hlayout valign="middle" spacing="14px">
+					<button id="exportPdfBtn" label="Export PDF" iconSclass="z-icon-download"
+							sclass="at-btn at-btn-ghost"/>
+					<button id="editDetailsBtn" label="Edit Details" iconSclass="z-icon-pencil"
+							sclass="at-btn at-btn-primary"/>
+				</hlayout>
+			</div>
+
+			<!-- ===== summary stat cards ===== -->
+			<hlayout hflex="1" spacing="20px" valign="top">
+				<vlayout sclass="at-stat" hflex="1" spacing="12px">
+					<label value="APPLICATION STATUS" sclass="at-stat-label"/>
+					<hlayout valign="middle" spacing="10px">
+						<span sclass="at-dot"/>
+						<label id="statusValue" sclass="at-stat-value"/>
+					</hlayout>
+				</vlayout>
+				<vlayout sclass="at-stat" hflex="1" spacing="12px">
+					<label value="APPLICATION ID" sclass="at-stat-label"/>
+					<label id="applicationId" sclass="at-stat-value"/>
+				</vlayout>
+				<vlayout sclass="at-stat" hflex="1" spacing="12px">
+					<label value="SUBMISSION DATE" sclass="at-stat-label"/>
+					<label id="submissionDate" sclass="at-stat-value"/>
+				</vlayout>
+				<vlayout sclass="at-stat" hflex="1" spacing="12px">
+					<label value="PROCESSING FEE" sclass="at-stat-label"/>
+					<label id="processingFee" sclass="at-stat-value at-stat-value-blue"/>
+				</vlayout>
+			</hlayout>
+
+			<!-- ===== two-column body ===== -->
+			<hlayout hflex="1" spacing="24px" valign="top" sclass="at-body-cols">
+
+				<!-- ===== left column ===== -->
+				<vlayout hflex="19" spacing="24px">
+
+					<!-- overall progress -->
+					<div sclass="at-card at-card-pad">
+						<vlayout hflex="1" spacing="18px">
+							<hlayout valign="middle" hflex="1">
+								<label value="Overall Progress" sclass="at-card-title" hflex="1"/>
+								<label id="progressPill" sclass="at-pill"/>
+							</hlayout>
+							<progressmeter id="progressBar" sclass="at-progress" hflex="1"/>
+							<hlayout valign="middle" spacing="6px">
+								<label id="progressStepIndex" sclass="at-progress-caption"/>
+								<label id="progressStepName" sclass="at-progress-step"/>
+							</hlayout>
+						</vlayout>
+					</div>
+
+					<!-- required checklist -->
+					<div sclass="at-card at-card-pad">
+						<vlayout hflex="1" spacing="14px">
+							<label value="Required Checklist" sclass="at-card-title"/>
+
+							<hlayout sclass="at-row" valign="top" hflex="1" spacing="16px">
+								<span sclass="at-ico at-ico-done z-icon-check"/>
+								<vlayout hflex="1" spacing="5px">
+									<label value="Identity Verification" sclass="at-row-title"/>
+									<label value="Passport or National ID scan uploaded" sclass="at-row-desc"/>
+								</vlayout>
+								<label id="check1Meta" sclass="at-row-meta"/>
+							</hlayout>
+
+							<hlayout sclass="at-row" valign="top" hflex="1" spacing="16px">
+								<span sclass="at-ico at-ico-done z-icon-check"/>
+								<vlayout hflex="1" spacing="5px">
+									<label value="Employment History" sclass="at-row-title"/>
+									<label value="Last 3 years verified by HR" sclass="at-row-desc"/>
+								</vlayout>
+								<label id="check2Meta" sclass="at-row-meta"/>
+							</hlayout>
+
+							<hlayout sclass="at-row at-row-active" valign="top" hflex="1" spacing="16px">
+								<span sclass="at-ico at-ico-active z-icon-ellipsis-h"/>
+								<vlayout hflex="1" spacing="5px">
+									<label value="Financial Statement" sclass="at-row-title"/>
+									<label value="Processing bank transaction logs" sclass="at-row-desc"/>
+								</vlayout>
+								<label id="check3Meta" sclass="at-row-meta at-row-meta-active"/>
+							</hlayout>
+
+							<hlayout sclass="at-row" valign="top" hflex="1" spacing="16px">
+								<span sclass="at-ico at-ico-todo"/>
+								<vlayout hflex="1" spacing="5px">
+									<label value="Legal Background Check"
+										   sclass="at-row-title at-row-title-muted"/>
+									<label value="Waiting for local authorities" sclass="at-row-desc"/>
+								</vlayout>
+								<label id="check4Meta" sclass="at-row-meta"/>
+							</hlayout>
+						</vlayout>
+					</div>
+				</vlayout>
+
+				<!-- ===== right column ===== -->
+				<vlayout hflex="10" spacing="24px">
+
+					<!-- recent messages -->
+					<div sclass="at-card">
+						<div sclass="at-card-head">
+							<hlayout valign="middle" hflex="1">
+								<label value="Recent Messages" sclass="at-card-title" hflex="1"/>
+								<a label="View All" sclass="at-link"/>
+							</hlayout>
+						</div>
+
+						<hlayout sclass="at-msg-row" valign="top" hflex="1" spacing="14px">
+							<span sclass="at-msg-avatar z-icon-user"/>
+							<vlayout hflex="1" spacing="5px">
+								<hlayout valign="middle" hflex="1">
+									<label id="msg1Name" sclass="at-msg-name" hflex="1"/>
+									<label id="msg1Time" sclass="at-msg-time"/>
+								</hlayout>
+								<label id="msg1Text" sclass="at-msg-text"/>
+							</vlayout>
+						</hlayout>
+
+						<hlayout sclass="at-msg-row" valign="top" hflex="1" spacing="14px">
+							<span sclass="at-msg-avatar z-icon-user"/>
+							<vlayout hflex="1" spacing="5px">
+								<hlayout valign="middle" hflex="1">
+									<label id="msg2Name" sclass="at-msg-name" hflex="1"/>
+									<label id="msg2Time" sclass="at-msg-time"/>
+								</hlayout>
+								<label id="msg2Text" sclass="at-msg-text"/>
+							</vlayout>
+						</hlayout>
+
+						<hlayout sclass="at-msg-row" valign="top" hflex="1" spacing="14px">
+							<span sclass="at-msg-avatar at-msg-avatar-bot z-icon-info"/>
+							<vlayout hflex="1" spacing="5px">
+								<hlayout valign="middle" hflex="1">
+									<label id="msg3Name" sclass="at-msg-name" hflex="1"/>
+									<label id="msg3Time" sclass="at-msg-time"/>
+								</hlayout>
+								<label id="msg3Text" sclass="at-msg-text"/>
+							</vlayout>
+						</hlayout>
+
+						<hlayout sclass="at-msg-row" valign="top" hflex="1" spacing="14px">
+							<span sclass="at-msg-avatar z-icon-user"/>
+							<vlayout hflex="1" spacing="5px">
+								<hlayout valign="middle" hflex="1">
+									<label id="msg4Name" sclass="at-msg-name" hflex="1"/>
+									<label id="msg4Time" sclass="at-msg-time"/>
+								</hlayout>
+								<label id="msg4Text" sclass="at-msg-text"/>
+							</vlayout>
+						</hlayout>
+
+						<div sclass="at-msg-foot">
+							<button id="newMessageBtn" label="Send New Message"
+									sclass="at-btn at-btn-soft" hflex="1"/>
+						</div>
+					</div>
+
+					<!-- need help -->
+					<vlayout sclass="at-help" hflex="1" spacing="16px">
+						<hlayout valign="middle" spacing="14px">
+							<span sclass="at-help-icon z-icon-question"/>
+							<label value="Need Help?" sclass="at-help-title"/>
+						</hlayout>
+						<label value="Our support team is available 24/7 to guide you through the process."
+							   sclass="at-help-text"/>
+						<button id="liveChatBtn" label="Live Chat Support"
+								sclass="at-btn at-btn-help" hflex="1"/>
+					</vlayout>
+				</vlayout>
+			</hlayout>
+		</div>
+	</div>
+</zk>

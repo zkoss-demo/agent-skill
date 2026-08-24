@@ -46,13 +46,14 @@ PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 # --------------------------------------------------------------------------- helpers
 
-def cli(*args, timeout=RENDER_TIMEOUT, env=None):
+def cli(*args, timeout=RENDER_TIMEOUT, env=None, cwd=None):
     """Run preview-zul.py with exactly these arguments and nothing implicit."""
     child_env = None
     if env is not None:
         child_env = {**os.environ, **env}
     proc = subprocess.run([sys.executable, str(SCRIPT), *args], env=child_env,
-                          capture_output=True, text=True, timeout=timeout, cwd=str(REPO_ROOT))
+                          capture_output=True, text=True, timeout=timeout,
+                          cwd=str(cwd or REPO_ROOT))
     return proc.returncode, proc.stdout, proc.stderr
 
 
@@ -457,6 +458,28 @@ def check_a11_json_report_agrees_with_stdout():
     return fails
 
 
+def check_a14_default_out_is_the_cwd():
+    """With no --out the PNG lands in the *current directory* as <name>-preview.png. Run from a
+    disposable cwd, not the repo: that both proves the path follows the caller and keeps the
+    suite from leaving images behind."""
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        # resolve(): on macOS the temp dir is a symlink, and the script reports Path.cwd(),
+        # which is the real path.
+        expected = Path(tmp).resolve() / f"{GOLDEN.stem}-preview.png"
+        code, out, _ = cli("--launcher-jar", JAR, str(GOLDEN), cwd=tmp)
+        if code != 0:
+            fails.append(f"default out: expected exit 0, got {code}\n{out}")
+        if value(out, "SCREENSHOT") != str(expected):
+            fails.append(f"default out: SCREENSHOT is {value(out, 'SCREENSHOT')!r}, "
+                         f"expected {str(expected)!r}")
+        if not expected.is_file():
+            fails.append(f"default out: no PNG at {expected}; cwd held {[p.name for p in Path(tmp).iterdir()]}")
+        elif expected.read_bytes()[:8] != PNG_MAGIC:
+            fails.append(f"default out: {expected.name} is not a PNG")
+    return fails
+
+
 def check_a13_launcher_precedence():
     """A13: --launcher-jar wins over the environment, and the LAUNCHER: line says which won."""
     fails = []
@@ -500,6 +523,7 @@ CHECKS = [
     ("A10 mode inversion   ", check_a10_mode_inversion),
     ("A11 --report json    ", check_a11_json_report_agrees_with_stdout),
     ("A13 jar precedence   ", check_a13_launcher_precedence),
+    ("A14 default out = cwd", check_a14_default_out_is_the_cwd),
 ]
 
 # A12, the exit-code map, has no check of its own on purpose: 0, 1, 2, 3 and 4 are each already

@@ -1,7 +1,7 @@
 <window id="editDialog" title="Edit Item" border="normal"
         width="400px" mode="modal" closable="true"
         viewModel="@id('vm') @init('com.example.EditViewModel')">
-    <vlayout>
+    <vlayout spacing="10px">
         <grid>
             <columns>
                 <column width="100px"/>
@@ -14,7 +14,7 @@
                 </row>
             </rows>
         </grid>
-        <hlayout style="margin-top: 10px">
+        <hlayout>
             <button label="OK" onClick="@command('confirm')"/>
             <button label="Cancel" onClick="@command('cancel')"/>
         </hlayout>

@@ -1,5 +1,10 @@
 <zk>
     <style>
+    /* A class carries every static declaration; the tag colour below is the one
+       exception, because it is only known once the data is loaded. */
+    .kanbanavatar{
+        border-radius: 15px;
+    }
     .kanbantag{
         display:inline-block;
         line-height: 26px;
@@ -38,7 +43,7 @@
                 <vlayout hflex="1">
                     <label value="@load(item.taskDescription)"/>
                     <hlayout>
-                        <image src="@load(item.taskImage)" style="width:30px;height:30px;border-radius:15px;"/>
+                        <image src="@load(item.taskImage)" width="30px" height="30px" sclass="kanbanavatar"/>
                         <div hflex="1">
                             <forEach items="@init(item.tags)" var="tag">
                                 <label value="@load(tag.label)" sclass="kanbantag" style="@load(&quot;background-color:&quot;.concat(tag.color))"/>

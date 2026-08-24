@@ -2,8 +2,9 @@
 name: zul-writer
 description: >
   Generates ZK Framework ZUL pages (.zul) through a structured 5-step workflow: requirements clarification, ZUL generation, validation, controller generation, and a rendered-image self-review.
-  Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, visual analysis for screenshot-to-ZUL conversion, and rendering an existing .zul to a preview PNG.
-  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, or preview/screenshot/see what a ZUL page looks like.
+  Every step also stands alone, so use this skill for a single step too — validating an existing .zul, writing the Composer/ViewModel for a page that already exists, or just rendering a .zul to a preview PNG without touching it.
+  Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, and visual analysis for screenshot-to-ZUL conversion.
+  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, edit or extend an existing ZUL page, validate/fix a .zul that errors, or preview/screenshot/see what a ZUL page looks like.
 license: MIT
 compatibility: >
   Designed for Claude Code, Gemini CLI, and GitHub Copilot/Cursor.
@@ -26,11 +27,36 @@ This skill creates well-structured zul pages through a 5-step process:
 
 **Alternative entry**: When user provides a UI image (screenshot/mockup), perform the **Visual Analysis** below first, then proceed to the 5-step process.
 
+### Run only the steps the request needs
+
+The five steps are entry points, not a chain. A page built from nothing needs all of them; most
+other requests need one or two. Someone who hands you a finished `.zul` and asks what it looks like
+wants Step 5 and nothing else — interviewing them about MVC vs MVVM, or "improving" their markup on
+the way past, answers a question they did not ask and costs them a page they were happy with.
+
+| What the user asks | Steps to run |
+|---|---|
+| "Build me a page that…", "turn this mockup into ZUL" | 1 → 5, the whole workflow |
+| "Preview / screenshot / show me what `foo.zul` looks like" | 5 |
+| "Is this ZUL valid?", "why won't this page parse?" | 3 |
+| "Write the ViewModel for this page" | 4 |
+| "Add a column to this grid", "make the sidebar narrower" | 2 on the existing file → 3 → 5 if the change is visible |
+
+The steps you skip still feed the ones you run — Step 4 needs to know whether the page is MVC or
+MVVM, Step 5 needs something to judge the render against. Read those out of the file and the user's
+message rather than restarting Step 1: an existing `.zul` already states its pattern, its layout and
+its ZK version far more reliably than an interview would. Ask only what you genuinely cannot infer.
+
+**Called in for one step, report rather than rewrite.** Validating or rendering a page you did not
+write surfaces things nobody asked you to change. Say what you found, then make only the edit that
+was requested — or wait to be told to fix the rest. The exception is the defect that blocks the step
+itself: a page that will not parse cannot be rendered, so name it and offer the fix.
+
 ---
 
 ## Visual Analysis (for Images/Mockups)
 
-When a UI screenshot or mockup image is provided, perform this analysis **before** starting the 4-step workflow:
+When a UI screenshot or mockup image is provided, perform this analysis **before** starting the 5-step workflow:
 
 1. **Visual Breakdown**: Identify all UI elements (layout, inputs, buttons, tables, navigation).
 2. **Component & Layout Strategy**: Plan the ZK component mapping (refer to [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md)) and determine the overall layout (e.g., `<borderlayout>`, nested `<vlayout>`).
@@ -45,6 +71,10 @@ When a UI screenshot or mockup image is provided, perform this analysis **before
 ## Step 1: Clarify User Requirements
 
 Ask targeted questions to understand needs. If starting from an image, use the results of the **Visual Analysis** to inform these questions.
+
+Ask only what is still open. The request, the project and any existing file answer several of these
+already — a version in `pom.xml`, a pattern visible in the markup you were pointed at, a layout
+described in the prompt — and re-asking those reads as though you did not look.
 
 ### Questions to Ask
 
@@ -94,9 +124,30 @@ When generating the ZUL file, follow these technical guidelines:
 1. **Map UI Elements**: Consult [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) to choose the correct ZK components. 
    - Prioritize ZK components over native HTML.
    - Use layout components like `<borderlayout>`, `<vlayout>`, and `<hlayout>` effectively.
-2. **Handle CSS Inclusion**: 
-   - If fallback native HTML elements (e.g. `<n:div>`) are used, identify and include the necessary CSS.
-   - Use the `<style>` element for inline CSS; **do not** use the `<?style ?>` processing instruction.
+2. **Style through classes, not through `style` attributes**:
+   - Put the page's CSS in one `<style>` element near the top of the file — **not** the `<?style ?>`
+     processing instruction — and attach it with `sclass` on ZK components (`class` on native `n:`
+     elements). Name each class for what the thing *is* (`sclass="stat-card"`), and give the page's
+     classes a short prefix of their own so they cannot collide with ZK's `z-` classes or with
+     another page's CSS.
+   - **Why this is not just taste.** A `style` attribute is rendered onto the widget's own element,
+     where it outranks every rule any stylesheet can write: the page stops being themeable, CSS
+     written later silently loses to it, and no `:hover`, `:focus` or `@media` rule can ever reach
+     it. Declarations pasted onto a dozen components also drift into a dozen near-identical values,
+     where one class is edited once and every instance follows.
+   - **When a class looks like it "doesn't work", the theme is out-specifying it** — `.z-button` is
+     more specific than `.my-btn`, so the theme wins. Qualify the selector
+     (`.my-page button.my-btn { … }`) rather than reaching for `style`; that reach is exactly how a
+     page ends up inline-styled all the way down.
+   - **Size and spacing belong to the component, not to the CSS.** `hflex`/`vflex`, `width`,
+     `height`, `spacing` and `valign` are the component's own API and cooperate with ZK's layout
+     engine; recreating them in CSS is how flex layouts break. Let the component own the box and the
+     class own the appearance.
+   - **One honest exception: a value that only exists at runtime.** A colour or width that comes from
+     data (`style="@load('background-color:'.concat(tag.color))"`) cannot be a static class. Keep
+     that one declaration inline and leave the rest in the class.
+   - If fallback native HTML elements (e.g. `<n:div>`) are used, include the CSS they need in that
+     same `<style>` block.
 3. **ZK Documentation**:
    - Query `zk-doc-mcp-server` for detailed component info if available.
    - Use [ZK Javadoc](https://www.zkoss.org/javadoc/latest/zk/) for properties and event details.
@@ -139,6 +190,9 @@ uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --zk-version 10.3.0 p
 - Layer 1: XML well-formedness (no dependencies). Multi-root fragments are auto-wrapped in `<zk>` before validating.
 - Layer 2: XSD schema validation (requires `lxml`)
 - Layer 3: Attribute placement check (requires `lxml`) - catches misplaced attributes (e.g. `iconSclass` on `textbox`)
+- Layer 5: inline-style advisory — lists static `style="..."` attributes that belong in a `<style>`
+  class attached with `sclass`. It reports and never fails the run, so treat each line as a defect
+  to fix rather than noise to pass over; a data-driven `style="@load(...)"` is skipped on purpose.
 - Layer 4: version compatibility checks for the target ZK version — removed/deprecated API for all targets, plus ZK-10-only API (e.g. dropped `<fragment>`, or new `accept`/`responsive` attributes) gated by `--zk-version`. Defaults to `10` if omitted.
 
 ### Prerequisites
@@ -152,6 +206,12 @@ python3 <skill-base-dir>/scripts/validate-zul.py --zk-version <detected-version>
 ### Usage Tracking
 Running this script also fires an anonymous, aggregate usage ping (skill name + version only, no identifier) on a background thread — it never delays or blocks validation. Opt out with `DO_NOT_TRACK=1` or `TRACK_URL=""`.
 
+### Asked only to validate
+
+Report the layers that failed, quote the lines the script names, and say what each one means — then
+stop. A validation request is a request to be told what is wrong; edit the file when the user asks
+for the fix, or when fixing it is the task you were already on.
+
 ### Post-Validation Checklist
 
 #### Pattern Consistency
@@ -161,7 +221,8 @@ Running this script also fires an anonymous, aggregate usage ping (skill name + 
 
 #### Best Practices
 - IDs are unique within each ID space owner (`<window>`, `<idspace>`)
-- Prefer `sclass` over inline styles
+- Appearance lives in `<style>` classes attached with `sclass`; the only `style` attribute left is
+  one whose value comes from data. Layer 5 lists any others it found
 - Prefer `hflex`/`vflex` over fixed dimensions
 - Include meaningful labels and tooltips for accessibility
 
@@ -193,21 +254,36 @@ For complex UI patterns like Kanban Boards or Dashboards, and for complete templ
 
 Render the finished page to an image, **look at it**, and check it against the requirements gathered in Step 1. Steps 2–4 only ever see markup; this is the only step that sees what the page actually looks like.
 
+**Asked only for a preview**, there are no Step 1 answers to judge against — so judge the render
+against the page's own markup and whatever the user said they expected, describe what you see, and
+report the image path. The *What to fix* list below still tells you what counts as a defect worth
+mentioning; it does not license editing a file the user asked you to look at rather than change.
+
 Run the preview script from this skill's base directory (same convention as Step 3):
 
 ```bash
-uv run <skill-base-dir>/scripts/preview-zul.py --out <path-to-png> <path-to-zul-file>
+uv run <skill-base-dir>/scripts/preview-zul.py <path-to-zul-file>
 ```
 
 Example: if the skill base directory is `~/.claude/skills/zul-writer/` and the page lives in a Maven webapp, run:
 ```bash
-uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --out /tmp/zul-preview.png src/main/webapp/index.zul
+uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py src/main/webapp/index.zul
 ```
+
+**Where the image goes: the current working directory.** With no `--out`, the PNG is written to the
+directory you are working in, named after the page — `index.zul` gives `./index-preview.png` — and
+the `SCREENSHOT:` line reports the exact path. Leave it there. This image is not a scratch file: it
+is the one visual artifact of the whole workflow, the thing the user opens to see whether the page
+matches what they asked for, so it belongs beside their work where they can click it, keep it, or
+delete it. Sending it to a temp or scratchpad directory instead hides it behind a path they would
+have to be told about and cannot find again later. Re-renders overwrite the same file, so the path
+stays valid across fix rounds and is still the right one to report at the end. Pass `--out` only
+when the user names a destination, or when a corpus/CI job needs the images collected somewhere.
 
 If this session wrote the page's controller, append `--run-controllers` (read the next paragraph
 before you do — it executes project code):
 ```bash
-uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --run-controllers --out /tmp/zul-preview.png src/main/webapp/index.zul
+uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --run-controllers src/main/webapp/index.zul
 ```
 
 **When to pass `--run-controllers`.** Pass it when this session wrote the page's controller
@@ -224,9 +300,12 @@ a legitimately slow page keeps degrading (the default budget is 10 s for the who
 line in the output always says which viewport the render actually used.
 
 - **Match the mockup's width.** When the user supplied a screenshot or mockup, pass `--width` at
-  approximately that image's pixel width, clamped to 1024-1920, so the two images compare like for
-  like — a 1600 px mockup means `--width 1600`. Rendering the 1280 default against a wider mockup
-  adds differences that are yours, not the page's, and you will spend fix rounds on them.
+  approximately that image's pixel width, so the two images compare like for like — a 1600 px
+  mockup means `--width 1600`. Rendering the 1280 default against a wider mockup adds differences
+  that are yours, not the page's, and you will spend fix rounds on them. Match the *layout* width,
+  not the file's pixel count: halve a high-DPI export, and do not follow a thumbnail far below 1024
+  unless you mean to test a narrow viewport — a very narrow render manufactures `clipped-text`
+  findings that the same markup does not produce at desktop width.
 - **`--full-page` when the page flows past the fold** — long forms, stacked reports, anything meant
   to scroll. It stitches the whole scrollable page into the PNG.
 - **`--height` when the page is a vertical flex shell.** A page whose root region is `vflex` is
@@ -236,7 +315,7 @@ line in the output always says which viewport the render actually used.
   as tall as the `SIZE:` viewport is telling you the page is flex-sized, not truncated.
 
 ```bash
-uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --width 1600 --full-page --run-controllers --out /tmp/zul-preview.png src/main/webapp/index.zul
+uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --width 1600 --full-page --run-controllers src/main/webapp/index.zul
 ```
 
 The script resolves the project's ZK jars (Maven, Gradle, or stock ZK when the file belongs to no project), renders the page through ZK's own engine, and writes a PNG. **Requires Java 17+ and Google Chrome or Microsoft Edge.** On first use it downloads the render helper (`zk-preview-launcher.jar`, ~500 KB), verifies its SHA-256, and caches it under `~/.cache/zul-writer/`; later runs need no network.

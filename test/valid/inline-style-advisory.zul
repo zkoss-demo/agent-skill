@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Layer 5 is an advisory: it reports static inline styles and never changes the
+     exit code, so this file belongs in the PASS corpus. The second label keeps its
+     style attribute on purpose — a value computed from data at runtime cannot be a
+     static class, and Layer 5 skips it. -->
+<zk>
+    <style>
+        .ia-note { color: #555555; }
+    </style>
+    <vlayout spacing="10px">
+        <label value="Reported by Layer 5" style="font-weight: bold"/>
+        <label value="Skipped by Layer 5" sclass="ia-note"
+               style="@load('color:'.concat(vm.tone))"/>
+    </vlayout>
+</zk>

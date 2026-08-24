@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?page title="Product Management"?>
 <zk>
+    <style>
+        .dm-pad { padding: 10px; }
+        .dm-title { font-size: 18px; font-weight: bold; }
+    </style>
     <borderlayout hflex="1" vflex="1"
                   viewModel="@id('vm') @init('com.example.vm.ProductViewModel')">
         <north height="50px" border="none">
-            <hlayout valign="middle" hflex="1" style="padding: 10px">
-                <label value="Product Management"
-                       style="font-size: 18px; font-weight: bold"/>
+            <hlayout valign="middle" hflex="1" sclass="dm-pad">
+                <label value="Product Management" sclass="dm-title"/>
                 <space hflex="1"/>
                 <button label="Add Product"
                         onClick="@command('showAddDialog')"
@@ -24,7 +27,7 @@
             </listbox>
         </west>
         <center border="none">
-            <vlayout vflex="1" hflex="1" style="padding: 10px">
+            <vlayout vflex="1" hflex="1" sclass="dm-pad">
                 <!-- Search bar -->
                 <hlayout>
                     <textbox value="@bind(vm.searchKeyword)"

@@ -1,22 +1,26 @@
-<hlayout vflex="1" hflex="1">
-    <!-- Master list -->
-    <listbox model="@load(vm.items)"
-             selectedItem="@bind(vm.selectedItem)"
-             hflex="1" vflex="1">
-        <listhead>
-            <listheader label="Name"/>
-        </listhead>
-        <template name="model" var="item">
-            <listitem label="@load(item.name)"/>
-        </template>
-    </listbox>
+<zk>
+    <style>
+        .md-detail-title { font-weight: bold; font-size: 16px; }
+    </style>
+    <hlayout vflex="1" hflex="1">
+        <!-- Master list -->
+        <listbox model="@load(vm.items)"
+                 selectedItem="@bind(vm.selectedItem)"
+                 hflex="1" vflex="1">
+            <listhead>
+                <listheader label="Name"/>
+            </listhead>
+            <template name="model" var="item">
+                <listitem label="@load(item.name)"/>
+            </template>
+        </listbox>
 
-    <!-- Detail panel -->
-    <vlayout hflex="2" vflex="1"
-             visible="@load(not empty vm.selectedItem)">
-        <label value="@load(vm.selectedItem.name)"
-               style="font-weight: bold; font-size: 16px"/>
-        <separator/>
-        <label value="@load(vm.selectedItem.description)"/>
-    </vlayout>
-</hlayout>
+        <!-- Detail panel -->
+        <vlayout hflex="2" vflex="1"
+                 visible="@load(not empty vm.selectedItem)">
+            <label value="@load(vm.selectedItem.name)" sclass="md-detail-title"/>
+            <separator/>
+            <label value="@load(vm.selectedItem.description)"/>
+        </vlayout>
+    </hlayout>
+</zk>

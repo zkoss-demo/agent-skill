@@ -13,6 +13,8 @@ Validates ZUL files for:
            attributes that XSD's anyAttribute wildcard allows through
   Layer 4: Version compatibility checks for the target ZK version
            (removed/deprecated API; ZK-10-only API on ZK 9 targets)
+  Layer 5: Inline style advisory (never fails) - static style="..." attributes
+           that belong in a <style> class attached with sclass
 
 Recommended invocation is `uv run validate-zul.py ...`: uv reads the PEP 723
 inline metadata above and provides `lxml` in an ephemeral environment, so no
@@ -519,16 +521,16 @@ REMOVED_ATTRIBUTES = {
     "heights": (["box", "hbox", "vbox"], "Deprecated since 5.0.0, put <cell height> inside instead."),
     "timeZone": (["calendar"], "Deprecated since 5.0.5, please remove it."),
     "border": (["captcha"], "Deprecated since 5.0.4, use \"frame\" attribute instead."),
-    "align": (["div", "grid", "iframe", "image"], "Deprecated since 5.0/6.0, use CSS instead e.g. align=\"left\" --> style=\"text-align:left\", align=\"right\" --> style=\"text-align:right\""),
+    "align": (["div", "grid", "iframe", "image"], "Deprecated since 5.0/6.0. Use CSS instead: text-align: left|right, in a class attached with sclass"),
     "compact": (["datebox"], "Deprecated since 5.0.0, please remove it."),
     "maxsize": (["fileupload"], "Deprecated since 5.0.0, specified it in \"upload\" attribute e.g. upload=\"maxsize=1024\""),
     "number": (["fileupload"], "Deprecated since 5.0.0, specified it in \"upload\" attribute"),
     "native": (["fileupload"], "Deprecated since 5.0.0, specified it in \"upload\" attribute e.g. upload=\"native\""),
     "fixedLayout": (["grid", "listbox", "tree"], "Since 5.0.0, use \"sizedByContent\" attribute instead."),
     "legend": (["groupbox"], "Deprecated since 6.0, please remove it."),
-    "hspace": (["image"], "Deprecated since 6.0.0, use CSS instead, style=\"margin-left:10px; margin-right:10px;\""),
-    "vspace": (["image"], "Deprecated since 6.0.0, use CSS instead, style=\"margin-top:10px; margin-bottom:10px;\""),
-    "hyphen": (["label"], "Deprecated since 5.0.0, use CSS instead, style=\"overflow-wrap: break-word;\""),
+    "hspace": (["image"], "Deprecated since 6.0.0. Use CSS instead: margin-left/margin-right, in a class attached with sclass"),
+    "vspace": (["image"], "Deprecated since 6.0.0. Use CSS instead: margin-top/margin-bottom, in a class attached with sclass"),
+    "hyphen": (["label"], "Deprecated since 5.0.0. Use CSS instead: overflow-wrap: break-word, in a class attached with sclass"),
     "flex": (["center", "east", "north", "south", "west"], "Deprecated since 6.0.2, use hflex or vflex on child components instead"),
     "preloadSize": (["grid", "listbox"], "Deprecated since 5.0.8, use <custom-attributes org.zkoss.zul.listbox.preloadSize=\"\"> or <custom-attributes org.zkoss.zul.grid.preloadSize=\"\" instead."),
     "checkable": (["listitem", "treeitem"], "Deprecated since 8.0.0, please use selectable"),
@@ -634,6 +636,58 @@ def validate_version_compatibility(file_path: Path, major: int) -> tuple[bool, l
         return False, [f"Compatibility check error: {e}"]
 
 
+# A style value that is computed while the page runs -- a colour or a width taken from a
+# record -- cannot be expressed as a static class, so a binding or EL expression here is
+# a legitimate inline style and not worth reporting.
+DYNAMIC_STYLE_VALUE = re.compile(r'\$\{|@\s*(?:load|bind|init)\s*\(')
+
+
+def find_inline_styles(file_path: Path) -> list[str]:
+    """
+    Layer 5 (advisory): report static style="..." attributes.
+
+    A style attribute is rendered onto the widget's own element, so it outranks every
+    rule any stylesheet can write: the page stops being themeable, later CSS silently
+    loses to it, and no :hover/:focus/@media rule can reach it. The same declarations
+    pasted onto several components then drift apart, where one class would be edited
+    once. The fix is always the same -- move the declarations into the page's <style>
+    block as a class and attach it with sclass.
+
+    This is a convention rather than a correctness question, and a page may have a
+    defensible one-off, so this layer reports and never fails the run.
+    """
+    notes = []
+    try:
+        try:
+            from lxml import etree
+            with open(file_path, 'rb') as f:
+                root = etree.parse(f).getroot()
+            use_lxml = True
+        except ImportError:
+            root = ET.parse(file_path).getroot()
+            use_lxml = False
+
+        for elem in root.iter():
+            if not isinstance(elem.tag, str):
+                continue
+            tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+            for attr_name, attr_value in elem.attrib.items():
+                local = attr_name.split('}')[-1] if '}' in attr_name else attr_name
+                if local != "style" or DYNAMIC_STYLE_VALUE.search(attr_value or ""):
+                    continue
+                line_str = f"Line {elem.sourceline}: " if use_lxml and hasattr(elem, 'sourceline') else ""
+                value = " ".join((attr_value or "").split())
+                if len(value) > 60:
+                    value = value[:57] + "..."
+                notes.append(f'{line_str}<{tag} style="{value}">')
+        return notes
+
+    except Exception:
+        # Never let the advisory layer speak up about anything but inline styles: the
+        # failing layers above have already reported whatever made parsing impossible.
+        return []
+
+
 def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(DEFAULT_XSD_PATH), zk_version: str = "10") -> bool:
     """
     Validate a ZUL file through all validation layers.
@@ -720,6 +774,19 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
         for error in errors:
             print(f"  {error}")
         all_valid = False
+
+    # Layer 5: Inline Styles (advisory -- reports, never fails; see find_inline_styles)
+    print("Layer 5: Inline Styles... ", end="")
+    inline_styles = find_inline_styles(active_path)
+    if not inline_styles:
+        print("✓ PASS")
+    else:
+        plural = "s" if len(inline_styles) > 1 else ""
+        print(f"⚠ {len(inline_styles)} inline style attribute{plural} (advisory)")
+        for note in inline_styles:
+            print(f"  {note}")
+        print("  Move these declarations into the page's <style> block as a class and "
+              "attach it with sclass.")
 
     if wrapped_path:
         wrapped_path.unlink(missing_ok=True)
