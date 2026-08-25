@@ -223,6 +223,24 @@ def wrap_fragment_in_zk(file_path: Path) -> Path | None:
     return Path(tmp.name)
 
 
+def _double_dash_comment_line(text: str) -> int | None:
+    """
+    Find a comment whose body contains '--', which XML forbids. Java allows it,
+    and the controller guidelines suggest '// --- section ---' separators, so the
+    habit carries into ZUL and costs a validation round.
+
+    Returns the 1-based line number of the offending comment, or None.
+    """
+    pos = 0
+    while (start := text.find('<!--', pos)) != -1:
+        end = text.find('-->', start + 4)
+        body = text[start + 4:end if end != -1 else len(text)]
+        if '--' in body:
+            return text.count('\n', 0, start) + 1
+        pos = (end + 3) if end != -1 else len(text)
+    return None
+
+
 def validate_xml_wellformedness(file_path: Path) -> tuple[bool, str | None]:
     """
     Layer 1: Check if the file is well-formed XML.
@@ -254,6 +272,16 @@ def validate_xml_wellformedness(file_path: Path) -> tuple[bool, str | None]:
                         prev_line = lines[line_num - 2].strip()
                         if '<' in prev_line and '>' not in prev_line:
                             error_msg += f"\n  Hint: Line {line_num-1} appears to have an unclosed tag: {prev_line}"
+
+                    # Heuristic for '--' inside a comment: expat only reports an
+                    # "invalid token", which does not point at the real rule.
+                    bad = _double_dash_comment_line(''.join(lines))
+                    if bad is not None:
+                        error_msg += (
+                            f"\n  Hint: Line {bad} has '--' inside an XML comment."
+                            " XML forbids that anywhere between <!-- and -->."
+                            " Use '=' for separators: <!-- ===== left column ===== -->"
+                        )
         except Exception:
             pass # Fallback to original message if file reading fails
             

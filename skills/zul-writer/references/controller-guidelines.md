@@ -7,7 +7,7 @@ When generating controller code for ZUL pages, whether using the MVC or MVVM pat
 1. **Provide Realistic Scaffold Code**: The controller should be fully functional to demonstrate the page layout, using mock or example data. It should not contain real application logic but should clearly indicate (e.g., via comments) where developers should insert their actual service/repository calls.
 2. **Generate Sample Data**: Generate realistic example data (e.g., sample messages, dashboard metrics, product lists) to populate tables, lists, and summary cards. This prevents the page from looking empty and helps verify the UI binding and layout.
 3. **Use Inner Classes for Models**: For simplicity and self-containment in scaffolding, define model objects representing the data (e.g., `Message`, `Product`) as `public static class` within the controller file. Remind developers that these can be refactored into separate files.
-4. **Organize Logically**: Group related fields, formatters, initialization, commands/events, and sample data methods together using comment blocks (e.g., `// --- Wired components ---`, `// --- Sample Data ---`).
+4. **Organize Logically**: Group related fields, formatters, initialization, commands/events, and sample data methods together using comment blocks (e.g., `// --- Wired components ---`, `// --- Sample Data ---`). That dash style is Java-only — XML forbids `--` inside a comment, so the ZUL needs `<!-- ===== Left column ===== -->` instead.
 
 ## MVC Pattern (Extending `SelectorComposer`)
 

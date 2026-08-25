@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The healthy specimen for test/run-preview-tests.py. This is the one page the CLI contract suite
+  needs to be KNOWN GOOD, and seven checks depend on it. Each needs a different property:
+
+    * it renders with exit 0, so the block order and the LAUNCHER line can be asserted
+    * it produces ZERO layout findings, so "no LAYOUT block" is what zero findings looks like
+    * it is comfortably taller than 300px, so the full page flag provably stitches past the fold
+    * it is clean at viewport width 1280 and also at 1600, because one check renders it wide
+
+  Rules for anyone editing this file:
+
+    * DO NOT "improve" it, restyle it, or add components. It is a control, not a demo. Every
+      element here sizes to its own content precisely so that nothing can clip.
+    * Never give a label a fixed width, never leave a container empty, never add anything
+      width sensitive.
+    * A showcase page must never be used for this again. Those get regenerated on purpose, and
+      one regenerated clipped label would fail the "zero findings" check for a reason that has
+      nothing to do with the CLI contract.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <div width="900px" style="padding:24px;font-family:system-ui,sans-serif">
+        <vlayout spacing="16px">
+            <label value="Healthy page" style="font-size:22px;font-weight:600"/>
+            <label value="A deliberately unremarkable page. Nothing here is fixed width except the
+                          outer container, so no text can be clipped at any viewport the suite uses."/>
+            <div height="150px" style="background:#f4f7fb;border:1px solid #d8e0ea;padding:12px">
+                <label value="Block one"/>
+            </div>
+            <div height="150px" style="background:#f4f7fb;border:1px solid #d8e0ea;padding:12px">
+                <label value="Block two"/>
+            </div>
+            <div height="150px" style="background:#f4f7fb;border:1px solid #d8e0ea;padding:12px">
+                <label value="Block three, which puts the page well past 300px tall"/>
+            </div>
+        </vlayout>
+    </div>
+</zk>

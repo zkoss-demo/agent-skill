@@ -4,7 +4,7 @@ description: >
   Generates ZK Framework ZUL pages (.zul) through a structured 5-step workflow: requirements clarification, ZUL generation, validation, controller generation, and a rendered-image self-review.
   Every step also stands alone, so use this skill for a single step too — validating an existing .zul, writing the Composer/ViewModel for a page that already exists, or just rendering a .zul to a preview PNG without touching it.
   Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, and visual analysis for screenshot-to-ZUL conversion.
-  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, edit or extend an existing ZUL page, validate/fix a .zul that errors, or preview/screenshot/see what a ZUL page looks like.
+  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, edit or extend an existing ZUL page, move a page's hard-coded data into a Composer/ViewModel, validate/fix a .zul that errors, or preview/screenshot/see what a ZUL page looks like.
 license: MIT
 compatibility: >
   Designed for Claude Code, Gemini CLI, and GitHub Copilot/Cursor.
@@ -40,6 +40,7 @@ the way past, answers a question they did not ask and costs them a page they wer
 | "Preview / screenshot / show me what `foo.zul` looks like" | 5 |
 | "Is this ZUL valid?", "why won't this page parse?" | 3 |
 | "Write the ViewModel for this page" | 4 |
+| "Move this page's data into a ViewModel/Composer" | the extraction pass in Step 2 → 4 → 5 with `--run-controllers` |
 | "Add a column to this grid", "make the sidebar narrower" | 2 on the existing file → 3 → 5 if the change is visible |
 
 The steps you skip still feed the ones you run — Step 4 needs to know whether the page is MVC or
@@ -97,7 +98,20 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 - **MVVM**: ViewModel-based with `@bind`/`@command` data binding — testable, requires more ZK familiarity
 - **MVC**: Composer-based with `apply` and wired components — straightforward, beginner-friendly
 
-#### 4. Layout Requirements
+#### 4. Static Data or Model-Driven
+
+Ask this as its own question. It is independent of MVC/MVVM — that choice decides where *behaviour*
+lives, this one decides where *data* lives — and it changes the order the work happens in:
+
+- **Static data**: the text and rows are written in the ZUL (`<label value="Acme Corp"/>`, rows
+  spelled out). Right for a layout, a mockup, a demo, anything whose content is fixed.
+- **Model-driven**: the controller supplies them — a Composer setting values, or a ViewModel the page
+  reads through `@load`/`@bind` and a bound `model`. Right for anything backed by real data.
+
+Either answer still gets a controller in Step 4. Model-driven pages are additionally built in two
+passes — see *Model-driven pages* in Step 2.
+
+#### 5. Layout Requirements
 - Borderlayout (north/south/east/west/center)
 - Vertical layout (vlayout)
 - Horizontal layout (hlayout)
@@ -105,11 +119,11 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 - Tabbed layout (tabbox)
 - Combined layouts
 
-#### 5. ZK Charts (only when charts are needed)
+#### 6. ZK Charts (only when charts are needed)
 
 If the ZUL page requires a `<charts>` component, follow [references/charts-guidelines.md](references/charts-guidelines.md) before generating any chart code.
 
-#### 6. Theme and Data Density
+#### 7. Theme and Data Density
 
 If a page is designed to show a high density of data, suggest to the user to use another free theme called `iceblue_c`, a compact theme that has smaller padding, margin, and font-size.
 
@@ -154,7 +168,34 @@ When generating the ZUL file, follow these technical guidelines:
 4. **Best Practices**:
    - Prefer `hflex`/`vflex` over fixed pixel widths for responsive layouts. `hflex="min"` sizes a component to fit its content — useful for a `<button>` sitting beside an `hflex="1"` field (see [assets/flexible-sizing.zul](assets/flexible-sizing.zul)).
    - Use meaningful IDs and follow the [assets/template.zul](assets/template.zul) structure.
+   - **Never put `--` inside an XML comment.** XML forbids it anywhere between `<!--` and `-->`, so
+     the `<!-- ---------- Left column ---------- -->` separator that is perfectly good Java style is
+     a hard parse error in a ZUL. Use `=`: `<!-- ===== Left column ===== -->`.
 
+
+### Model-driven pages: write the data in, then take it out
+
+A page whose values come from a controller cannot show you itself until that controller runs. Until
+then `@load(vm.customer)` renders as dimmed expression text and a bound `model` renders as a couple
+of placeholder rows — so column widths, wrapping, card heights and whether a row of stats fits are
+all being judged against text that is not the text the page will hold. That is how a page passes
+Step 5 and still comes out wrong the first time it is run for real.
+
+So when the controller does not exist and compile yet — the usual case for a new page — write the
+first version with literal values, shaped like the data that will replace them: a name of realistic
+length, a price with its real digits, enough rows to fill the region. Literals render as themselves,
+so the Step 5 screenshot is the page the user will actually get. Iterate there until the layout and
+the styling are right.
+
+Once the layout is settled, extract in one pass: move each literal into the controller as a field,
+getter or list, and replace it in the ZUL with the binding that reads it (`@load(vm.customer.name)`,
+`model="@load(vm.items)"`). Change nothing else — same components, same `sclass`, same `hflex`.
+Extraction moves values, not structure, so if the page shifts afterwards the extraction is what to
+look at; re-render with `--run-controllers` to confirm it did not.
+
+When the controller already exists and compiles — a page bound to a ViewModel the project already
+has — there is nothing to extract. Render with `--run-controllers` from the start and judge the real
+data.
 
 ### Layout & Component Patterns
 
@@ -231,6 +272,13 @@ for the fix, or when fixing it is the task you were already on.
 
 Generate the corresponding Java controller class (ViewModel or Composer) for the ZUL page. 
 
+**Generate it for a static-data page too.** The values may be fixed, but the page will still have to
+*do* something, and what a developer needs from you is the shape of that attachment: how a Composer
+wires a component and listens for its event, how a ViewModel declares a `@Command` and what the ZUL
+writes to invoke it. Leaving it out withholds the one part that is ZK-specific and hard to guess. So
+include at least one working handler on something the page really has — the Save button, the row
+selection, the search box — acting on the values already in the markup.
+
 ### Controller Generation Guidelines
 
 1. **Pattern Consistency**: 
@@ -289,7 +337,9 @@ uv run ~/.claude/skills/zul-writer/scripts/preview-zul.py --run-controllers src/
 **When to pass `--run-controllers`.** Pass it when this session wrote the page's controller
 (Step 4's composer or ViewModel): the sample data in it is yours, running it is what turns a
 skeleton screenshot into a judgeable one, and the flag makes bound values, model-bound rows and
-composer-filled labels real. Do **not** pass it for a page whose controller you did not write —
+composer-filled labels real. It is also the render that checks an *extraction*: after moving a
+page's literals into its controller (Step 2), this is what shows the page still looks like the one
+you approved. Do **not** pass it for a page whose controller you did not write —
 the flag **executes arbitrary project code** from the project's classpath (constructors, service
 calls, whatever `doAfterCompose` does), so it is opt-in per render and never a default. If the
 controller has not been compiled yet, build first (`mvn compile` / `gradle classes`); the script
@@ -447,7 +497,7 @@ The preview renders the **first paint only**. With `CONTROLLERS: skipped (isolat
 renderer behaving correctly. Do **not** "fix" it, do not report it as a flaw, and do not let it
 drive a re-render:
 
-- **Bound values shown as dimmed expression text** (e.g. a literal `vm.customer` inside a textbox) — the ViewModel never runs.
+- **Bound values shown as dimmed expression text** (e.g. a literal `vm.customer` inside a textbox) — the ViewModel never runs. This is the renderer being correct, and it is also why a new model-driven page is written with literal data first (Step 2): you cannot measure a layout against text that is not the text it will hold.
 - **Placeholder rows** in a `<grid>`/`<listbox>`/`<tree>` whose `model` is bound (e.g. rows reading `each.product`) — dimmed sample rows keep the component's real geometry.
 - **A whole section missing where an `<include>` has a bound `src`** — this one is *not* placeholdered. A constant literal (`src="@load('~./page.zul')"`) is included for real; anything the ViewModel supplies (`src="@load(vm.page)"`) leaves `src` unset, so the include contributes **nothing** and you see a silent gap, not dimmed text. Adding a hard-coded `src` to "fix" the gap breaks the real page.
 - **Anything a Composer or ViewModel would populate** — default values, initial selections, computed labels, i18n text. `apply="..."` composers are no-ops here.
@@ -469,6 +519,10 @@ round-trip"* down still holds in both modes.
 
 - **At most two fix rounds — three renders total.** Round 1: render, read, list defects from *What to fix*. Fix them, re-run Step 3 validation, re-render. Round 2: same. Then stop.
 - **Fix only whole defects from that list.** If your list is empty, or everything left on it is in *What you cannot judge*, the page is good enough — say so in one line and stop. "Good enough" means every requirement from Step 1 is visibly present, in the right region, in the right kind of component, and nothing is clipped or overlapping.
+- **A model-driven page spends its rounds on the literal version.** Settle the layout while the data
+  is still in the markup, then extract and re-render once with `--run-controllers`. That render sits
+  outside the two-round budget because it checks the extraction, not the layout — and if the page
+  looks different afterwards, the extraction is what changed it.
 - **Never edit the ZUL for a cosmetic difference alone.** Chasing pixels against a mockup costs rounds and regresses working markup.
 - If a defect survives both rounds, **stop and tell the user** what it is and what you tried. Do not keep rendering.
 - Report the final image path so the user can look at it themselves.

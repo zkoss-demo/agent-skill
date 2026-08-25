@@ -28,7 +28,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "skills" / "zul-writer" / "scripts" / "preview-zul.py"
 WEBAPP = REPO_ROOT / "zulwriter-showcase" / "src" / "main" / "webapp"
 FIXTURES = WEBAPP / "preview-fixtures"
-GOLDEN = WEBAPP / "application-review.zul"
+# The success-path control. Deliberately a purpose-built fixture and never a showcase page:
+# showcase pages get regenerated, and one regenerated clipped label would fail the
+# "zero findings" checks for a reason that has nothing to do with the CLI contract.
+# Measured clean at viewport 1280 and 1600, and 625px tall.
+GOLDEN = FIXTURES / "healthy-page.zul"
 
 # The pinned-digest warning that every local-jar run emits, because the digest in preview-zul.py
 # is pinned to a build that is not published yet. Filtered by CONTENT and never by count: a check
