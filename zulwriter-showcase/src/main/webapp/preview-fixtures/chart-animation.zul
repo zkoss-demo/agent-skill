@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  D2 regression fixture: a chart with its default JS-driven entry animation still on.
+
+  Rendered with the run-controllers flag. Before the fix, three consecutive captures of this
+  page differ from each other, because each one catches the series animation at a different
+  point; after it they are byte-identical, because the pipeline settles JS animation first.
+
+  No id on anything but the chart itself, and no styling beyond a fixed size: the subject here is
+  the timing of the capture, not the layout.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <div apply="zwriter.previewfixtures.ChartAnimationComposer" hflex="1" height="420px">
+        <charts id="revenueChart" type="area" hflex="1" vflex="1"/>
+    </div>
+</zk>

@@ -214,7 +214,7 @@ def track_usage_async():
 #
 # To move to a new launcher release, edit these three constants together.
 LAUNCHER_VERSION = "1.0.2"
-LAUNCHER_SHA256 = "bab6493c2168e909e562299e041c9b3d2bb7719b7ad1c145b5db0dd365ea5b82"
+LAUNCHER_SHA256 = "d451589f8d0e447599a96240fb17cef5b39e1575596bdc71a5bd9ad7b0d3fb7e"
 LAUNCHER_URL = (
     "https://github.com/zkoss/zkidea/releases/download/"
     f"v{LAUNCHER_VERSION}/zk-preview-launcher-{LAUNCHER_VERSION}.jar"
@@ -1186,13 +1186,120 @@ class Launcher:
 
 # --- Capture -------------------------------------------------------------
 
-# ZK's client engine builds the DOM after load; the served HTML is mostly a
-# bootstrap script. These flags are set at the end of ZK's initial mount pipeline
-# and have been stable client API since ZK 5, so this covers ZK 9 and 10 alike.
+# ZK's client engine builds the DOM after load; the served HTML is mostly a loader
+# for it. These flags are set at the end of ZK's initial mount pipeline and have been
+# stable client API since ZK 5, so this covers ZK 9 and 10 alike. It reads window.zk
+# defensively, so it is also false on a page that has no ZK on it at all.
 ZK_READY = """() => {
   const z = window.zk;
   return !!z && z.booted === true && z.mounting !== true && !z.loading && z.processing !== true;
 }"""
+
+# Every ZK-served page fetches its client engine from under this path, and nothing else does.
+# It is what separates "a ZK page still mounting" from "not a ZK page", and it is read from the
+# HTML the server sent rather than from the live page -- see capture() for why that matters.
+ZKAU_PATH = "/zkau/"
+
+
+# --- Settling JS-driven animation ----------------------------------------
+# Playwright's screenshot(animations="disabled") covers CSS animations and transitions and
+# nothing else. A charting library draws its entry animation from requestAnimationFrame onto SVG
+# attributes -- zkcharts/Highcharts widens an SVG clip rect over ~1000ms -- so that flag never
+# touches it, and until this existed nothing in the wait sequence asked whether the page had
+# stopped moving: ZK_READY watches ZK's mount, networkidle watches the network, fonts.ready
+# watches fonts. A capture could therefore be of a half-drawn chart, and the LAYOUT audit would
+# measure mid-flight geometry as if it were the final page.
+#
+# Provenance, because it matters for how much to trust this: the symptom was observed during a
+# skill evaluation, where one page cost six diagnostic renders before the truncated chart was
+# understood. It does NOT reproduce in the fixture suite on this machine -- chart-animation.zul
+# settles before the capture either way -- so what is closed here is a race that is real by
+# construction rather than a failure reproduced on demand. The regression sample asserts the
+# property that matters (two captures, same bytes) instead of the symptom.
+#
+# Two defences, because neither alone is enough:
+#
+#   1. ANIMATION_OFF_JS turns the animation off before it can start. Free, and it is the only
+#      one that makes the *first* frame final -- which is what the audit needs.
+#   2. _settle() refuses to shoot while the pixels are still moving. Costs a little time and
+#      knows nothing about any library, so it also covers whatever animates next.
+
+# Injected with add_init_script, so it runs in a fresh document BEFORE any of the page's own
+# scripts. That timing is the whole trick, and specifically because of how zkcharts uses
+# Highcharts' globals: Charts.src.js snapshots `Highcharts.getOptions()` into its own
+# DefaultOptions at module load, and resetOptions() restores that snapshot before every chart
+# is built (zkcharts 12.2.0.0 Charts.src.js:50-58, :146-156). Calling setOptions() after the
+# page has loaded is therefore erased by the next chart; setting it before the snapshot is
+# taken puts `animation: false` INSIDE the snapshot, so every reset restores it.
+#
+# Highcharts is not present yet at init time, so the assignment itself is what is intercepted.
+# The accessor is configurable and keeps the value, so a later reassignment still works and any
+# reader sees the real library -- this cannot break a page that has no charts on it.
+ANIMATION_OFF_JS = """(() => {
+  const off = (H) => {
+    try {
+      if (!H || H.__zulWriterAnimationOff || typeof H.setOptions !== 'function') return H;
+      H.__zulWriterAnimationOff = true;
+      // chart.animation covers redraws, plotOptions.series.animation covers the entry
+      // animation of each series -- the second is the one that truncates a line chart, and
+      // chart-level setAnimation(false) alone does NOT suppress it.
+      H.setOptions({chart: {animation: false},
+                    plotOptions: {series: {animation: false}}});
+    } catch (e) {}
+    return H;
+  };
+  let value = window.Highcharts;
+  try {
+    Object.defineProperty(window, 'Highcharts', {
+      configurable: true,
+      enumerable: true,
+      get() { return value; },
+      set(v) { value = off(v); },
+    });
+  } catch (e) { return; }
+  if (value) off(value);
+})()"""
+
+# The still-frame gate. A screenshot is the signature deliberately: the thing being promised is
+# that the delivered PNG is reproducible, so comparing PNGs is the promise itself rather than a
+# proxy for it. Any cheaper signature -- an attribute scrape, an rAF counter -- would be a guess
+# about which properties an animation touches.
+#
+# Same flags as the real capture (see capture()), so the frames compared are the frames that
+# would be delivered. Never full_page: this is the viewport only, which keeps the probe cheap
+# on a long page while still catching anything moving above the fold.
+SETTLE_INTERVAL_MS = 120     # long enough that a 1s entry animation moves visibly between frames
+SETTLE_BUDGET_MS = 2000      # a perpetual animation is capped here and warned about, not waited on
+
+
+def _settle(page, warnings):
+    """Hold until two consecutive frames are identical, or the budget runs out.
+
+    A still page pays one extra viewport screenshot plus one interval -- measured at 260-350ms
+    across the fixtures, against renders that take seconds. A page that never settles is captured
+    anyway and the caller is TOLD, because a mid-animation image the author knows about costs one
+    glance, and one they do not know about cost six diagnostic renders in the evaluation this
+    came from.
+    """
+    started = time.monotonic()
+    deadline = started + SETTLE_BUDGET_MS / 1000
+    previous = page.screenshot(animations="disabled", caret="hide")
+    frames = 1
+    while time.monotonic() < deadline:
+        page.wait_for_timeout(SETTLE_INTERVAL_MS)
+        current = page.screenshot(animations="disabled", caret="hide")
+        frames += 1
+        if current == previous:
+            debug("settle", f"still after {frames} frames, "
+                            f"{(time.monotonic() - started) * 1000:.0f} ms")
+            return True
+        previous = current
+    debug("settle", f"still moving after {frames} frames, "
+                    f"{(time.monotonic() - started) * 1000:.0f} ms")
+    warnings.append(
+        f"the page was still changing after {SETTLE_BUDGET_MS}ms — it was captured anyway, so "
+        "the image and the LAYOUT findings may show an animation in progress")
+    return False
 
 
 # --- Layout audit --------------------------------------------------------
@@ -1334,16 +1441,49 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
   // overflow:auto, so the spec's literal "overflow is not visible" would fire on
   // every row of every data table in the corpus.
   const HARD = {hidden: 1, clip: 1};
-  const clipperOf = (el) => {
+  // EVERY clipping ancestor, intersected, and per axis -- not just the nearest one. What a text
+  // run is actually visible inside is the intersection: a roomy overflow:hidden box nested in a
+  // narrow one shows only what the narrow one allows, so stopping at the first clipper found
+  // reported plainly cut text as fully visible. That was a false negative in the direction this
+  // rule can least afford, because the LAYOUT block is documented to the agent as the browser's
+  // own measurement -- an author who trusts it stops looking.
+  //
+  // Per axis because `overflow-x: hidden; overflow-y: auto` is real and common -- ZK's own mesh
+  // bodies are built that way -- and folding it into one rectangle would clip vertically where
+  // the browser actually scrolls, inventing a finding on every data table in the corpus.
+  //
+  // The walk narrows once it crosses an out-of-flow box: an absolutely positioned element is
+  // clipped only by ancestors in its containing-block chain, and a fixed one by almost nothing,
+  // so both are handled by dropping ancestors rather than by keeping them. Reaching further up
+  // is only safe while it stays on the under-reporting side of the line.
+  const clipRegionOf = (el) => {
+    let left = -Infinity, right = Infinity, top = -Infinity, bottom = Infinity;
+    let nearest = null, count = 0, needsPositioned = false;
     for (let n = el; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
       const cs = style(n);
       if (!cs) continue;
       // Not text-overflow:ellipsis on its own: CSS gives that property no effect at all
       // while overflow is visible, so a box that really elides its text is already a
       // hidden|clip box and is caught here.
-      if (HARD[cs.overflowX] || HARD[cs.overflowY]) return {el: n, cs: cs};
+      const clips = HARD[cs.overflowX] || HARD[cs.overflowY];
+      if (clips && (n === el || !needsPositioned || cs.position !== 'static')) {
+        const box = paddingBox(n, cs);
+        if (HARD[cs.overflowX]) {
+          left = Math.max(left, box.left); right = Math.min(right, box.right);
+        }
+        if (HARD[cs.overflowY]) {
+          top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom);
+        }
+        if (!nearest) nearest = {el: n, cs: cs};
+        count += 1;
+      }
+      // Its own overflow has already been applied above; what stops here is the claim that
+      // anything ABOVE a fixed box still clips it.
+      if (cs.position === 'fixed') break;
+      if (cs.position === 'absolute') needsPositioned = true;
     }
-    return null;
+    return nearest ? {left: left, right: right, top: top, bottom: bottom,
+                      nearest: nearest, count: count} : null;
   };
   const hasBoxInside = (el) => {
     const kids = el.querySelectorAll('*');
@@ -1369,6 +1509,51 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
       top: r.top + n('border-top-width'),
       bottom: r.bottom - n('border-bottom-width'),
     };
+  };
+
+  // --- ink ---------------------------------------------------------------
+  // Does anything RENDERABLE fall inside a rectangle? This is what separates a box whose edge
+  // pokes out of its clipping parent from content the reader actually loses, and rule 3 needs
+  // the distinction: measured on a status bar built as `hlayout` > inline-block dot + label
+  // inside a borderlayout south, the hlayout's box overflows the region by a constant while
+  // every pixel it contains stays visible, because the line box is taller than its own content.
+  // That finding was reported identically at south heights 34, 52 and 64 -- an agent told to
+  // trust the list has no way to act on a number that does not move.
+  const TRANSPARENT = /^rgba\\(.*,\\s*0(\\.0+)?\\)$/;
+  const paints = (el, cs) => {
+    if (!cs) return false;
+    const bg = cs.backgroundColor;
+    if (bg && bg !== 'transparent' && !TRANSPARENT.test(bg)) return true;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
+    const edges = ['Top', 'Right', 'Bottom', 'Left'];
+    for (let i = 0; i < edges.length; i++) {
+      if (cs['border' + edges[i] + 'Style'] !== 'none' &&
+          parseFloat(cs['border' + edges[i] + 'Width']) > 0) return true;
+    }
+    return false;
+  };
+  // More than a hairline of real overlap, so a box that merely touches the strip edge does not
+  // count as falling inside it.
+  const overlaps = (r, s) => (Math.min(r.right, s.right) - Math.max(r.left, s.left) > 1) &&
+                             (Math.min(r.bottom, s.bottom) - Math.max(r.top, s.top) > 1);
+  const inkInside = (el, strip) => {
+    if (paints(el, style(el))) return true;
+    const nodes = ownTextNodes(el);
+    if (nodes.length) {
+      const range = document.createRange();
+      range.setStartBefore(nodes[0]);
+      range.setEndAfter(nodes[nodes.length - 1]);
+      if (overlaps(range.getBoundingClientRect(), strip)) return true;
+    }
+    // Only reached for a candidate finding, which is rare, so the subtree walk is affordable.
+    const kids = el.querySelectorAll('*');
+    for (let i = 0; i < kids.length; i++) {
+      const kid = kids[i];
+      if (hiddenSomewhere(kid)) continue;
+      if (!overlaps(kid.getBoundingClientRect(), strip)) continue;
+      if (ownText(kid) || paints(kid, style(kid))) return true;
+    }
+    return false;
   };
 
   // --- rule 1: zero-size -------------------------------------------------
@@ -1418,7 +1603,7 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
     if (claimed.has(el)) continue;
     const nodes = ownTextNodes(el);
     if (!nodes.length || hiddenSomewhere(el)) continue;
-    const clip = clipperOf(el);
+    const clip = clipRegionOf(el);
     if (!clip) continue;
     // A Range measures the text run exactly where it already is — no node inserted,
     // no style written. That is what keeps the audit non-mutating.
@@ -1427,14 +1612,14 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
     range.setEndAfter(nodes[nodes.length - 1]);
     const t = range.getBoundingClientRect();
     if (t.width <= 0.5 && t.height <= 0.5) continue;
-    const box = paddingBox(clip.el, clip.cs);
-    const boxW = box.right - box.left, boxH = box.bottom - box.top;
+    const boxW = clip.right - clip.left, boxH = clip.bottom - clip.top;
     // Edge by edge against the clip rectangle, with a 1px tolerance for sub-pixel text
     // metrics. Position matters as much as size: a run narrower than the box is still cut
     // when it starts inside the padding and ends past the far edge, which is exactly how
-    // a listcell truncates its own label.
-    const past = {left: box.left - t.left, right: t.right - box.right,
-                  top: box.top - t.top, bottom: t.bottom - box.bottom};
+    // a listcell truncates its own label. An axis nobody clips stays infinite here, so its
+    // two edges evaluate to -Infinity and can never win the `cut` comparison below.
+    const past = {left: clip.left - t.left, right: t.right - clip.right,
+                  top: clip.top - t.top, bottom: t.bottom - clip.bottom};
     let side = '', cut = 0;
     for (const edge in past) if (past[edge] > cut) { side = edge; cut = past[edge]; }
     if (cut <= 1) continue;
@@ -1447,8 +1632,13 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
              : 'text is ' + px(cut) + 'px past the ' + side + ' edge of the ' +
                px(boxSize) + 'px box',
            {axis: vertical ? 'y' : 'x', side: side, cut: cut,
-            textWidth: t.width, textHeight: t.height, boxWidth: boxW, boxHeight: boxH,
-            clipperScrollWidth: clip.el.scrollWidth, clipperClientWidth: clip.el.clientWidth});
+            textWidth: t.width, textHeight: t.height,
+            // null, not Infinity, on an axis nobody clips: `measured` is serialised into the
+            // --report JSON, and Infinity has no representation there.
+            boxWidth: isFinite(boxW) ? boxW : null, boxHeight: isFinite(boxH) ? boxH : null,
+            clippers: clip.count,
+            clipperScrollWidth: clip.nearest.el.scrollWidth,
+            clipperClientWidth: clip.nearest.el.clientWidth});
   }
 
   // --- rule 3: escapes-parent --------------------------------------------
@@ -1471,6 +1661,17 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
     let side = '', over = 0;
     for (let k = 0; k < sides.length; k++) if (sides[k][1] > over) { side = sides[k][0]; over = sides[k][1]; }
     if (over <= 2) continue;
+    // The strip that the parent cuts away, and the judgement call this rule turns on: report it
+    // only when something is rendered in there. A bare box edge crossing the boundary costs the
+    // reader nothing and cannot be fixed by the one move the message invites -- give the parent
+    // more room -- because the child's box grows with it and the number never changes. Silence
+    // here is the same under-reporting bias the offsetParent walk already accepts.
+    const strip = {left: r.left, right: r.right, top: r.top, bottom: r.bottom};
+    if (side === 'bottom') strip.top = box.bottom;
+    else if (side === 'top') strip.bottom = box.top;
+    else if (side === 'right') strip.left = box.right;
+    else strip.right = box.left;
+    if (!inkInside(el, strip)) continue;
     record('escapes-parent', el,
            'escapes clipping parent ' + locator(op) + ' by ' + px(over) + 'px on the ' + side,
            {side: side, overflow: over, parent: locator(op)});
@@ -1574,6 +1775,11 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
 
         try:
             page = browser.new_page(viewport={"width": args.width, "height": args.height})
+            # Before page.goto, because add_init_script only reaches documents opened after it
+            # is registered. Suppressed on its own: a browser that rejects the script must not
+            # cost the caller the render, it just costs them the animation guarantee.
+            with contextlib.suppress(Exception):
+                page.add_init_script(ANIMATION_OFF_JS)
             page.on("pageerror", lambda e: warnings.append(f"page error: {str(e).splitlines()[0]}"))
 
             # The console carries what the page's own JavaScript logged — ZK's client engine
@@ -1626,25 +1832,52 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
                     controllers["failure"] = failure
                     warnings.append(f"controller failure: {failure}")
 
-            try:
-                page.wait_for_function("() => typeof window.zk !== 'undefined'", timeout=5000)
-            except PWTimeout:
-                # No ZK client engine: this is the launcher's error page, or a page
-                # with no ZK content. Capture it as-is rather than failing.
-                debug("zk client engine", "absent (error page, or no ZK content)")
-            else:
+            # Whether this page has a ZK client engine at all is answered from the HTML the
+            # server sent, and deliberately not by asking the live page. The question used to be
+            # "is window.zk defined within 5s?", and wait_for_function evaluates its predicate on
+            # the page's own main thread -- which on a page heavy enough to be worth previewing is
+            # saturated at exactly the moment it gets asked. Measured on a page holding one div
+            # and one chart: zk.wpd finished downloading at 499ms, window.zk existed at 2.5s, ZK
+            # finished mounting 34ms after that, and the main thread was then blocked for 4.6s
+            # straight by mounting plus chart construction. The 5s check expired inside that
+            # block and reported "no ZK content" about a page that had been fully mounted for
+            # seconds -- and then skipped the mount wait below and captured whatever was up.
+            #
+            # Reading the response body needs no main thread, so a busy page cannot make it lie.
+            served = ""
+            if response is not None:
+                with contextlib.suppress(Exception):
+                    served = response.text()
+            if ZKAU_PATH in served:
                 try:
+                    # The caller's whole budget, because "how long does this page take to mount"
+                    # has no answer shorter than "as long as it takes". ZK_READY is false while
+                    # window.zk is undefined, so the not-loaded-yet case needs no separate gate.
                     page.wait_for_function(ZK_READY, timeout=timeout_ms)
                     debug("zk client engine", "mounted")
                 except PWTimeout:
                     warnings.append(f"ZK's client engine did not finish mounting within "
                                     f"{args.timeout}s — captured the page as-is")
+            else:
+                # The launcher's error page lands here, and so does any plain HTML: measured 200
+                # with /zkau/ for both ZK fixtures, 500 without it for the error page. Capture it
+                # as-is rather than failing, and say what was actually observed rather than
+                # guessing at which of the two it was.
+                debug("zk client engine",
+                      "none on this page (the served HTML loads nothing from /zkau/)")
             with contextlib.suppress(PWTimeout):
                 page.wait_for_load_state("networkidle", timeout=5000)
             with contextlib.suppress(Exception):
                 page.evaluate("() => (document.fonts ? document.fonts.ready : null)")
 
             details = _scrape_error(page) if status >= 500 else None
+
+            # Last of the waits and deliberately so: it is the only one that asks about the
+            # pixels rather than about a subsystem. Skipped on the launcher's error page, which
+            # is static markup of our own and has nothing to settle.
+            if details is None:
+                with contextlib.suppress(Exception):
+                    _settle(page, warnings)
 
             out_path.parent.mkdir(parents=True, exist_ok=True)
             # animations/caret disabled so repeated captures are comparable if the

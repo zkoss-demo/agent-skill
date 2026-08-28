@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <!--
+        Regression sample: escapes-parent must report content the reader loses, not a bare box
+        edge. The three status bars differ ONLY in the height of the box that clips them. Each is
+        sized height:100% with vertical padding under content-box, so its box is always the parent
+        plus the padding - the overflow figure is the same 16px at every parent height, and giving
+        the parent more room, which is the one move the message invites, can never change it.
+        Nothing is rendered in the strip that gets cut, so all three must stay silent.
+
+        The fourth block spills a painted box for real and must keep reporting. That is what
+        separates correcting the rule from switching it off.
+
+        No apply, no composer: it renders identically with and without the run-controllers flag.
+    -->
+    <style>
+        .region { position: relative; overflow: hidden; background: #f4f6f9; margin-bottom: 16px; }
+        .r34 { height: 34px; } .r52 { height: 52px; } .r64 { height: 64px; }
+        /* content-box + height:100% + vertical padding = parent height + 16px, forever */
+        .sb34, .sb52, .sb64 { }
+        .statusbar { box-sizing: content-box; height: 100%; padding: 8px 12px; }
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+               background: #22c55e; }
+        .sb-text { font-size: 13px; }
+        /* control: a box with a visible background that really does spill out and get cut */
+        .spill { position: absolute; left: 12px; top: 20px; width: 180px; height: 60px;
+                 background: #ecfaf1; border: 1px solid #b7e4c7; }
+    </style>
+
+    <div sclass="region r34">
+        <hlayout valign="middle" spacing="8px" sclass="sb34 statusbar">
+            <span sclass="dot"/><label value="Ready" sclass="sb-text"/>
+        </hlayout>
+    </div>
+    <div sclass="region r52">
+        <hlayout valign="middle" spacing="8px" sclass="sb52 statusbar">
+            <span sclass="dot"/><label value="Ready" sclass="sb-text"/>
+        </hlayout>
+    </div>
+    <div sclass="region r64">
+        <hlayout valign="middle" spacing="8px" sclass="sb64 statusbar">
+            <span sclass="dot"/><label value="Ready" sclass="sb-text"/>
+        </hlayout>
+    </div>
+
+    <div sclass="region r34">
+        <div sclass="spill"/>
+    </div>
+</zk>

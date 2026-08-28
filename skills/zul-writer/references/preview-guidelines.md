@@ -127,6 +127,13 @@ whenever the result was not what you expected:
 - the docroot rule, the exact URL requested, the HTTP status, whether ZK's client engine reported
   itself mounted, and the PNG's size on disk.
 
+Whether a page carries a ZK client engine at all is decided from the HTML the server sent — every
+ZK page fetches its engine from under `/zkau/`, and the launcher's own error page does not. That
+question is deliberately not put to the live page: the answer would be evaluated on the page's main
+thread, and on a page busy enough to be worth previewing that thread is saturated at exactly the
+moment it is asked. When the engine is present, the render waits out the whole `--timeout` budget
+for it to finish mounting, and says so in `WARNINGS:` if it never does.
+
 `PREVIEW_SKIPPED: internal error in preview-zul.py` means the script itself crashed, not that the
 page is bad — a traceback is printed on stderr. Re-run with `--debug` and report both at
 [zkoss/zkidea issues](https://github.com/zkoss/zkidea/issues).
@@ -214,10 +221,17 @@ the audit existed.
 
 | Rule | Fires when | Remedy |
 |---|---|---|
-| `clipped-text` | an element's own text run does not fit inside the nearest ancestor that clips (`overflow: hidden` or `clip`), measured against that ancestor's **padding box** | widen the box, allow wrapping, or shorten the text |
+| `clipped-text` | an element's own text run does not fit inside **every** ancestor that clips it (`overflow: hidden` or `clip`), intersected and measured against each one's **padding box** | widen the box, allow wrapping, or shorten the text |
 | `zero-size` | a ZK widget root measures 0 in width or height while it has text or children, and nothing inside it has a box either | a missing `height`/`vflex`, or a `width: 0` rule |
-| `escapes-parent` | an element's border box exceeds its `offsetParent`'s padding box by more than 2px while that parent clips | give the parent room, or stop the child overflowing |
+| `escapes-parent` | an element's border box exceeds its `offsetParent`'s padding box by more than 2px while that parent clips, **and something is actually rendered in the strip that gets cut** | give the parent room, or stop the child overflowing |
 | `viewport-overflow` | `documentElement.scrollWidth` exceeds the viewport width; one finding for the page, naming the widest element whose right edge passes the viewport | drop the fixed width on the named element |
+
+**Every clipper, not just the nearest one.** A text run is visible inside the *intersection* of
+the ancestors that clip it, so a roomy `overflow: hidden` box nested inside a narrow one does not
+make its text safe — measuring only the innermost one reported plainly cut text as fitting. Each
+clipper applies per axis, because `overflow-x: hidden; overflow-y: auto` is a real combination —
+ZK's own mesh bodies are built that way — and clipping vertically where the browser actually
+scrolls would put a finding on every data table.
 
 The padding box is the measurement that matters: `overflow: hidden` clips there, not at the content
 box, so text may spill out of the content box into the padding and still be perfectly visible. ZK's
@@ -242,6 +256,12 @@ nothing anyone can search for, so the id is used only when it differs from the u
   them as clippers would report every row of every data table. The cost is that a page which clips
   through `auto` on an axis that cannot actually scroll goes unreported: the audit under-reports
   rather than over-reports, deliberately.
+- **A box edge with nothing rendered behind it.** `escapes-parent` needs the clipped strip to
+  contain something: the element's own background or border, its own text, or a descendant that
+  paints. A box sized `height: 100%` with vertical padding under `content-box` overflows its
+  parent by exactly that padding forever — the figure is identical at every parent height, growing
+  the parent never changes it, and nothing is lost on screen. Reporting it costs a fix round and
+  buys nothing.
 - **Overlapping widgets.** Dropped for v1 — the rule was too noisy to be worth an agent's attention.
 - **ZK chrome that legitimately measures nothing.** Only widget *roots* can raise `zero-size`, and
   only when nothing inside them has a box: a ZK borderlayout region root is a class-less wrapper at

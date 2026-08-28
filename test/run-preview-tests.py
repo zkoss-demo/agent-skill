@@ -34,15 +34,20 @@ FIXTURES = WEBAPP / "preview-fixtures"
 # Measured clean at viewport 1280 and 1600, and 625px tall.
 GOLDEN = FIXTURES / "healthy-page.zul"
 
-# The pinned-digest warning that every local-jar run emits, because the digest in preview-zul.py
-# is pinned to a build that is not published yet. Filtered by CONTENT and never by count: a check
-# that asserted "WARNINGS: 1" would silently swallow a second, real warning.
+# The pinned-digest warning emitted when a run is handed a jar whose bytes are not the pinned
+# release -- a local rebuild, say, which differs byte-for-byte from CI's while being functionally
+# identical. A run against the published jar does not emit it at all, so this is noise to filter
+# rather than a fixture. Filtered by CONTENT and never by count: a check that asserted
+# "WARNINGS: 1" would silently swallow a second, real warning.
 PIN_NOISE = "is not the pinned launcher"
 
-# Documented order of the stdout blocks. LAYOUT is inserted between CONTROLLERS and WARNINGS when
-# the audit found something; REPORT is appended by --report.
+# Documented order of the stdout blocks a successful render always prints, in this order.
+# Three more are conditional and none of them belong in this spine: LAYOUT is inserted between
+# CONTROLLERS and WARNINGS when the audit found something, REPORT is appended by --report, and
+# WARNINGS prints only when a warning was actually raised -- which a clean run against the
+# published jar no longer does.
 BLOCK_ORDER = ["STATUS", "SCREENSHOT", "SIZE", "DOCROOT", "CLASSPATH", "ZK", "LAUNCHER",
-               "CONTROLLERS", "WARNINGS"]
+               "CONTROLLERS"]
 
 RENDER_TIMEOUT = 300
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -142,8 +147,12 @@ def check_a1_good_page():
         fails.append(f"golden page: expected exit 0, got {code}\n{out}")
     if value(out, "STATUS") != "ok":
         fails.append(f"golden page: STATUS is {value(out, 'STATUS')!r}, expected 'ok'")
-    if blocks(out) != BLOCK_ORDER:
-        fails.append(f"golden page: block order {blocks(out)} != {BLOCK_ORDER}")
+    order = blocks(out)
+    # WARNINGS is the one optional block a clean golden run can still produce: it appears when the
+    # jar under test is not the pinned release, and vanishes when it is. Accept the spine either
+    # way, and nothing else -- an unexpected LAYOUT or REPORT here is still a failure.
+    if order not in (BLOCK_ORDER, BLOCK_ORDER + ["WARNINGS"]):
+        fails.append(f"golden page: block order {order} != {BLOCK_ORDER} (+ optional WARNINGS)")
     if size_line(out) != (1280, 900):
         fails.append(f"golden page: default viewport is {size_line(out)}, expected (1280, 900)")
     if blob is None:
@@ -507,6 +516,109 @@ def check_a13_launcher_precedence():
     return fails
 
 
+def check_a15_every_clipping_ancestor_is_measured():
+    """A15: text is measured against every clipping ancestor, not only the nearest one.
+
+    The regression sample for a false negative that mattered. A roomy `overflow:hidden` box
+    nested inside a narrow one made plainly cut text measure as fitting, so the LAYOUT block --
+    which the skill tells the agent to trust as the browser's own measurement rather than an
+    opinion -- stayed silent about a label with a letter missing. What a text run is visible
+    inside is the intersection of its clipping ancestors, not the first one found walking up.
+    """
+    code, out, _, _ = render(FIXTURES / "layout-nested-clip.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"layout-nested-clip: expected exit 0, got {code}\n{out}")
+    entries = layout_entries(out)
+    nested = [e for e in entries if "Clipped by the outer box" in e]
+    if not nested:
+        fails.append("layout-nested-clip: the outer-clipper case produced no finding -- only the "
+                     f"nearest clipping ancestor is being measured again:\n{entries}")
+    elif not nested[0].startswith("clipped-text"):
+        fails.append(f"layout-nested-clip: expected clipped-text, got {nested[0]!r}")
+    # The negative control shares the page, so a rule that fires on everything fails here too.
+    if any("This one fits" in e for e in entries):
+        fails.append(f"layout-nested-clip: reported a text run that fits its box:\n{entries}")
+    return fails
+
+
+def check_a16_escapes_parent_needs_something_to_lose():
+    """A16: escapes-parent reports content the reader loses, not a bare box edge.
+
+    Three status bars differing only in the height of the box that clips them. Each is sized
+    `height:100%` with vertical padding under `content-box`, so its box is always the parent plus
+    the padding: the overflow figure is the same number at every parent height, and growing the
+    parent -- the one move the message invites -- can never change it. Nothing renders in the
+    strip that gets cut. The fourth block spills a painted box for real and must keep reporting,
+    which is what separates fixing the rule from switching it off.
+    """
+    code, out, _, _ = render(FIXTURES / "layout-escapes-parent.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"layout-escapes-parent: expected exit 0, got {code}\n{out}")
+    entries = layout_entries(out)
+    for bar in ("sb34", "sb52", "sb64"):
+        if any(bar in e for e in entries):
+            fails.append(f"layout-escapes-parent: {bar} reported an overflow with nothing rendered "
+                         f"in the strip that gets clipped:\n{entries}")
+    spill = [e for e in entries if "div.spill" in e]
+    if not spill:
+        fails.append("layout-escapes-parent: the genuine overflow stopped being reported -- the "
+                     f"rule was turned off rather than corrected:\n{entries}")
+    elif not spill[0].startswith("escapes-parent"):
+        fails.append(f"layout-escapes-parent: expected escapes-parent, got {spill[0]!r}")
+    return fails
+
+
+def check_a17_capture_of_an_animated_page_is_reproducible():
+    """A17: two captures of a page with a JS-driven animation are byte-identical.
+
+    A chart left on its default entry animation. Playwright's `animations="disabled"` covers CSS
+    animations and transitions and nothing else, and a charting library draws its entry animation
+    from requestAnimationFrame onto SVG attributes -- so none of the waits before the capture
+    used to promise the page had stopped moving. Two renders, same bytes, is that promise.
+    """
+    fails = []
+    first_code, first_out, _, first = render(FIXTURES / "chart-animation.zul", "--run-controllers")
+    second_code, second_out, _, second = render(FIXTURES / "chart-animation.zul", "--run-controllers")
+    for tag, code, out in (("first", first_code, first_out), ("second", second_code, second_out)):
+        if code != 0:
+            fails.append(f"chart-animation ({tag}): expected exit 0, got {code}\n{out}")
+    if first is None or second is None:
+        return fails + ["chart-animation: a capture produced no PNG"]
+    if first != second:
+        fails.append(f"chart-animation: two captures differ ({len(first)} vs {len(second)} bytes) "
+                     "-- the page was still moving when at least one of them was taken")
+    return fails
+
+
+def check_a18_zk_engine_is_recognised_on_a_busy_page():
+    """A18: a page whose main thread is saturated is still recognised as a ZK page.
+
+    The regression sample for a check that asked the wrong thing. "Is window.zk defined within
+    5s?" was evaluated on the page's own main thread, and on a page holding one div and one chart
+    that thread is blocked for 4.6s straight by mounting plus chart construction -- so the check
+    expired and declared "no ZK content" about a page that had been fully mounted for seconds,
+    then skipped the mount wait and captured whatever was on screen. Measured on this fixture:
+    zk.wpd finished downloading at 499ms and window.zk existed at 2.5s, so nothing about it was
+    ever slow to load.
+
+    Whether a page has a ZK client engine is now read from the HTML the server sent, which needs
+    no main thread and cannot be starved. Both halves are asserted, because a check that answered
+    "yes, ZK" for everything would pass the first half alone.
+    """
+    fails = []
+    _, _, busy_err, _ = render(FIXTURES / "chart-animation.zul", "--run-controllers", "--debug")
+    if "zk client engine: mounted" not in busy_err:
+        fails.append("chart-animation: the ZK client engine was not recognised on a page whose "
+                     "main thread is busy -- the detection is back on a clock")
+    _, _, plain_err, _ = render(FIXTURES / "render-error.zul", "--debug")
+    if "loads nothing from /zkau/" not in plain_err:
+        fails.append("render-error: a page with no ZK client engine was not identified as one, "
+                     "so every non-ZK page now waits out the full mount budget")
+    return fails
+
+
 CHECKS = [
     ("usage/no-args        ", check_usage_no_args),
     ("skip/missing-jar     ", check_skip_missing_jar),
@@ -528,6 +640,10 @@ CHECKS = [
     ("A11 --report json    ", check_a11_json_report_agrees_with_stdout),
     ("A13 jar precedence   ", check_a13_launcher_precedence),
     ("A14 default out = cwd", check_a14_default_out_is_the_cwd),
+    ("A15 nested clippers ", check_a15_every_clipping_ancestor_is_measured),
+    ("A16 escapes w/ content", check_a16_escapes_parent_needs_something_to_lose),
+    ("A17 stable capture   ", check_a17_capture_of_an_animated_page_is_reproducible),
+    ("A18 zk engine detected", check_a18_zk_engine_is_recognised_on_a_busy_page),
 ]
 
 # A12, the exit-code map, has no check of its own on purpose: 0, 1, 2, 3 and 4 are each already

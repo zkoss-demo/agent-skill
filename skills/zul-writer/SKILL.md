@@ -411,7 +411,7 @@ markup.
 |---|---|---|
 | `clipped-text` | the text does not fit the box that clips it, so part of it is cut off | widen the box (`width`/`hflex`), let it wrap, or shorten the text |
 | `zero-size` | the component occupies no space at all, and its content is invisible | a missing `height`/`vflex` on it or an ancestor, or a `width: 0` style rule |
-| `escapes-parent` | the component's box sticks out of an ancestor that clips, so the overhang is cut | give the parent room, or stop the child overflowing it |
+| `escapes-parent` | visible content sticks out of an ancestor that clips, so the overhang is cut | give the parent room, or stop the child overflowing it |
 | `viewport-overflow` | the page is wider than the viewport, so it needs a horizontal scrollbar; the line names the widest offender | remove the fixed width on the named element, or make it `hflex`/percentage |
 
 Three things to know before you act on the block:

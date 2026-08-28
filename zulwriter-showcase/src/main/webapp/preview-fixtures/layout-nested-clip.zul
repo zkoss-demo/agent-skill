@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <!--
+        Regression sample: clipped-text must measure a text run against EVERY ancestor that clips
+        it, not just the nearest one. Case B is the one that used to be missed - a roomy
+        overflow:hidden box nested inside a narrow one made plainly cut text measure as fitting,
+        so the LAYOUT block stayed silent about a label with a letter cut off.
+
+        Cases C and D are single-clipper controls that were always reported and must stay
+        reported. Case E fits and must stay silent, so a rule that fires on everything fails here
+        too. Case A is a deliberate non-defect: a button narrower than its label does not clip in
+        Chrome, the text simply overflows the border box and stays readable.
+
+        No apply, no composer: it renders identically with and without the run-controllers flag.
+    -->
+    <style>
+        .case { margin: 12px; }
+        /* case A: button narrower than its label, no explicit overflow anywhere */
+        .a-btn { width: 70px; }
+        /* case B: nested clippers -- inner one is roomy, OUTER one is what cuts the text */
+        .b-outer { width: 80px; overflow: hidden; }
+        .b-inner { width: 400px; overflow: hidden; white-space: nowrap; }
+        /* case C: known-good control -- single clipper directly around the text */
+        .c-box { width: 70px; overflow: hidden; white-space: nowrap; display: inline-block; }
+        /* case D: a cut of roughly 3px, inside the clipper's own box */
+        .d-box { width: 97px; overflow: hidden; white-space: nowrap; display: inline-block;
+                 font-size: 15px; }
+        /* case E: negative control -- fits, must stay silent */
+        .e-box { width: 400px; overflow: hidden; white-space: nowrap; display: inline-block; }
+    </style>
+
+    <div sclass="case"><button label="CSS Selector" sclass="a-btn"/></div>
+
+    <div sclass="case">
+        <div sclass="b-outer">
+            <div sclass="b-inner">
+                <label value="Clipped by the outer box"/>
+            </div>
+        </div>
+    </div>
+
+    <div sclass="case"><label value="Single clipper control" sclass="c-box"/></div>
+    <div sclass="case"><label value="Three pixel cut here" sclass="d-box"/></div>
+    <div sclass="case"><label value="This one fits" sclass="e-box"/></div>
+</zk>
