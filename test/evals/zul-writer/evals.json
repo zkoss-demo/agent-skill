@@ -1,0 +1,95 @@
+{
+  "skill_name": "zul-writer",
+  "note": "Behaviour evals for the DOM-probe channel (--probe / --dump-dom). Baseline is the skill as of 53f1050, before the probe existed. Eval 1 replays a failure observed for real: in the six-run end-to-end evaluation, three runs saw z-icon empty boxes and all three named the wrong cause. Deliberately OUTSIDE skills/zul-writer/: installation symlinks or copies that whole directory, so anything under it ships to every install, and these fixtures are pages with known defects sitting next to assets/ — the directory the skill tells the agent to take templates from. An agent that browsed them would copy the exact bug the skill exists to prevent. Paths below are repo-relative; a run copies each fixture into its sandbox as ui/<name>.zul, which is what the prompts refer to.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "icon-blank-box",
+      "prompt": "The status icons in the Status column of ui/invoice-list.zul are all rendering as empty boxes. The Export and New invoice icons in the toolbar right above them come out fine. What's going on?",
+      "expected_output": "Renders the page, probes the icon elements, and reports that the z-icon-* class sits on a <label> — which carries .z-label's own font-family, so ::before asks for the right glyph in a font that cannot draw it. Fix moves the class to a span/div or a button's iconSclass.",
+      "files": [
+        "test/evals/zul-writer/fixtures/invoice-list.zul"
+      ],
+      "assertions": [
+        {
+          "id": "a1",
+          "text": "Ran preview-zul.py with --probe or --dump-dom at least once"
+        },
+        {
+          "id": "a2",
+          "text": "Names the <label> / .z-label carrier as the cause"
+        },
+        {
+          "id": "a3",
+          "text": "Cites the font-family evidence — the icon font is absent on the broken elements while ::before still requests the glyph"
+        },
+        {
+          "id": "a4",
+          "text": "Does NOT blame a missing webfont, a 404, or an unavailable ~./ resource"
+        },
+        {
+          "id": "a5",
+          "text": "Does NOT substitute emoji or literal unicode characters for the icons"
+        },
+        {
+          "id": "a6",
+          "text": "Proposed fix moves the class onto a span/div or an iconSclass attribute"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "clipped-sidebar-item",
+      "prompt": "On ui/team-settings.zul two items in the left sidebar are cut off — 'Billing and invoices' and 'Authentication policy' both show only part of their text. Why?",
+      "expected_output": "Reads the LAYOUT: findings, pastes the reported locator into --probe, and names .ts-item-name's fixed width:96px with overflow:hidden as the clipping cause.",
+      "files": [
+        "test/evals/zul-writer/fixtures/team-settings.zul"
+      ],
+      "assertions": [
+        {
+          "id": "b1",
+          "text": "Rendered the page and read the LAYOUT: findings"
+        },
+        {
+          "id": "b2",
+          "text": "Used --probe (ideally with the locator the LAYOUT block reported)"
+        },
+        {
+          "id": "b3",
+          "text": "Names the .ts-item-name rule — width 96px plus overflow hidden — as the clipping cause, not merely 'the text is too long'"
+        },
+        {
+          "id": "b4",
+          "text": "Does NOT dismiss it as a preview-only artefact"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "bound-values-not-a-defect",
+      "prompt": "I previewed ui/customer-detail.zul and every field is empty with grey placeholder text, and the Recent orders table is full of rows saying each.reference / each.placedOn. Is the page broken?",
+      "expected_output": "Says the page is not broken: the preview runs no ViewModel, so bound values show as dimmed expression text and model-bound rows show as placeholders. Makes no edit and spends no probe round on it.",
+      "files": [
+        "test/evals/zul-writer/fixtures/customer-detail.zul"
+      ],
+      "assertions": [
+        {
+          "id": "c1",
+          "text": "States the page is NOT broken"
+        },
+        {
+          "id": "c2",
+          "text": "Attributes it to the isolated preview not running the ViewModel"
+        },
+        {
+          "id": "c3",
+          "text": "Does NOT edit the .zul file"
+        },
+        {
+          "id": "c4",
+          "text": "Does NOT spend a --probe or --dump-dom round on it (anti-overtrigger check)"
+        }
+      ]
+    }
+  ]
+}

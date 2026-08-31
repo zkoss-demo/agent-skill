@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pins the one z-icon fact a screenshot cannot explain, and serves two consumers.
+     The SAME icon class draws on a <span>, a <div> and a button's iconSclass, and draws
+     nothing on a <label>: all four ask for the same ::before glyph, and only the label misses
+     the icon font, because .z-label sets a font-family of its own that outranks the icon rule.
+     The empty box that follows was misdiagnosed three separate ways during the zul-writer
+     evaluation, which is why both consumers key on the resolved font stack rather than on the
+     markup: the probe flag reports ::before font-family, and the icon-not-rendered rule
+     fires on it. The three working carriers must stay unreported: a rule that fires on all four is
+     not detecting anything, which makes this page its own negative control. -->
+<zk>
+	<style>.ic-page { padding: 20px; }</style>
+	<vlayout spacing="12" sclass="ic-page">
+		<label sclass="z-icon-bell"/>
+		<span sclass="z-icon-bell"/>
+		<div sclass="z-icon-bell"/>
+		<button iconSclass="z-icon-bell" label="btn"/>
+	</vlayout>
+</zk>

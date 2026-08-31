@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Customer detail"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+	<style>
+		.cd-page { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			background: #f7f9fc; padding: 24px; }
+		.cd-card { background: #fff; border: 1px solid #e4e9f0; border-radius: 10px;
+			padding: 22px 26px; max-width: 760px; }
+		.cd-h1 { font-size: 20px; font-weight: 700; color: #101828; }
+		.cd-hint { color: #667085; font-size: 13px; }
+	</style>
+
+	<div sclass="cd-page" viewModel="@id('vm') @init('zwriter.CustomerDetailVM')">
+		<div sclass="cd-card">
+			<vlayout spacing="14px">
+				<label value="Customer detail" sclass="cd-h1"/>
+				<label value="@load(vm.customer.accountNumber)" sclass="cd-hint"/>
+
+				<grid>
+					<columns>
+						<column width="170px"/>
+						<column/>
+					</columns>
+					<rows>
+						<row>
+							<label value="Company"/>
+							<textbox value="@bind(vm.customer.companyName)" width="320px"/>
+						</row>
+						<row>
+							<label value="Primary contact"/>
+							<textbox value="@bind(vm.customer.contactName)" width="320px"/>
+						</row>
+						<row>
+							<label value="Email"/>
+							<textbox value="@bind(vm.customer.email)" width="320px"/>
+						</row>
+						<row>
+							<label value="Country"/>
+							<combobox value="@bind(vm.customer.country)" width="320px"/>
+						</row>
+					</rows>
+				</grid>
+
+				<label value="Recent orders" sclass="cd-h1"/>
+				<listbox model="@load(vm.recentOrders)" height="180px">
+					<listhead>
+						<listheader label="Order" width="140px"/>
+						<listheader label="Placed" width="140px"/>
+						<listheader label="Total" width="120px" align="right"/>
+					</listhead>
+					<template name="model">
+						<listitem>
+							<listcell label="@load(each.reference)"/>
+							<listcell label="@load(each.placedOn)"/>
+							<listcell label="@load(each.total)"/>
+						</listitem>
+					</template>
+				</listbox>
+
+				<hlayout spacing="8px">
+					<button label="Save" onClick="@command('save')"/>
+					<button label="Cancel"/>
+				</hlayout>
+			</vlayout>
+		</div>
+	</div>
+</zk>

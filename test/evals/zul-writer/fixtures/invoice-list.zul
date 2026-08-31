@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Invoices | Billing"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+	<style>
+		.bl-page { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			background: #f7f9fc; padding: 24px; }
+		.bl-card { background: #fff; border: 1px solid #e4e9f0; border-radius: 10px; padding: 20px 24px; }
+		.bl-title { font-size: 22px; font-weight: 700; color: #101828; }
+		.bl-toolbar { padding-bottom: 16px; }
+		.bl-page button.bl-btn { height: 38px; padding: 0 16px; border-radius: 8px; font-size: 14px;
+			border: 1px solid #d0d5dd; background: #fff; color: #344054; cursor: pointer; }
+		.bl-page button.bl-btn-primary { background: #1570ef; border-color: #1570ef; color: #fff; }
+		.bl-search-icon { color: #98a2b3; font-size: 14px; }
+		.bl-status { font-size: 14px; }
+		.bl-status-paid { color: #12b76a; }
+		.bl-status-due { color: #f79009; }
+		.bl-status-void { color: #d92d20; }
+		.bl-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+	</style>
+
+	<div sclass="bl-page">
+		<div sclass="bl-card">
+			<hlayout valign="middle" spacing="12px" sclass="bl-toolbar">
+				<label value="Invoices" sclass="bl-title"/>
+				<span sclass="bl-search-icon z-icon-search"/>
+				<textbox placeholder="Search invoice no." width="220px"/>
+				<button label="Export" iconSclass="z-icon-download" sclass="bl-btn"/>
+				<button label="New invoice" iconSclass="z-icon-plus" sclass="bl-btn bl-btn-primary"/>
+			</hlayout>
+
+			<grid>
+				<columns>
+					<column label="Invoice" width="140px"/>
+					<column label="Customer"/>
+					<column label="Status" width="150px"/>
+					<column label="Amount" width="120px" align="right"/>
+				</columns>
+				<rows>
+					<row>
+						<label value="INV-2041"/>
+						<label value="Northwind Traders"/>
+						<hlayout valign="middle" spacing="6px">
+							<label sclass="z-icon-check-circle bl-status-paid"/>
+							<label value="Paid" sclass="bl-status bl-status-paid"/>
+						</hlayout>
+						<label value="$4,280.00" sclass="bl-amount"/>
+					</row>
+					<row>
+						<label value="INV-2042"/>
+						<label value="Contoso Ltd"/>
+						<hlayout valign="middle" spacing="6px">
+							<label sclass="z-icon-clock-o bl-status-due"/>
+							<label value="Due in 3 days" sclass="bl-status bl-status-due"/>
+						</hlayout>
+						<label value="$1,150.00" sclass="bl-amount"/>
+					</row>
+					<row>
+						<label value="INV-2043"/>
+						<label value="Fabrikam Inc"/>
+						<hlayout valign="middle" spacing="6px">
+							<label sclass="z-icon-ban bl-status-void"/>
+							<label value="Voided" sclass="bl-status bl-status-void"/>
+						</hlayout>
+						<label value="$0.00" sclass="bl-amount"/>
+					</row>
+					<row>
+						<label value="INV-2044"/>
+						<label value="Adventure Works"/>
+						<hlayout valign="middle" spacing="6px">
+							<label sclass="z-icon-check-circle bl-status-paid"/>
+							<label value="Paid" sclass="bl-status bl-status-paid"/>
+						</hlayout>
+						<label value="$12,900.00" sclass="bl-amount"/>
+					</row>
+				</rows>
+			</grid>
+		</div>
+	</div>
+</zk>

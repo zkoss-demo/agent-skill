@@ -210,9 +210,29 @@ undefined, so it needed no separate gate.
 
 | Page | Before | After |
 |---|---|---|
-| `chart-animation.zul` | `absent`, mount wait skipped | `mounted`, 22.5s |
-| `healthy-page.zul` | `mounted` | `mounted`, 18.5s, unchanged |
-| `render-error.zul` | 5s burned before giving up | identified at once, 9.1s |
+| `chart-animation.zul` | `absent`, mount wait skipped | `mounted` |
+| `healthy-page.zul` | `mounted` | `mounted`, unchanged |
+| `render-error.zul` | 5s burned before giving up | identified from the response, no wait |
+
+### What it costs, measured per stage rather than by wall clock
+
+Whole-process wall time is not usable for this comparison: Chrome's own launch varies between
+4.9s and 8.4s run to run, which swamps the change. Stamping each `--debug` line instead, same
+fixture, the commit before this one against this one:
+
+| Stage | Before | After |
+|---|---|---|
+| startup: python, cached classpath, JDK, jar digest, **JVM up and reporting its port** | 1.30s | 0.70s |
+| Chrome launch | 6.20s | 4.87s |
+| `goto(wait_until="load")` — includes ZK's first-request init and the .zul compile server-side | 6.91s | 6.50s |
+| **the ZK gate** | **5.03s, then the wrong verdict and no mount wait** | **5.70s, then `mounted`** |
+| networkidle + fonts + settle | 1.21s | 0.38s |
+| screenshot + layout audit | 0.45s | 0.46s |
+
+So the gate itself costs **+0.67s**, not the +3.5s an earlier note in this log claimed — because the
+old code was already spending 5.03s on a check that then failed. The server is not where the time
+goes either: the JVM is up and serving inside the first 0.7s, and ZK's real startup cost is inside
+the `goto`, on the first request.
 
 Covered by **A18**, which asserts both halves: the busy page is recognised as ZK, and the page with
 no ZK is still recognised as having none. A check that answered "yes, ZK" for everything would pass

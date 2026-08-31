@@ -793,7 +793,14 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
 
     # Layer 4: Version Compatibility (runs for every target ZK version)
     major = parse_major_version(zk_version)
-    print(f"Layer 4: ZK {major} Compatibility... ", end="")
+    # Echo the raw --zk-version beside the number it was reduced to, whenever the two differ.
+    # Six independent runs of this skill passed six different spellings of the same version
+    # ('10.3.0', '10.3.0.1-Eval', ...) and every one of them guessed at what the flag does with
+    # the tail, because this line printed only the outcome. The input and its interpretation
+    # side by side answer that where it is actually being asked; a sentence in the workflow
+    # would only be read by whoever went looking for it.
+    parsed_from = "" if zk_version.strip() == str(major) else f' (major version from "{zk_version}")'
+    print(f"Layer 4: ZK {major} Compatibility{parsed_from}... ", end="")
     is_valid, errors = validate_version_compatibility(active_path, major)
     if is_valid:
         print("✓ PASS")

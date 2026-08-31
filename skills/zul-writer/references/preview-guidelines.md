@@ -87,9 +87,17 @@ requests the `.zul` *relative to it*. Rules, in order (the output's `DOCROOT:` l
 3. **Content-root fallback** — the project root.
 4. **File-parent fallback** — the `.zul`'s own directory. This is what a standalone file gets.
 
-**This is what to check when the page renders but its `~./` resources, images or `<include>`s 404.**
+**This is what to check when the page renders but its `~./` resources or `<include>`s 404.**
 A fallback rule in the `DOCROOT:` line is itself a hint that the project layout wasn't recognised;
 `--webapp <dir>` overrides it.
+
+**Images and other static files are a different matter, and no docroot will fix them.** The render
+server serves `.zul` pages and ZK classpath resources only — measured, a `.png`, a `.css` and a
+`.js` sitting inside the correctly resolved docroot all return 404 — so a docroot-relative asset is
+blank in every preview whatever the `DOCROOT:` line says. `WARNINGS:` groups those URLs into one
+line that names the limitation, which is worth reading for a path you did not intend but is not
+evidence of a broken page. A `~./` miss is the opposite: it keeps its own line and does mean a jar
+is absent from the classpath.
 
 The `.zul` **must** live inside the docroot. The render server rejects anything resolving outside it,
 so a `../` path cannot work — hence the `outside-docroot` skip below.
@@ -225,6 +233,7 @@ the audit existed.
 | `zero-size` | a ZK widget root measures 0 in width or height while it has text or children, and nothing inside it has a box either | a missing `height`/`vflex`, or a `width: 0` rule |
 | `escapes-parent` | an element's border box exceeds its `offsetParent`'s padding box by more than 2px while that parent clips, **and something is actually rendered in the strip that gets cut** | give the parent room, or stop the child overflowing |
 | `viewport-overflow` | `documentElement.scrollWidth` exceeds the viewport width; one finding for the page, naming the widest element whose right edge passes the viewport | drop the fixed width on the named element |
+| `icon-not-rendered` | an element's `::before`/`::after` content is a single Private Use Area codepoint — an icon glyph — and the font stack resolved for that pseudo-element reaches no `@font-face` family, so the browser will draw a fallback box | move the icon class to a carrier that keeps the icon font (`iconSclass`, or a plain container), or raise the icon rule's specificity over whatever set the element's own `font-family` |
 
 **Every clipper, not just the nearest one.** A text run is visible inside the *intersection* of
 the ancestors that clip it, so a roomy `overflow: hidden` box nested inside a narrow one does not
@@ -334,6 +343,65 @@ are not captured. And the error box is a real visible overlay, so on a page that
 error it may show up in the PNG — possibly mid-animation, since `animations="disabled"` applies to
 the screenshot and not to a jQuery `slideDown` already in flight.
 
+## Probing the rendered DOM (`--probe`, `--dump-dom`)
+
+`LAYOUT:` answers *is this element the wrong size*. `--probe` answers *why* — and it is the only
+channel that can, because a screenshot cannot be interrogated and the served response is not the
+page. ZK sends a `zkmx([...])` bootstrap that restates the `.zul`; the class names, fonts and boxes
+are all built afterwards by the client engine. Reading the served HTML tells you what you already
+wrote.
+
+`--probe '<css-selector>'` reports each match as the browser built it. Repeatable; capped at 10
+elements per selector and 200 characters of the opening tag, with an `... and N more` tail — the
+same truncation idiom `LAYOUT:` and `WARNINGS:` use.
+
+```
+PROBE: 2 selectors, 4 matches
+  [class*="z-icon-bell"]  —  4 matches
+    - <span id="mSAA1" class="z-icon-bell z-label">
+      box 8x18 @ (25,20) | display inline-block | position static | overflow visible
+      font-family "Helvetica Neue", Helvetica, Arial, sans-serif | color rgb(0, 0, 0) | background-color rgba(0, 0, 0, 0)
+      width 8px | height 18px | flex 0 1 auto
+      ::before content "\uf0f3" | ::before font-family "Helvetica Neue", Helvetica, Arial, sans-serif
+    - <span id="mSAA2" class="z-icon-bell z-span">
+      box 14x16 @ (25,39) | display inline-block | position static | overflow visible
+      font-family ZK85Icons, FontAwesome | color rgb(0, 0, 0) | background-color rgba(0, 0, 0, 0)
+      width 14px | height 16px | flex 0 1 auto
+      ::before content "\uf0f3" | ::before font-family ZK85Icons, FontAwesome
+  .nothing-here  —  0 matches
+```
+
+Read that pair: **both elements request the same glyph and only one has a font that can draw it.**
+That is the whole diagnosis, and it is not visible in markup alone — which is why the block carries
+computed styles and not just the tag.
+
+**The style set is fixed** (`display`, `position`, `overflow`, `font-family`, `color`,
+`background-color`, `width`, `height`, `flex`, and `::before` `content` / `font-family`), chosen
+from the defects that actually occur: icon tofu, flat-grey leftover flex space, `hflex="min"`
+under-measuring, clipped text. `::before` is reported only when there is one — `content: none` is
+every ordinary element, and printing it everywhere would bury the line it exists for. The glyph is
+escaped (`\uf0f3`) because a private-use codepoint printed raw is invisible in a terminal, which
+would make "the glyph *was* requested" read as proof that it was not.
+
+Three properties worth knowing:
+
+- **Both blocks are omitted unless their flag is passed.** A run without them prints exactly what it
+  printed before they existed, byte for byte, on every exit code.
+- **A selector matching nothing still gets its line.** `0 matches` is an answer — the component is
+  not in the DOM at all — and silence is not. A malformed selector prints its reason and costs the
+  run nothing: exit code, PNG and every other block are unaffected.
+- **On an error page the probe is skipped and says so**, and `--dump-dom` writes the file but labels
+  the `DOM:` line `[ERROR PAGE — this is not your UI]`, exactly as `SCREENSHOT:` does. That markup
+  is the launcher's, not yours.
+
+`--dump-dom` writes the whole post-mount DOM beside the PNG — its path with a `.dom.html` suffix —
+and names it on a `DOM:` line beside `SCREENSHOT:`. It takes **no** value; use `--out` to place the
+pair. (An optional value was tried and reverted: `--dump-dom page.zul` is how anyone would type it,
+and argparse hands the `.zul` to the flag, killing the run at exit 3.) Reach for it when you do
+not yet know what to probe, then grep the file. It is a file rather than a block on purpose:
+measured, a typical generated page is ~24 KB of DOM but a 200-row grid is **231 KB**, and data
+tables are exactly what this skill generates.
+
 ## The JSON report (`--report json`)
 
 `--report json` writes the whole run as one JSON object beside the PNG — the screenshot's path with
@@ -364,6 +432,12 @@ and it is always the last line printed.
      "detail": "text needs 77px, box is 48px",
      "measured": {"axis": "x", "textWidth": 76.98, "boxWidth": 48}}   // shape varies by rule
   ]},
+  "probe": [{"selector": ".z-label", "total": 1,                       // null unless --probe was passed;
+             "elements": [{"html": "<span class=\"z-icon-bell z-label\">",   // [] means asked and found nothing
+                           "rect": {"x": 25, "y": 20, "w": 8, "h": 18},
+                           "styles": {"fontFamily": "…", "display": "…"},
+                           "before": {"content": "\uf0f3", "fontFamily": "…"}}]}],
+  "domDump": "/abs/page.dom.html",                                    // null unless --dump-dom was passed
   "warnings": ["console error: boom"],                                // the WARNINGS: entries, verbatim
   "error": null                                                       // see the table below
 }

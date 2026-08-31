@@ -69,6 +69,24 @@ Map visual UI elements from screenshots/mockups to ZK components. Use ZK compone
 | Badge / tag | No direct component | Use `<label sclass="...">` + CSS |
 | Popover | `<popup>` | |
 
+## Icons (`z-icon-*`)
+
+Put a `z-icon-*` class on `iconSclass`, or on a plain container (`<div>`, `<span>`). **Never on
+`<label>`.**
+
+| Written as | Renders |
+|---|---|
+| `<label sclass="z-icon-bell"/>` | **empty box** — `.z-label` sets a `font-family` of its own that outranks the icon rule, so `::before` asks for the glyph in a text font |
+| `<span sclass="z-icon-bell"/>` | correct |
+| `<div sclass="z-icon-bell"/>` | correct |
+| `<button iconSclass="z-icon-bell"/>` | correct |
+
+All four ask for the same glyph; only the label lacks the font to draw it. The failure looks exactly
+like a missing webfont, and it is not — the font loaded fine for every other icon on the page. If
+you see empty boxes, `--probe '[class*="z-icon-"]'`: a `::before content` that is set beside a
+`font-family` that is not the icon font means the class is on the wrong carrier, not that the
+resource 404'd. Pinned by `preview-fixtures/icon-carrier.zul`.
+
 ## Common Mistakes — Do NOT Use Native HTML For These
 
 - **Tab-like navigation** → Use `<tabbox>`, not `<n:button class="tab">`

@@ -4,7 +4,7 @@ description: >
   Generates ZK Framework ZUL pages (.zul) through a structured 5-step workflow: requirements clarification, ZUL generation, validation, controller generation, and a rendered-image self-review.
   Every step also stands alone, so use this skill for a single step too — validating an existing .zul, writing the Composer/ViewModel for a page that already exists, or just rendering a .zul to a preview PNG without touching it.
   Supports both MVC (Composer-based) and MVVM (ViewModel-based) patterns, ZK 9/10, and visual analysis for screenshot-to-ZUL conversion.
-  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, edit or extend an existing ZUL page, move a page's hard-coded data into a Composer/ViewModel, validate/fix a .zul that errors, or preview/screenshot/see what a ZUL page looks like.
+  Use when the user asks to create a ZUL page, build ZK UI components (forms, grids, dashboards, borderlayouts), convert an image/mockup to ZUL code, edit or extend an existing ZUL page, move a page's hard-coded data into a Composer/ViewModel, validate/fix a .zul that errors, preview/screenshot/see what a ZUL page looks like, or work out why a rendered page looks wrong — a blank icon, a clipped label, an element that is not there, a colour or width nobody asked for.
 license: MIT
 compatibility: >
   Designed for Claude Code, Gemini CLI, and GitHub Copilot/Cursor.
@@ -38,10 +38,22 @@ the way past, answers a question they did not ask and costs them a page they wer
 |---|---|
 | "Build me a page that…", "turn this mockup into ZUL" | 1 → 5, the whole workflow |
 | "Preview / screenshot / show me what `foo.zul` looks like" | 5 |
+| "Why is this icon a blank box / this label clipped / this section missing?" | 5, then `--probe` the element |
 | "Is this ZUL valid?", "why won't this page parse?" | 3 |
 | "Write the ViewModel for this page" | 4 |
 | "Move this page's data into a ViewModel/Composer" | the extraction pass in Step 2 → 4 → 5 with `--run-controllers` |
 | "Add a column to this grid", "make the sidebar narrower" | 2 on the existing file → 3 → 5 if the change is visible |
+
+**"Why does this look wrong?" is a diagnosis request, not a validation one.** The two rows sit
+together because they are so easy to confuse: *why won't this page parse* and *why is this icon a
+blank box* read alike, and Step 3 answers only the first. `<label sclass="z-icon-bell"/>` is valid
+ZUL — the validator passes it and reports the page clean, which is precisely how a real defect
+gets closed as "no problem found". A page that renders wrong while validating clean is the case
+Step 3 cannot see. The markup is already written; the question is what the browser did to it, and
+only a render can answer that. Go to Step 5 and probe the element, so the measurement names the
+cause before you touch the markup — opening with a guess costs a round and can "fix" the wrong
+line convincingly. Naming the cause is the whole answer to a "why"; the edit is a separate
+question, and it is the user's to ask.
 
 The steps you skip still feed the ones you run — Step 4 needs to know whether the page is MVC or
 MVVM, Step 5 needs something to judge the render against. Read those out of the file and the user's
@@ -413,6 +425,7 @@ markup.
 | `zero-size` | the component occupies no space at all, and its content is invisible | a missing `height`/`vflex` on it or an ancestor, or a `width: 0` style rule |
 | `escapes-parent` | visible content sticks out of an ancestor that clips, so the overhang is cut | give the parent room, or stop the child overflowing it |
 | `viewport-overflow` | the page is wider than the viewport, so it needs a horizontal scrollbar; the line names the widest offender | remove the fixed width on the named element, or make it `hflex`/percentage |
+| `icon-not-rendered` | a font icon will draw as an empty box: its glyph is there, but the font stack the browser resolved for it cannot supply that glyph | put the icon class on a carrier that keeps the icon font — `iconSclass`, or a plain container — rather than on one whose own `font-family` outranks it |
 
 Three things to know before you act on the block:
 
@@ -490,6 +503,29 @@ Judge **structure**, not pixels and not data. Fix only these:
   never work around it by hard-coding values into the markup. The exit code is still 0 and the
   screenshot is still valid; it just shows the isolated render.
 
+### When the image shows a defect but not its cause
+
+An empty box where an icon belongs. A component you cannot find. A colour nobody asked for. A
+width that is not the one you set. In each case the PNG proves something is wrong and says nothing
+about why — and re-rendering produces the same PNG.
+
+**Probe the element instead of re-rendering.** `--probe '<css-selector>'` reports every match as
+the browser actually built it: its opening tag, its measured box, and the computed styles these
+defects turn on. It reads the render you already have, so it costs no extra round.
+
+```bash
+uv run --with playwright preview-zul.py page.zul --probe '[class*="z-icon-"]'
+```
+
+The `LAYOUT:` findings already name their elements with a CSS locator — paste that locator straight
+into `--probe` to see why the measurement came out the way it did. When you do not yet know what to
+ask for, `--dump-dom` writes the whole post-mount DOM to a file you can grep; it is a file and not a
+block because a data-heavy page runs to hundreds of KB.
+
+This matters because the DOM is the only place a ZK page exists as markup. The served response is a
+`zkmx([...])` bootstrap that merely restates your `.zul` back to you — every class name, font and
+box is built afterwards, in the browser.
+
 ### What you cannot judge from this image
 
 The preview renders the **first paint only**. With `CONTROLLERS: skipped (isolated)` or
@@ -502,7 +538,22 @@ drive a re-render:
 - **A whole section missing where an `<include>` has a bound `src`** — this one is *not* placeholdered. A constant literal (`src="@load('~./page.zul')"`) is included for real; anything the ViewModel supplies (`src="@load(vm.page)"`) leaves `src` unset, so the include contributes **nothing** and you see a silent gap, not dimmed text. Adding a hard-coded `src` to "fix" the gap breaks the real page.
 - **Anything a Composer or ViewModel would populate** — default values, initial selections, computed labels, i18n text. `apply="..."` composers are no-ops here.
 - **Anything requiring a server round-trip** — button clicks, paging, sorting, tree expansion, selection highlighting, a `<window>` or popup opened by an event. Only the first-paint state exists. Client-side `w:` handlers *do* run, and so does `<zscript>`.
-- **Missing images, fonts or `~./` resources** — the docroot is inferred, so assets outside it 404 in the preview but load fine on a real server.
+- **Images and other files a real server would hand out from the docroot** — measured, the preview
+  server serves `.zul` pages and ZK classpath resources and nothing else, so `<image
+  src="/img/logo.png"/>` is blank here regardless of what a real server would do. The `WARNINGS:`
+  block groups those URLs into one line that says so; read them for a path you did not intend, not
+  as a defect in the page.
+  **Two things that look like this and are not, because both are now measured.** A `~./` resource
+  that 404s gets its own `WARNINGS` line and means a jar is missing from the classpath. A font icon
+  that will not draw is reported as `icon-not-rendered` in `LAYOUT:`, naming the glyph and the font
+  stack that failed to supply it; `--probe` on the element shows the same thing element by element
+  if you want to see it, and *Icons* in
+  [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) says which carrier
+  to move it to. Neither is a preview artifact, and the older wording here — which swept "missing
+  images, fonts or `~./` resources" into one unfixable category — is exactly how an evaluation run
+  came to close a one-word markup bug as impossible and ship a page whose every icon was an empty
+  box. **If the block is silent and something is still missing from the image, that is a defect,
+  not an exemption.**
 - **Theme-dependent colours and spacing** when the theme jar isn't a project dependency.
 - **Exact spacing, font rendering, sub-pixel alignment, or a colour that is merely close** to the mockup.
 - **Data content from the mockup** — sample data will differ. Compare the *shape* of the UI, not the values in it.
@@ -517,7 +568,18 @@ round-trip"* down still holds in both modes.
 
 ### How many rounds
 
-- **At most two fix rounds — three renders total.** Round 1: render, read, list defects from *What to fix*. Fix them, re-run Step 3 validation, re-render. Round 2: same. Then stop.
+- **At most two fix rounds.** A round is: render, read, list defects from *What to fix*, fix them,
+  re-run Step 3 validation. Two of those, then stop.
+- **The budget counts edits, not renders.** Rendering again to work out *why* something is wrong —
+  which element, which measurement, which of two possible causes — is not a fix round and is not
+  capped, and neither is a `--probe` or `--dump-dom` run. Nothing has been changed yet, so there is
+  nothing to have got wrong twice; what the cap exists to stop is editing on a guess and then
+  editing again on the next guess. Stopping at the cap with the cause still unknown is how a real
+  defect gets shipped, or gets blamed on the preview. Diagnosis has a different stopping rule and it
+  is not a number: **stop when the next render would not tell you anything the last one did not.**
+  One evaluation run spent six renders isolating a chart animation that was clipping every
+  screenshot, and that was the right call — a cap that made it feel like a transgression was
+  measuring the wrong thing.
 - **Fix only whole defects from that list.** If your list is empty, or everything left on it is in *What you cannot judge*, the page is good enough — say so in one line and stop. "Good enough" means every requirement from Step 1 is visibly present, in the right region, in the right kind of component, and nothing is clipped or overlapping.
 - **A model-driven page spends its rounds on the literal version.** Settle the layout while the data
   is still in the markup, then extract and re-render once with `--run-controllers`. That render sits

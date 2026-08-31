@@ -46,6 +46,13 @@ OPTIONS worth knowing, and when to reach for one
   --controller-timeout N
                    wall-clock budget for a --run-controllers render (default 10s); on
                    expiry the page is rendered again isolated and the run still succeeds
+  --probe SELECTOR every element matching this CSS selector, as the browser rendered it:
+                   opening tag, measured box, and the computed styles a layout or icon
+                   defect turns on. Repeatable. Reach for it when the image shows that
+                   something is wrong but not why — it reads the render you already have
+                   instead of costing another one.
+  --dump-dom       write the whole post-mount DOM beside the PNG (its path with a
+                   .dom.html suffix), for when you do not yet know what to --probe
   --report json[:<path>]
                    also write this whole run as one JSON object, for a caller that parses
                    rather than reads (default path: the PNG's, with a .json suffix). The
@@ -73,6 +80,13 @@ read them before opening the PNG. The block covers the WHOLE document, not just 
 captured region, so a finding may name something the screenshot does not show. It is
 omitted when there is nothing to report, and it never changes the exit code unless
 --fail-on-layout is passed.
+
+PROBE: and DOM: are the rendered DOM, and they exist because the served response is not
+it: ZK sends a `zkmx([...])` bootstrap that restates the .zul, and the client engine builds
+the real markup afterwards. So the class names, the fonts and the boxes only exist in the
+browser. An empty box where an icon belongs, a component you cannot find, a colour nobody
+asked for, a width that is not the one you set — --probe answers all four from the render
+already in hand. Neither block appears unless its flag was passed.
 
 The text lines are the contract, with or without --report. `REPORT: <path>` names a
 sidecar file carrying this same run as one JSON object — the same facts, no more — for a
@@ -1184,6 +1198,63 @@ class Launcher:
                     os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
 
 
+# --- Probing the rendered DOM --------------------------------------------
+# The LAYOUT audit answers "is this element the wrong size"; a probe answers "why".
+# Both read the same post-mount DOM, and that DOM is the only place a ZK page exists as
+# markup: the served response is a `zkmx([...])` bootstrap that merely restates the .zul,
+# so the class names, the fonts and the boxes all come into being client-side.
+PROBE_MATCH_CAP = 10      # elements reported per selector
+PROBE_HTML_CAP = 200      # characters of the opening tag per element
+
+PROBE_JS = """([selector, matchCap, htmlCap]) => {
+  let nodes;
+  try {
+    nodes = Array.from(document.querySelectorAll(selector));
+  } catch (e) {
+    // A malformed selector is the caller's typo, not a failed render: it comes back as
+    // data on this object and is printed as such, never raised.
+    return {error: String((e && e.message) || e)};
+  }
+  const shown = nodes.slice(0, matchCap).map((el) => {
+    const cs = getComputedStyle(el);
+    const before = getComputedStyle(el, '::before');
+    const r = el.getBoundingClientRect();
+    // The OPENING TAG only. A probe reports the element, not the subtree under it, and one
+    // grid row's full outerHTML would bury the line the reader came for.
+    const cut = el.outerHTML.indexOf('>');
+    const open = cut === -1 ? el.outerHTML : el.outerHTML.slice(0, cut + 1);
+    return {
+      html: open.length > htmlCap ? open.slice(0, htmlCap) + '\u2026' : open,
+      rect: {x: Math.round(r.x), y: Math.round(r.y),
+             w: Math.round(r.width), h: Math.round(r.height)},
+      styles: {display: cs.display, position: cs.position, overflow: cs.overflow,
+               fontFamily: cs.fontFamily, color: cs.color,
+               backgroundColor: cs.backgroundColor,
+               width: cs.width, height: cs.height, flex: cs.flex},
+      // Reported only when there IS one. `content: none` is every ordinary element, and
+      // printing it for all of them would bury the case this line exists for: an icon
+      // glyph asked for in a font that cannot draw it.
+      before: (before.content && before.content !== 'none')
+              ? {content: before.content, fontFamily: before.fontFamily} : null,
+    };
+  });
+  return {total: nodes.length, elements: shown};
+}"""
+
+
+def dom_dump_path(args, out_path: Path):
+    """None when --dump-dom was not passed; otherwise beside the PNG, which is the rule
+    --report json already follows and the only place a caller can predict without being told.
+
+    The flag deliberately takes NO value. An optional one (`nargs="?"`) reads well in a help
+    text and is a trap on the command line: `--dump-dom page.zul` is how anyone would type it,
+    and argparse hands `page.zul` to the flag as its path, leaving the .zul positional empty
+    and the run dead at exit 3. Layer A caught it. --out places the PNG and this together."""
+    if not args.dump_dom:
+        return None
+    return out_path.with_suffix(".dom.html")
+
+
 # --- Capture -------------------------------------------------------------
 
 # ZK's client engine builds the DOM after load; the served HTML is mostly a loader
@@ -1677,6 +1748,83 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
            {side: side, overflow: over, parent: locator(op)});
   }
 
+  // --- rule 5: icon-not-rendered -----------------------------------------
+  // A font icon that renders as an empty box, decided by measurement rather than by markup.
+  // The mechanism: an icon is a Private Use Area codepoint in ::before, and it only draws if
+  // the font stack the browser resolved for that pseudo-element actually reaches the icon
+  // webfont. Measured on ZK's four carriers of the SAME class, all four ask for U+F0F3 and
+  // only one misses the font:
+  //   <span>, <div>, button iconSclass  ->  ::before font-family "ZK85Icons, FontAwesome"
+  //   <label>                           ->  ::before font-family "Helvetica Neue", ...
+  // The empty box that follows was misdiagnosed three separate ways in the zul-writer
+  // evaluation -- built-in font lacks the glyph, webfont 404, and once not noticed at all --
+  // and one of those pages shipped with every icon on it blank. None of the three readings is
+  // available to a screenshot, which is why this has to be a measurement and not advice.
+  //
+  // Deliberately framework-agnostic: nothing here knows the name ZK85Icons, or that <label> is
+  // the carrier that fails. It asks whether the resolved stack reaches ANY @font-face family,
+  // so it holds for Font Awesome, Material Icons or a house icon font equally.
+  const webfonts = new Set();
+  try {
+    // Declared, NOT `status === 'loaded'`. A face is 'unloaded' until something on the page
+    // uses it, so a page whose every icon is broken -- exactly the page that shipped -- would
+    // present an empty set and silence the rule on the one case it exists for. A declared face
+    // whose file 404s is a different defect, and the WARNINGS block reports that one by URL.
+    document.fonts.forEach((ff) => {
+      const fam = String(ff.family || '').trim().replace(/^['"]|['"]$/g, '').toLowerCase();
+      if (fam) webfonts.add(fam);
+    });
+  } catch (e) { /* no FontFaceSet: leave the set empty and skip below, never guess */ }
+  // No webfonts at all means no icon font could be reaching anything, so every PUA glyph
+  // would report. Under-reporting is the only safe direction for a rule the agent is told
+  // to trust as the browser's own measurement.
+  if (webfonts.size) {
+    // A single Private Use Area codepoint. Three ranges, because Material Symbols and some
+    // house fonts sit in the supplementary planes rather than in U+E000-F8FF.
+    const puaGlyph = (raw) => {
+      if (!raw) return null;
+      const s = String(raw).trim();
+      if (s === 'none' || s === 'normal' || s === '""' || s === "''") return null;
+      // Only a quoted string is a glyph: counter(), attr() and url() forms are not.
+      const m = s.match(/^(?:"([^"]*)"|'([^']*)')$/);
+      if (!m) return null;
+      const text = m[1] !== undefined ? m[1] : m[2];
+      const chars = Array.from(text);
+      if (chars.length !== 1) return null;      // an icon is exactly one glyph
+      const cp = chars[0].codePointAt(0);
+      const pua = (cp >= 0xE000 && cp <= 0xF8FF) ||
+                  (cp >= 0xF0000 && cp <= 0xFFFFD) ||
+                  (cp >= 0x100000 && cp <= 0x10FFFD);
+      return pua ? cp : null;
+    };
+    const reachesWebfont = (fontFamily) => {
+      const list = String(fontFamily || '').split(',');
+      for (let i = 0; i < list.length; i++) {
+        const fam = list[i].trim().replace(/^['"]|['"]$/g, '').toLowerCase();
+        if (webfonts.has(fam)) return true;
+      }
+      return false;
+    };
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      if (claimed.has(el) || hiddenSomewhere(el)) continue;
+      for (const pseudo of ['::before', '::after']) {
+        let cs = null;
+        try { cs = getComputedStyle(el, pseudo); } catch (e) { cs = null; }
+        if (!cs) continue;
+        const cp = puaGlyph(cs.content);
+        if (cp === null) continue;
+        if (reachesWebfont(cs.fontFamily)) continue;
+        const hex = 'U+' + cp.toString(16).toUpperCase();
+        record('icon-not-rendered', el,
+               pseudo + ' glyph ' + hex + ' needs an icon font, but the resolved stack is ' +
+                 snip(String(cs.fontFamily || '(none)'), 60),
+               {pseudo: pseudo, codepoint: hex, fontFamily: cs.fontFamily || null});
+        break;      // one finding per element: both pseudos share the one broken stack
+      }
+    }
+  }
+
   // --- rule 4: viewport-overflow -----------------------------------------
   // One finding for the whole document, naming the widest element whose right edge
   // passes the viewport — that is the element to fix, and it is what turns "there is a
@@ -1741,13 +1889,14 @@ def _one_line(text, limit=200):
     return first if len(first) <= limit else first[:limit] + "\u2026"
 
 
-def capture(url, out_path: Path, args, warnings, controllers, layout):
+def capture(url, out_path: Path, args, warnings, controllers, layout, probes, dom):
     """Returns (http_status, error_details_or_None).
 
     `controllers` is mutated in place (same idiom as `warnings`) with what the launcher
     reported for this render, because it is a property of the response rather than of the
     process: one launcher can serve several pages. `layout` is mutated the same way with
-    the DOM audit's result."""
+    the DOM audit's result, `probes` with one entry per --probe selector, and `dom` with
+    the path --dump-dom was written to (absent when it was not passed, or could not be)."""
     from playwright.sync_api import sync_playwright, Error as PWError, TimeoutError as PWTimeout
 
     with sync_playwright() as pw:
@@ -1813,8 +1962,22 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
 
             page.on("console", _on_console)
             missing = []
+            # EVERY 4xx/5xx, not only ZK's own /zkau/web/ assets. The narrower filter that used
+            # to be here left the tool silent on the case it is most often asked about: an
+            # <image src="/img/logo.png"> that does not resolve produced no WARNINGS entry and
+            # no console line either -- Chromium reports those as "Failed to load resource:",
+            # which the console handler above drops because every page emits one for its
+            # favicon. Measured on a three-case fixture: the ~./ asset reported, while a
+            # docroot-relative <image> and a native <n:img> both vanished from the output
+            # entirely. A blank box in the image with nothing in the text is the worst
+            # combination available, because the reader has to guess which of the two it is.
+            # The page's own document is excluded: a render error serves the launcher's error
+            # page with a 4xx, and reporting that as a missing asset told the reader to go
+            # hunting for a path when STATUS/PHASE/MESSAGE and the exit code had already named
+            # the real problem. Only subresources belong in this list.
             page.on("response", lambda r: missing.append(r.url) if r.status >= 400
-                    and "/zkau/web/" in r.url else None)
+                    and not r.url.endswith("/favicon.ico")
+                    and r.url.split("?")[0] != url.split("?")[0] else None)
 
             timeout_ms = args.timeout * 1000
             debug("GET", url)
@@ -1886,6 +2049,24 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
                             animations="disabled", caret="hide")
             debug("screenshot", f"{out_path} ({out_path.stat().st_size} bytes)")
 
+            # After the screenshot for the same reason as the audit below: the PNG is
+            # already on disk, so nothing read here can alter the image it explains. Written
+            # even on the error page -- that markup is what a reader chasing an error page
+            # would want -- and the DOM: line labels it there, exactly as SCREENSHOT: does.
+            dom_target = dom_dump_path(args, out_path)
+            if dom_target is not None:
+                # A dump that cannot be written must not cost the caller a render that
+                # worked, so no DOM: line means no dump and the reason goes to stderr,
+                # where every diagnostic goes.
+                try:
+                    dom_target.parent.mkdir(parents=True, exist_ok=True)
+                    dom_target.write_text(page.content(), encoding="utf-8")
+                    dom["path"] = str(dom_target)
+                    debug("dom dump", f"{dom_target} ({dom_target.stat().st_size} bytes)")
+                except Exception as failure:
+                    print(f"warning: could not write the DOM dump to {dom_target}: {failure}",
+                          file=sys.stderr)
+
             # Deliberately AFTER the screenshot: the PNG is already on disk before
             # anything evaluates in the page, so the audit cannot alter the image it
             # describes. Skipped on the launcher's error page — that is not the user's
@@ -1914,9 +2095,41 @@ def capture(url, out_path: Path, args, warnings, controllers, layout):
                     client_errors.extend(_one_line(m) for m in page.evaluate(ZK_ERROR_BOX_JS))
                     debug("client error box", f"{len(client_errors)} message(s)")
 
-            for url_404 in dict.fromkeys(missing):
+                # Last of the three DOM reads, and gated on `details` with the other two: the
+                # launcher's error page is not the user's UI, so measuring it would answer a
+                # question about our own diagnostic markup. Each selector is suppressed on its
+                # own -- one bad selector must not cost the caller the others, nor the render.
+                for selector in args.probe:
+                    found = {"selector": selector, "total": 0, "elements": []}
+                    with contextlib.suppress(Exception):
+                        found.update(page.evaluate(
+                            PROBE_JS, [selector, PROBE_MATCH_CAP, PROBE_HTML_CAP]))
+                    probes.append(found)
+                    debug("probe", f"{selector}: {found.get('error') or found['total']}")
+
+            # Two causes that need two different things done about them, so they get two
+            # shapes. A /zkau/web/ 404 is diagnostic: the classpath is missing the jar that
+            # would have defined the resource, and that is a defect in the run. Everything
+            # else is the harness: measured on a fixture whose png, css and js all sit inside
+            # the resolved DOCROOT and are all 404, the preview's PreviewHttpServer serves
+            # .zul pages and /zkau/web/ classpath resources and nothing else, even though it
+            # is handed the docroot. So a docroot-relative asset is blank here by construction
+            # and reporting each one as a defect would put false findings on every page that
+            # has a logo. One grouped line instead: it stays honest about the cause while
+            # still naming the URLs, which is what catches a path the author typo'd.
+            zk_misses = [u for u in dict.fromkeys(missing) if "/zkau/web/" in u]
+            page_misses = [u for u in dict.fromkeys(missing) if "/zkau/web/" not in u]
+            for url_404 in zk_misses:
                 warnings.append(f"ZK resource not served: {url_404} — an add-on jar may be "
                                 "missing from the classpath, so the image may be misleading")
+            if page_misses:
+                shown = ", ".join(page_misses[:5])
+                more = f" (and {len(page_misses) - 5} more)" if len(page_misses) > 5 else ""
+                warnings.append(
+                    f"{len(page_misses)} docroot asset(s) not served: {shown}{more} — the "
+                    "preview server serves .zul pages and ZK classpath resources only, so "
+                    "these are blank in the image no matter what a real server would do. "
+                    "Worth reading for a path you did not intend; not evidence of a page bug")
 
             # P1-4 feeds the EXISTING WARNINGS block: the block order is a contract, so no
             # new block and no new exit code. Ungated on `details`, because on the launcher's
@@ -1976,6 +2189,46 @@ def emit_warnings(warnings):
             print(f"  - {warning}")
 
 
+def _visible(text):
+    """An icon's ::before content is a private-use codepoint: printed raw it is an empty box
+    in the terminal, or nothing at all, so the one line that proves the glyph WAS requested
+    would read as proof that it was not. Escaped, it reads \uf0f3 and says what it is."""
+    return "".join(c if 32 <= ord(c) <= 126 else f"\\u{ord(c):04x}" for c in text)
+
+
+def emit_probe(probes):
+    """Omitted entirely when --probe was not passed, so a run without it prints exactly what
+    it printed before this block existed. A selector that matched nothing still gets its line:
+    "0 matches" is an answer -- the component is not in the DOM at all -- and silence is not."""
+    if not probes:
+        return
+    emit("PROBE", f"{len(probes)} selector{'' if len(probes) == 1 else 's'}, "
+                  f"{sum(p.get('total', 0) for p in probes)} matches")
+    for probe in probes:
+        if probe.get("error"):
+            print(f"  {probe['selector']}  —  not a usable selector: {probe['error']}")
+            continue
+        total = probe.get("total", 0)
+        shown = probe.get("elements") or []
+        print(f"  {probe['selector']}  —  {total} match{'' if total == 1 else 'es'}")
+        for element in shown:
+            rect, styles = element["rect"], element["styles"]
+            print(f"    - {element['html']}")
+            print(f"      box {rect['w']}x{rect['h']} @ ({rect['x']},{rect['y']})"
+                  f" | display {styles['display']} | position {styles['position']}"
+                  f" | overflow {styles['overflow']}")
+            print(f"      font-family {styles['fontFamily']} | color {styles['color']}"
+                  f" | background-color {styles['backgroundColor']}")
+            print(f"      width {styles['width']} | height {styles['height']}"
+                  f" | flex {styles['flex']}")
+            if element.get("before"):
+                print(f"      ::before content {_visible(element['before']['content'])}"
+                      f" | ::before font-family {element['before']['fontFamily']}")
+        # Never a silent truncation, for the same reason the LAYOUT block says so.
+        if total > len(shown):
+            print(f"    ... and {total - len(shown)} more")
+
+
 def emit_layout(layout):
     """Omitted entirely when there is nothing to report, so a clean page prints exactly
     what it printed before this block existed."""
@@ -2025,7 +2278,8 @@ def report_skeleton():
     than the work, and `warnings` is always an array."""
     return {"status": None, "exitCode": None, "zul": None, "screenshot": None, "size": None,
             "docroot": None, "classpath": None, "zk": None, "launcher": None,
-            "controllers": None, "layout": None, "warnings": [], "error": None}
+            "controllers": None, "layout": None, "probe": None, "domDump": None,
+            "warnings": [], "error": None}
 
 
 def write_report(obj):
@@ -2045,7 +2299,7 @@ def write_report(obj):
 
 
 def report_for_run(exit_code, args, target: "Target", launcher, warnings, controllers,
-                   layout, details):
+                   layout, details, probes, dom):
     """Exits 0, 1 and 4 — every one of them a render that reached the browser. Built from the
     same objects report_success/report_render_error print from, so text and JSON cannot drift.
     Called from main() and not from those two, because exit 4 is only known after the LAYOUT
@@ -2083,6 +2337,11 @@ def report_for_run(exit_code, args, target: "Target", launcher, warnings, contro
         # The COLLECT cap (200), not the print cap (25): a JSON consumer that got the printed
         # 25 with no way to tell would be reading a silent truncation, which nothing here does.
         layout={"total": layout.get("total", 0), "findings": layout.get("findings") or []},
+        # Null when the flag was not passed, which is not the same claim as "asked and found
+        # nothing" -- an empty array. The text block draws the same distinction by omitting
+        # the PROBE: block entirely in the first case and printing "0 matches" in the second.
+        probe=list(probes) if args.probe else None,
+        domDump=dom.get("path"),
         warnings=list(warnings),
     )
     if details:
@@ -2162,6 +2421,19 @@ def parse_args(argv):
                         help="exit 4 when the LAYOUT block has any finding, for CI use. It's "
                              "the exit code and nothing else that changes: the findings are "
                              "reported either way, and STATUS: ok still prints.")
+    parser.add_argument("--probe", action="append", default=[], metavar="<css-selector>",
+                        help="report the rendered DOM for every element matching this "
+                             "selector: its opening tag, its measured box and the computed "
+                             "styles a layout or icon defect turns on. Repeatable. Reach for "
+                             "it when the image shows something is wrong but not why; it "
+                             "reads the render you already have rather than costing another. "
+                             "Adds a PROBE: block and nothing else.")
+    parser.add_argument("--dump-dom", action="store_true",
+                        help="write the post-mount DOM beside the PNG (its path with a "
+                             ".dom.html suffix) and name it on a DOM: line. The whole page, "
+                             "for when you do not yet know what to --probe; a data-heavy page "
+                             "can run to hundreds of KB, which is why it is a file. Takes no "
+                             "value -- use --out to place it.")
     parser.add_argument("--report", type=_report_spec, metavar="json[:<path>]",
                         help="also write the whole result as one JSON object, for a caller "
                              "that parses rather than reads (default path: the PNG's, with a "
@@ -2233,12 +2505,13 @@ def resolve_request(zul: Path, args, resolved):
     return docroot, layout, "/" + urllib.parse.quote(zul.relative_to(docroot).as_posix())
 
 
-def render(target: Target, java: Path, jar: Path, args, warnings, controllers, layout):
+def render(target: Target, java: Path, jar: Path, args, warnings, controllers, layout,
+           probes, dom):
     """Steps 5-7: the launcher lives exactly as long as the capture needs it."""
     with Launcher(java, jar, launcher_classpath(target.resolved), target.docroot,
                   args.run_controllers, args.controller_timeout) as launcher:
         url = f"http://127.0.0.1:{launcher.port}{target.request_path}"
-        return capture(url, target.out_path, args, warnings, controllers, layout)
+        return capture(url, target.out_path, args, warnings, controllers, layout, probes, dom)
 
 
 # The three strings of the text contract (spec P0-2 item 4), keyed by the launcher's token.
@@ -2266,7 +2539,7 @@ def controllers_line(args, controllers, launcher: LauncherJar, warnings):
     return CONTROLLER_LINES.get(token, token)
 
 
-def report_render_error(target: Target, details, warnings, controllers_value):
+def report_render_error(target: Target, args, details, warnings, controllers_value, dom):
     """A real defect in the .zul — the one non-zero exit the agent should act on."""
     emit("STATUS", "render-error")
     emit("PHASE", details["phase"])
@@ -2279,17 +2552,28 @@ def report_render_error(target: Target, details, warnings, controllers_value):
         debug_lines("error page trace", first)
     emit("CONTROLLERS", controllers_value)
     emit("SCREENSHOT", f"{target.out_path}   [ERROR PAGE — this is not your UI]")
+    if dom.get("path"):
+        emit("DOM", f"{dom['path']}   [ERROR PAGE — this is not your UI]")
+    # Said rather than left silent: a caller who asked for a probe and got no block would
+    # read it as "nothing matched", which is a claim about their page. This is a claim
+    # about ours.
+    if args.probe:
+        emit("PROBE", "skipped — the error page is not your UI")
     emit_warnings(warnings)
     print("NEXT: fix the .zul at the location above, then re-run this script.")
     return EXIT_RENDER_ERROR
 
 
 def report_success(target: Target, args, launcher: LauncherJar, warnings, controllers_value,
-                   layout):
+                   layout, probes, dom):
     resolved = target.resolved
     zk_jars = [j.name for j in resolved["jars"] if re.match(r"zk-\d", j.name)]
     emit("STATUS", "ok")
     emit("SCREENSHOT", target.out_path)
+    # Beside SCREENSHOT: because it is the same kind of thing -- an artifact this run wrote,
+    # named by its path. Both are absent from a run that did not ask for them.
+    if dom.get("path"):
+        emit("DOM", dom["path"])
     emit("SIZE", f"{args.width}x{args.height}" + (" (full page)" if args.full_page else ""))
     emit("DOCROOT", f"{target.docroot}  (rule: {target.layout})")
     emit("CLASSPATH", f"{resolved['kind']}, {len(resolved['jars'])} jars + "
@@ -2299,6 +2583,7 @@ def report_success(target: Target, args, launcher: LauncherJar, warnings, contro
     emit("LAUNCHER", f"{launcher.version} ({launcher.source})")
     emit("CONTROLLERS", controllers_value)
     emit_layout(layout)
+    emit_probe(probes)
     emit_warnings(warnings)
     if args.fail_on_layout and (layout.get("findings") or []):
         return EXIT_LAYOUT
@@ -2321,6 +2606,9 @@ def main(argv=None):
     # Not `layout`: Target.layout is the docroot RULE STRING printed on the DOCROOT:
     # line, and a second meaning for that name would read as correct and be wrong.
     layout_findings = {"total": 0, "findings": []}
+    # Mutated in place by capture(), the same idiom as `warnings` and `layout_findings`:
+    # both are properties of the render rather than of the process.
+    probes, dom = [], {}
 
     zul = locate_zul(args.zul)
     resolved = resolve_classpath(zul, args, warnings)                       # 1
@@ -2337,22 +2625,22 @@ def main(argv=None):
     launcher = resolve_launcher(args.launcher_jar, args.launcher_version,   # 4
                                warnings)
     status, details = render(target, java, launcher.path, args, warnings,  # 5-7
-                             controllers, layout_findings)
+                             controllers, layout_findings, probes, dom)
 
     # Computed once, before either report: it can append a warning of its own.
     controllers_value = controllers_line(args, controllers, launcher, warnings)
     if details is not None:
-        code = report_render_error(target, details, warnings, controllers_value)
+        code = report_render_error(target, args, details, warnings, controllers_value, dom)
     else:
         if status != 200:
             raise Skipped(f"the render server answered HTTP {status} for {request_path}",
                           "check that the .zul path is correct relative to the docroot")
         code = report_success(target, args, launcher, warnings, controllers_value,
-                             layout_findings)
+                             layout_findings, probes, dom)
     # Last, and after the exit code exists: --fail-on-layout's 4 is decided on
     # report_success's final line, and REPORT: is the only line allowed after WARNINGS.
     write_report(report_for_run(code, args, target, launcher, warnings, controllers,
-                                layout_findings, details))
+                                layout_findings, details, probes, dom))
     return code
 
 

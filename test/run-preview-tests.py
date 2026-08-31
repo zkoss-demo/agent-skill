@@ -109,6 +109,22 @@ def blocks(stdout):
     return re.findall(r"^([A-Z][A-Z_]*): ", stdout, re.MULTILINE)
 
 
+def without_block(stdout, key):
+    """stdout with one KEY: block removed -- its header and the indented lines under it. Used
+    to prove a new block is purely additive: what is left has to equal a run that never asked
+    for it."""
+    kept, dropping = [], False
+    for line in stdout.splitlines():
+        if line.startswith(f"{key}: "):
+            dropping = True
+            continue
+        if dropping and (line.startswith(" ") or not line.strip()):
+            continue
+        dropping = False
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def real_warnings(stdout):
     """The indented WARNINGS entries, minus the expected pinned-digest noise."""
     return [line.strip()[2:] for line in stdout.splitlines()
@@ -619,6 +635,183 @@ def check_a18_zk_engine_is_recognised_on_a_busy_page():
     return fails
 
 
+def check_a19_probe_is_additive_and_reports_the_dom():
+    """A19: --probe adds a PROBE: block and changes nothing else; a selector that matches
+    nothing still gets a line, and a malformed one is the caller's typo, not a failed render."""
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        png = Path(tmp) / "out.png"
+        fixture = str(FIXTURES / "icon-carrier.zul")
+
+        plain_code, plain_out, _ = cli("--launcher-jar", JAR, "--out", str(png), fixture)
+        code, out, _ = cli("--launcher-jar", JAR, "--out", str(png),
+                           "--probe", '[class*="z-icon-bell"]', "--probe", ".nothing-here",
+                           fixture)
+
+    if code != plain_code:
+        fails.append(f"--probe changed the exit code: {plain_code} -> {code}")
+    if without_block(out, "PROBE").strip() != plain_out.strip():
+        fails.append("--probe changed stdout beyond adding the PROBE: block")
+    if value(plain_out, "PROBE") is not None:
+        fails.append("a run without --probe printed a PROBE block; absence is the contract")
+    header = value(out, "PROBE") or ""
+    if not header.startswith("2 selectors, 4 matches"):
+        fails.append(f"--probe: expected '2 selectors, 4 matches', got {header!r}")
+    if "  .nothing-here  —  0 matches" not in out:
+        fails.append("--probe: a selector that matched nothing lost its line; "
+                     "'0 matches' is an answer and silence is not")
+    for needed in ("box ", "display ", "font-family ", "::before content "):
+        if needed not in out:
+            fails.append(f"--probe: the block carries no {needed.strip()!r} -- markup alone "
+                         "does not answer why an element looks wrong")
+
+    # A bad selector must cost the caller nothing but the answer to that one selector.
+    bad_code, bad_out, _, blob = render(GOLDEN, "--probe", "a b (((")
+    if bad_code != 0:
+        fails.append(f"malformed --probe selector: expected exit 0, got {bad_code}\n{bad_out}")
+    if blob is None:
+        fails.append("malformed --probe selector: the render lost its PNG")
+    if "not a usable selector" not in bad_out:
+        fails.append("malformed --probe selector: no reason printed")
+    return fails
+
+
+def check_a19b_probe_pins_the_icon_carrier_rule():
+    """A19b: the fact --probe exists to deliver. All four carriers ask for the SAME ::before
+    glyph; only the <label> misses the icon font. Asserting the glyph is EQUAL and the font
+    differs is what makes this load-bearing: a probe that reported markup alone would show
+    four elements carrying z-icon-bell and prove nothing."""
+    import json
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        png, report = Path(tmp) / "out.png", Path(tmp) / "r.json"
+        code, out, _ = cli("--launcher-jar", JAR, "--out", str(png),
+                           "--probe", ".z-label", "--probe", ".z-span",
+                           "--report", f"json:{report}", str(FIXTURES / "icon-carrier.zul"))
+        if code != 0:
+            return [f"icon-carrier: expected exit 0, got {code}\n{out}"]
+        if not report.is_file():
+            return ["icon-carrier: no JSON report to read the probe out of"]
+        data = json.loads(report.read_text())
+
+    found = {p["selector"]: p for p in (data.get("probe") or [])}
+    label, span = found.get(".z-label"), found.get(".z-span")
+    if not (label and span and label["elements"] and span["elements"]):
+        return fails + ["icon-carrier: the probe did not reach both carriers"]
+    label, span = label["elements"][0], span["elements"][0]
+
+    if (label.get("before") or {}).get("content") != (span.get("before") or {}).get("content"):
+        fails.append("icon-carrier: the two carriers no longer request the same glyph, so this "
+                     "fixture has stopped pinning what it was written for")
+    if "ZK85Icons" in label["styles"]["fontFamily"]:
+        fails.append("icon-carrier: <label> now gets the icon font -- if ZK fixed this, delete "
+                     "the rule from ui-to-component-mapping.md too")
+    if "ZK85Icons" not in span["styles"]["fontFamily"]:
+        fails.append("icon-carrier: <span> lost the icon font, so the comparison proves nothing")
+    return fails
+
+
+def check_a20_dump_dom_writes_a_file_and_names_it():
+    """A20: --dump-dom writes the post-mount DOM beside the PNG and names it on a DOM: line.
+    On the error page it is written and LABELLED, exactly as SCREENSHOT: is -- that markup is
+    what a reader chasing an error page wants, but it is not their UI."""
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        png = Path(tmp) / "out.png"
+        code, out, _ = cli("--launcher-jar", JAR, "--out", str(png), "--dump-dom", str(GOLDEN))
+        dump = png.with_suffix(".dom.html")
+        if code != 0:
+            fails.append(f"--dump-dom: expected exit 0, got {code}\n{out}")
+        if not dump.is_file():
+            fails.append(f"--dump-dom: nothing written to the default path {dump}")
+        elif dump.stat().st_size == 0:
+            fails.append("--dump-dom: wrote an empty file")
+        elif "z-label" not in dump.read_text():
+            fails.append("--dump-dom: the file is not the post-mount DOM -- no ZK class names "
+                         "in it, which is what the served bootstrap response looks like")
+        # Compared resolved, not literally: tempfile hands out /var/folders/... on macOS and
+        # the script resolves --out, which is the same directory through /private/var.
+        printed = value(out, "DOM")
+        if printed is None or Path(printed).resolve() != dump.resolve():
+            fails.append(f"--dump-dom: the DOM: line says {printed!r}, not {dump}")
+        if not png.is_file():
+            fails.append("--dump-dom: the render lost its PNG")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        png = Path(tmp) / "err.png"
+        code, out, _ = cli("--launcher-jar", JAR, "--out", str(png), "--dump-dom", "--probe",
+                           "div", str(FIXTURES / "render-error.zul"))
+        if code != 1:
+            fails.append(f"--dump-dom on the error page: expected exit 1, got {code}")
+        if "ERROR PAGE" not in (value(out, "DOM") or ""):
+            fails.append("--dump-dom on the error page: the DOM: line is not labelled, so a "
+                         "reader would take the launcher's own markup for their page")
+        if "skipped" not in (value(out, "PROBE") or ""):
+            fails.append("--probe on the error page: silence would read as 'nothing matched', "
+                         "which is a claim about the user's page rather than ours")
+    return fails
+
+def check_a21_a_broken_icon_is_measured_not_guessed():
+    """A21: icon-not-rendered fires on the carrier that misses the icon font, and only on it.
+
+    Four carriers of the SAME class, so all four request the same ::before glyph and only the
+    <label> resolves a font stack that cannot draw it. That makes the fixture its own negative
+    control: a rule that reports all four has detected nothing, and a rule that reports none has
+    been switched off. The three empty boxes this covers were misdiagnosed three separate ways
+    during the zul-writer evaluation -- and one page shipped with every icon on it blank --
+    which is why the finding has to carry the measurement rather than a suspicion.
+    """
+    code, out, _, _ = render(FIXTURES / "icon-carrier.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"icon-carrier: expected exit 0, got {code}\n{out}")
+    icons = [e for e in layout_entries(out) if e.startswith("icon-not-rendered")]
+    if len(icons) != 1:
+        fails.append(f"icon-carrier: expected exactly one icon-not-rendered finding, got "
+                     f"{len(icons)}:\n{icons}")
+    elif "label" not in icons[0]:
+        fails.append(f"icon-carrier: the finding does not name the label carrier: {icons[0]!r}")
+    elif "U+F0F3" not in icons[0]:
+        fails.append(f"icon-carrier: the finding carries no codepoint measurement: {icons[0]!r}")
+    for working in ("span", "div", "btn"):
+        if any(e.startswith("icon-not-rendered") and working in e for e in layout_entries(out)):
+            fails.append(f"icon-carrier: reported {working}, whose icon draws correctly -- the "
+                         f"rule is firing on the class, not on the resolved font")
+    return fails
+
+
+def check_a22_a_missing_page_asset_is_reported():
+    """A22: a 4xx asset reaches WARNINGS, and the two causes stay separable.
+
+    A docroot-relative <image> and a native <n:img> used to produce a blank box in the PNG and
+    nothing at all in the text: the response filter kept only /zkau/web/ URLs, and the browser's
+    own "Failed to load resource:" console line is dropped for the favicon's sake. They are
+    reported now — but as ONE line saying the preview serves no docroot statics, because
+    measured, everything under the docroot 404s here and a per-URL defect line would fire on
+    every page that has a logo. The ~./ miss keeps its own line: that one really is a defect,
+    and conflating the two would cost the classpath signal.
+    """
+    code, out, _, _ = render(FIXTURES / "missing-asset.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"missing-asset: expected exit 0, got {code}\n{out}")
+    warns = real_warnings(out)
+    docroot = [w for w in warns if "docroot asset(s) not served" in w]
+    if len(docroot) != 1:
+        fails.append(f"missing-asset: expected exactly one grouped docroot line, got "
+                     f"{len(docroot)} -- a per-URL line here fires on every page with a "
+                     f"logo:\n{warns}")
+    else:
+        for expected in ("/img/does-not-exist.png", "/assets/nope.svg"):
+            if expected not in docroot[0]:
+                fails.append(f"missing-asset: {expected} 404'd and its URL was not named -- a "
+                             f"blank box in the image with silence in the text:\n{docroot[0]}")
+    if not any("ZK resource not served" in w and "/zkau/web/" in w for w in warns):
+        fails.append(f"missing-asset: the ~./ classpath miss lost its own line, so the one "
+                     f"cause that IS a defect is no longer separable:\n{warns}")
+    return fails
+
+
 CHECKS = [
     ("usage/no-args        ", check_usage_no_args),
     ("skip/missing-jar     ", check_skip_missing_jar),
@@ -644,6 +837,11 @@ CHECKS = [
     ("A16 escapes w/ content", check_a16_escapes_parent_needs_something_to_lose),
     ("A17 stable capture   ", check_a17_capture_of_an_animated_page_is_reproducible),
     ("A18 zk engine detected", check_a18_zk_engine_is_recognised_on_a_busy_page),
+    ("A19 --probe          ", check_a19_probe_is_additive_and_reports_the_dom),
+    ("A19b icon carrier    ", check_a19b_probe_pins_the_icon_carrier_rule),
+    ("A20 --dump-dom       ", check_a20_dump_dom_writes_a_file_and_names_it),
+    ("A21 broken icon      ", check_a21_a_broken_icon_is_measured_not_guessed),
+    ("A22 missing asset    ", check_a22_a_missing_page_asset_is_reported),
 ]
 
 # A12, the exit-code map, has no check of its own on purpose: 0, 1, 2, 3 and 4 are each already

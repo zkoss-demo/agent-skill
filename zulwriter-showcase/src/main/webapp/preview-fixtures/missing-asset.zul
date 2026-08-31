@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture for the WARNINGS 404 contract, and for the line between the two causes.
+     `~./` asks the classpath, and a miss there means a jar is absent — a real defect, reported
+     one URL per line. The other two ask the docroot, and the preview server does not serve
+     static files at all (measured: png, css and js inside the resolved DOCROOT are all 404),
+     so they are grouped into a single line that says so. Before this they produced a blank box
+     in the image and complete silence in the text, which is the one combination a reader
+     cannot resolve. -->
+<zk xmlns="http://www.zkoss.org/2005/zul" xmlns:n="native">
+	<vlayout>
+		<image id="docrootMiss" src="/img/does-not-exist.png"/>
+		<image id="classpathMiss" src="~./img/does-not-exist.png"/>
+		<n:img id="nativeMiss" src="/assets/nope.svg"/>
+	</vlayout>
+</zk>

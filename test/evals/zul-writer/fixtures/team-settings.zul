@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?page title="Team settings"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+	<style>
+		.ts-page { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			background: #fff; }
+		.ts-side { width: 220px; background: #f8fafc; border-right: 1px solid #e4e9f0;
+			padding: 20px 0; height: 520px; }
+		.ts-side-head { padding: 0 18px 12px; font-size: 12px; font-weight: 700;
+			letter-spacing: .8px; color: #667085; }
+		.ts-item { display: block; padding: 9px 18px; color: #344054; font-size: 15px;
+			text-decoration: none; white-space: nowrap; }
+		.ts-item-active { background: #e8f1ff; color: #1570ef; font-weight: 600; }
+		/* keeps the rail tidy when a workspace name runs long */
+		.ts-item-name { display: inline-block; width: 96px; overflow: hidden; white-space: nowrap; }
+		.ts-body { padding: 24px 28px; }
+		.ts-h1 { font-size: 20px; font-weight: 700; color: #101828; }
+		.ts-hint { color: #667085; font-size: 14px; }
+	</style>
+
+	<hlayout spacing="0" sclass="ts-page">
+		<div sclass="ts-side">
+			<label value="WORKSPACE" sclass="ts-side-head"/>
+			<vlayout spacing="0">
+				<a label="General" sclass="ts-item ts-item-active"/>
+				<a label="Members" sclass="ts-item"/>
+				<label value="Billing and invoices" sclass="ts-item ts-item-name"/>
+				<label value="Authentication policy" sclass="ts-item ts-item-name"/>
+				<a label="Integrations" sclass="ts-item"/>
+			</vlayout>
+		</div>
+		<div sclass="ts-body">
+			<vlayout spacing="10px">
+				<label value="General" sclass="ts-h1"/>
+				<label value="Workspace name, region and default permissions." sclass="ts-hint"/>
+				<hlayout valign="middle" spacing="10px">
+					<label value="Workspace name" width="140px"/>
+					<textbox value="Acme Platform Team" width="280px"/>
+				</hlayout>
+				<hlayout valign="middle" spacing="10px">
+					<label value="Region" width="140px"/>
+					<combobox value="eu-west-1" width="280px"/>
+				</hlayout>
+				<button label="Save changes" sclass="ts-save"/>
+			</vlayout>
+		</div>
+	</hlayout>
+</zk>
