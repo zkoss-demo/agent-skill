@@ -326,7 +326,8 @@ order:
    not structure, so if the page shifts afterwards the extraction is what to look at.
 
 Then re-render once with `--run-controllers` to confirm it did not. That render checks the
-extraction, not the layout, so it sits outside Step 5's two-round budget.
+extraction, not the layout, so it is not a fix round — and anything it does find is fixed on Pass
+2's own budget, not on what is left of Pass 1's. See *How many rounds* in Step 5.
 
 ### Layout & Component Patterns
 
@@ -709,25 +710,49 @@ round-trip"* down still holds in both modes.
 
 ### How many rounds
 
-- **At most two fix rounds.** A round is: render, read, list defects from *What to fix*, fix them,
-  re-run Step 3 validation. Two of those, then stop.
+A round is: render, read, list defects from *What to fix*, fix them, re-run Step 3 validation.
+Three rules decide whether there is another one, and each stops something the others cannot see.
+
+- **Fix one defect at most twice.** If the second edit aimed at a defect leaves it there, stop
+  editing it. Two edits that changed nothing mean the cause you have in mind is not the cause, so a
+  third edit changes markup rather than the defect — and the markup it changes is the part that was
+  working. Diagnose it instead (that costs no round, see below) or report it; coming back with a
+  measurement is not a third guess. This is the rule that stops blind looping: one defect, edited
+  over and over on successive theories.
+- **Keep going while the list is shrinking.** A round earns the next one by closing at least one
+  defect and introducing none. When a round closes nothing new, stop — the same shape as the
+  diagnosis rule below. For the measured half you do not have to hold the count in your head:
+  every render prints `LAYOUT: N findings`.
+- **At most four fix rounds, per pass.** A backstop for the case the two rules above cannot see —
+  defects that trade places, each round closing one and creating another. No page in six measured
+  runs needed more than three, so reaching four is itself a finding: say so rather than stopping
+  quietly. Pass 1 (the literal layout) and Pass 2 (after extraction) each get their own four,
+  because a defect that surfaces after extraction has a different cause — the extraction — from one
+  in the layout.
 - **The budget counts edits, not renders.** Rendering again to work out *why* something is wrong —
   which element, which measurement, which of two possible causes — is not a fix round and is not
   capped, and neither is a `--probe` or `--dump-dom` run. Nothing has been changed yet, so there is
-  nothing to have got wrong twice; what the cap exists to stop is editing on a guess and then
-  editing again on the next guess. Stopping at the cap with the cause still unknown is how a real
-  defect gets shipped, or gets blamed on the preview. Diagnosis has a different stopping rule and it
+  nothing to have got wrong twice; what these rules exist to stop is editing on a guess and then
+  editing again on the next guess. Stopping with the cause still unknown is how a real defect gets
+  shipped, or gets blamed on the preview. Diagnosis has a different stopping rule and it
   is not a number: **stop when the next render would not tell you anything the last one did not.**
   One evaluation run spent six renders isolating a chart animation that was clipping every
   screenshot, and that was the right call — a cap that made it feel like a transgression was
   measuring the wrong thing.
 - **Fix only whole defects from that list.** If your list is empty, or everything left on it is in *What you cannot judge*, the page is good enough — say so in one line and stop. "Good enough" means every requirement from Step 1 is visibly present, in the right region, in the right kind of component, and nothing is clipped or overlapping.
-- **A model-driven page spends its rounds on the literal version.** Settle the layout while the data
-  is still in the markup, then extract and re-render once with `--run-controllers`. That render sits
-  outside the two-round budget because it checks the extraction, not the layout — and if the page
-  looks different afterwards, the extraction is what changed it.
+- **A model-driven page spends Pass 1's rounds on the literal version.** Settle the layout while the
+  data is still in the markup, then extract and re-render once with `--run-controllers`. That render
+  is not a fix round — it checks the extraction, not the layout — and if the page looks different
+  afterwards, the extraction is what changed it. Anything it does find belongs to Pass 2 and is
+  fixed on Pass 2's budget.
 - **Never edit the ZUL for a cosmetic difference alone.** Chasing pixels against a mockup costs rounds and regresses working markup.
-- If a defect survives both rounds, **stop and tell the user** what it is and what you tried. Do not keep rendering.
-- Report the final image path so the user can look at it themselves.
+- **If a round left the page worse than it found it, revert that edit and stop.** A fix that
+  regressed something is evidence the defect is not understood yet, and the page you already had is
+  worth more than the next guess at it.
+- When you stop with a defect still open, **tell the user** what it is and what you tried. Do not
+  keep rendering.
+- **Say how many fix rounds you spent, and what is still open.** A budget nobody is told about
+  cannot be checked afterwards — the same reason Step 1 names the defaults it used. Report the final
+  image path too, so the user can look at the page themselves.
 
 For classpath resolution details, the docroot rules, and what each `PREVIEW_SKIPPED` reason means, see [references/preview-guidelines.md](references/preview-guidelines.md).
