@@ -842,6 +842,27 @@ or a section still missing **is a defect** — in the controller if it never sup
 the ZUL if the binding names the wrong property. Everything from *"Anything requiring a server
 round-trip"* down still holds in both modes.
 
+### A page with an empty state has two first paints, and you rendered one of them
+
+Anything gated on `empty vm.something` — a master-detail pane, a "no results" message, a dialog's
+body — has a second layout that no first-paint render reaches, and **defects hide there
+preferentially**, because that is the half nobody looks at.
+
+This skill's own `assets/master-detail-mvvm.zul` shipped two of them. It validated clean and
+rendered clean; both lived in the *selected* state. The detail pane bound
+`vm.selectedItem.description`, a property its companion `MyViewModel.Item` does not have — which
+does not render blank, it throws `PropertyNotFoundException` and takes the whole controller down, so
+the page falls back to `CONTROLLERS: failed → isolated` and shows placeholders. And `visible` sat on
+the `hflex="2"` pane itself, so the pane's width went to the master list until the first click and
+was taken back on it: **measured at 1265px with nothing selected and 422px with a row selected**, a
+3× snap invisible to every static layer and to the first render.
+
+Arranging the second render costs one line in the controller: start with a row selected
+(`selectedItem = items.get(0)` in `@Init`), render, then put it back. Do the same for a page whose
+list can come back empty, a wizard past step 1, or a panel that starts collapsed. Judge the pane's
+*geometry* across the two, not just its contents — `--probe` on the container reports the width, and
+a width that moves between the states is the defect.
+
 ### How many rounds
 
 A round is: render, read, list defects from *What to fix*, fix them, re-run Step 3 validation.

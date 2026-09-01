@@ -98,10 +98,22 @@ Nothing here has an owner. Grouped by where the work would land.
       byte-identical and complete. The mitigation shipped; the acceptance criterion (fails before, passes
       after) is unmet. Open question: what a real dashboard chart has that a minimal fixture does not.
       → [zk-measured-behaviour.md §13](zk-measured-behaviour.md)
-- [ ] **`skills/zul-writer/assets/master-detail-mvvm.zul` still carries both defects** that appeared the
-      moment it was pasted as a page: `vm.selectedItem.description` names a property no model has, and
-      `visible="@load(not empty vm.selectedItem)"` hides the whole detail pane, so the page snaps from
-      full width to a third on the first click. Reasonable in a generic snippet, defects in a page.
+- [x] **`skills/zul-writer/assets/master-detail-mvvm.zul` — both defects fixed, now verified.** This
+      item was **stale from birth**: `d8d6499` fixed the asset and created this list in the same
+      commit, and its own message says so. The item was carried over from the `tasks/` documents
+      being condensed and never reconciled against the change beside it.
+      What was missing was evidence, since the asset had only been re-validated, and neither defect is
+      visible to validation *or* to a first-paint render — both live in the **selected** state. Both
+      versions were pasted as a page and rendered in both states:
+
+      | Markup | nothing selected | a row selected |
+      |---|---|---|
+      | before `d8d6499` | master list **1265px** | master list **422px**, `CONTROLLERS: failed → isolated`, `PropertyNotFoundException: Property 'description' not found` |
+      | the asset today | master list **422px** | master list **422px**, controllers executed |
+
+      So the "snap to a third" was a 3× width jump on the first click, and the property defect did not
+      render blank — it took the whole controller down. The lesson that outlives the fix is in
+      `SKILL.md` Step 5, *A page with an empty state has two first paints*.
 - [ ] **Decide `.zhtml`**: it returns 404 from the launcher today. Either keep that or render it — but
       the static handler must never start returning it as *source text*.
       → [decisions.md](decisions.md)
