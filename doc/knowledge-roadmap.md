@@ -196,6 +196,12 @@ The evaluation already supplies the measurement: **renders per page.** The cap w
 Re-run the six-design suite after items 1–2 and compare render counts and the misdiagnosis rate on the
 icon finding — a direct read on "get it right the first time", needing no new benchmark.
 
+**That re-run is blocked on material, and a substitute measurement has been run instead.** All six
+mockups now have finished pages in this repository, so a re-run measures recall rather than generation.
+What was measured is the prerequisite question — whether the new tooling gives *right* answers — against
+558 external ZUL files and 192 zul/controller pairs. Results, including the two defects it found, are in
+[effectiveness-measurement.md](effectiveness-measurement.md).
+
 Worth noting for expectations: in the probe evaluation, the skill *without* the probe still reached the
 correct icon diagnosis on its own — it simply cost twice the tool calls. **Detection and prevention both
 work; prevention is the one that is cheap.**

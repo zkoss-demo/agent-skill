@@ -11,6 +11,7 @@ cannot reconstruct — **motivation, decisions, and facts that cost a measuremen
 | [zk-measured-behaviour.md](zk-measured-behaviour.md) | 18 ZK / browser / launcher behaviours established by running something. The most expensive content here to re-obtain |
 | [evaluation.md](evaluation.md) | The six-run end-to-end evaluation: reusable methodology, the nine repeated findings and their status, the method's own blind spots, and why it could not converge |
 | [knowledge-roadmap.md](knowledge-roadmap.md) | Where ZK knowledge should live (check / pre-write lookup / example / prose), the retrieval-precision bug, the corpus version trap, and the unresolved XSD maintenance problem |
+| [effectiveness-measurement.md](effectiveness-measurement.md) | Whether the pre-write lookup and Layers 6/7 give right answers — recall against the recorded failures, precision against 558 external ZUL files, and the two defects that sweep found |
 | [dev-environment.md](dev-environment.md) | Iterating on the skill in its plugin form, the two prerequisites that silently degrade every preview, and why testing the skill *inside this repository* measures recall rather than generation |
 
 Not documentation, but referenced from these files:
@@ -31,6 +32,18 @@ Nothing here has an owner. Grouped by where the work would land.
       so a bare "does ZK 10 have X?" reaches it. → [knowledge-roadmap.md §Tier 2](knowledge-roadmap.md)
 - [x] **The last two Tier-1 rules** — done: Layer 6 (a literal `selectedIndex` pointing past the items
       that exist) and Layer 7 (`@Wire` type and id cross-check, opt-in via `--controller`).
+- [ ] **`build_attribute_map()` never traverses `xs:simpleContent`**, so text-bearing elements resolve
+      to an empty attribute set. `--describe attribute --attr name` answers "NOT accepted" for canonical
+      ZUL used in 48 of ZK's own example files, and the same function drives Layer 3 — this is the root
+      cause of the `test/valid/zk-5793.zul` quarantine. Six-line fix, measured at −28% wrong answers.
+      → [effectiveness-measurement.md §2](effectiveness-measurement.md)
+- [ ] **`--describe` ignores `xs:anyAttribute` and pass-through parameter elements.** `custom-attributes`
+      and `variables` declare `anyAttribute` in the schema; `<apply>` and `<include>` take arbitrary
+      attribute names as documented parameters. Together, half the residual wrong answers.
+- [ ] **Layer 7's unknown-id check false-positives on `@Wire` inside a nested component class** (a
+      `class Foo extends Window` declared inside the composer). 2 fields of 170 measured. Restrict that
+      half of the rule to fields declared in the top-level class body.
+      → [effectiveness-measurement.md §4](effectiveness-measurement.md)
 - [ ] **Fix the zk-doc retrieval precision bug** before growing any corpus. A combobox
       default-selection query returns `treeitem` first — and `treeitem`'s answer is exactly the wrong
       spelling an evaluation run tried first.
