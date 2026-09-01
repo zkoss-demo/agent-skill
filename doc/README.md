@@ -50,6 +50,15 @@ Nothing here has an owner. Grouped by where the work would land.
       `@Wire` fields. The same section records why the runtime NPE cannot replace the check: when the
       field is used only in an event handler, the render reports `STATUS: ok` and never sees it.
       → [effectiveness-measurement.md §4](effectiveness-measurement.md)
+- [ ] **One cell of the `selectedIndex` table is still open: `cardlayout` on ZK 9 EE** (D5, deferred).
+      Every other cell was measured on both 9.6.6 and 10.3.0.1. `cardlayout` is a zkmax component, ZK 9
+      CE does not ship it, and no 9.6.x EE stack is cached locally — closing the cell means downloading
+      a whole second `-Eval` stack for three renders. Layer 6 therefore *extrapolates* one rule to
+      ZK 9 EE: that `<cardlayout selectedIndex="-1">` throws. The extrapolation is a reasonable one —
+      the rejection comes from a bounds check against children that are already attached, which is the
+      kind of thing that does not move between versions — and the limit is stated where the table lives,
+      so no reader is misled. Cost of being wrong: one false positive for ZK 9 EE users.
+      → [zk-measured-behaviour.md §21b](zk-measured-behaviour.md)
 - [ ] **Fix the zk-doc retrieval precision bug** before growing any corpus. A combobox
       default-selection query returns `treeitem` first — and `treeitem`'s answer is exactly the wrong
       spelling an evaluation run tried first.
