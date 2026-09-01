@@ -22,6 +22,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +41,11 @@ GOLDEN = FIXTURES / "healthy-page.zul"
 # rather than a fixture. Filtered by CONTENT and never by count: a check that asserted
 # "WARNINGS: 1" would silently swallow a second, real warning.
 PIN_NOISE = "is not the pinned launcher"
+
+# Read out of the script rather than restated here: a test that hard-codes the pinned
+# version keeps passing after the pin moves, while asserting something no longer true.
+LAUNCHER_VERSION = re.search(r'^LAUNCHER_VERSION = "([^"]+)"',
+                             SCRIPT.read_text(encoding="utf-8"), re.M).group(1)
 
 # Documented order of the stdout blocks a successful render always prints, in this order.
 # Three more are conditional and none of them belong in this spine: LAYOUT is inserted between
@@ -781,34 +787,86 @@ def check_a21_a_broken_icon_is_measured_not_guessed():
 
 
 def check_a22_a_missing_page_asset_is_reported():
-    """A22: a 4xx asset reaches WARNINGS, and the two causes stay separable.
+    """A22: a missing asset reaches WARNINGS per URL, and the two causes stay separable.
 
     A docroot-relative <image> and a native <n:img> used to produce a blank box in the PNG and
     nothing at all in the text: the response filter kept only /zkau/web/ URLs, and the browser's
-    own "Failed to load resource:" console line is dropped for the favicon's sake. They are
-    reported now — but as ONE line saying the preview serves no docroot statics, because
-    measured, everything under the docroot 404s here and a per-URL defect line would fire on
-    every page that has a logo. The ~./ miss keeps its own line: that one really is a defect,
-    and conflating the two would cost the classpath signal.
+    own "Failed to load resource:" console line is dropped for the favicon's sake. Each now gets
+    its own line naming the file to go and look at.
+
+    The served pixel is the control that makes this test worth running, and it is only assertable
+    from launcher 1.0.3 onwards: before it, nothing under the docroot was served at all, so
+    "a file that IS there stays quiet" could not be distinguished from "nothing is ever served".
+    A rule that reports the served asset too has stopped measuring anything.
+
+    The ~./ miss keeps its own wording because the remedy differs -- a jar on the classpath, not
+    an edit to the page -- and conflating the two would cost that signal.
     """
     code, out, _, _ = render(FIXTURES / "missing-asset.zul")
     fails = []
     if code != 0:
         fails.append(f"missing-asset: expected exit 0, got {code}\n{out}")
     warns = real_warnings(out)
-    docroot = [w for w in warns if "docroot asset(s) not served" in w]
-    if len(docroot) != 1:
-        fails.append(f"missing-asset: expected exactly one grouped docroot line, got "
-                     f"{len(docroot)} -- a per-URL line here fires on every page with a "
-                     f"logo:\n{warns}")
-    else:
-        for expected in ("/img/does-not-exist.png", "/assets/nope.svg"):
-            if expected not in docroot[0]:
-                fails.append(f"missing-asset: {expected} 404'd and its URL was not named -- a "
-                             f"blank box in the image with silence in the text:\n{docroot[0]}")
+    found = [w for w in warns if "page asset not found" in w]
+    for expected in ("/img/does-not-exist.png", "/assets/nope.svg"):
+        if not any(expected in w for w in found):
+            fails.append(f"missing-asset: {expected} 404'd and was not reported -- a blank box "
+                         f"in the image with silence in the text:\n{warns}")
+    if any("present-pixel.png" in w for w in warns):
+        fails.append(f"missing-asset: reported an asset the server actually served, so the rule "
+                     f"is firing on every asset rather than on missing ones:\n{warns}")
     if not any("ZK resource not served" in w and "/zkau/web/" in w for w in warns):
-        fails.append(f"missing-asset: the ~./ classpath miss lost its own line, so the one "
-                     f"cause that IS a defect is no longer separable:\n{warns}")
+        fails.append(f"missing-asset: the ~./ classpath miss lost its own wording, so the cause "
+                     f"whose remedy is a dependency is no longer separable:\n{warns}")
+    return fails
+
+
+def check_a23_an_unidentified_launcher_is_not_given_a_version():
+    """A23: the LAUNCHER: line names a version only when the digest proves it.
+
+    A jar's identity is its bytes. The launcher manifest carries no version and the cache
+    stores it under a plain name, so a jar whose digest is not the pinned one is a build this
+    script cannot name -- and it used to name it anyway, printing the requested version. A run
+    against a locally built 1.0.3 announced itself as `LAUNCHER: 1.0.2`.
+
+    That became load-bearing when WARNINGS started reading a missing docroot asset as a real
+    defect, which is only true from launcher 1.0.3 onwards. Someone judging those lines needs
+    to know what ran, and this line is where they look.
+
+    The test jar is the pinned one with a zip comment appended: different bytes, same entries,
+    still runnable. That keeps the check independent of any second jar happening to be on the
+    machine.
+    """
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        altered = Path(tmp) / "zk-preview-launcher.jar"
+        altered.write_bytes(Path(JAR).read_bytes())
+        with zipfile.ZipFile(altered, "a") as z:
+            z.comment = b"contract-test: same entries, different bytes"
+
+        code, out, _, blob = render(GOLDEN, jar=str(altered))
+        if code != 0:
+            fails.append(f"altered jar: expected exit 0 -- an unpinned jar must still render, "
+                         f"since building one locally is the point of the flag; got {code}\n{out}")
+        if blob is None:
+            fails.append("altered jar: no PNG, so the override stopped being usable")
+        launcher = value(out, "LAUNCHER") or ""
+        if LAUNCHER_VERSION in launcher:
+            fails.append(f"LAUNCHER: claims the pinned version {LAUNCHER_VERSION} for a jar whose "
+                         f"digest does not match it: {launcher!r}")
+        if "sha256:" not in launcher:
+            fails.append(f"LAUNCHER: does not say what it actually has -- the digest is the only "
+                         f"identity an unpinned jar has: {launcher!r}")
+        if PIN_NOISE not in out:
+            fails.append("the digest-mismatch WARNINGS entry disappeared; it is what explains "
+                         "the unidentified LAUNCHER: line")
+
+        # The control: the pinned jar itself must still be named, or the rule reports nothing.
+        code, out, _, _ = render(GOLDEN)
+        launcher = value(out, "LAUNCHER") or ""
+        if LAUNCHER_VERSION not in launcher:
+            fails.append(f"LAUNCHER: stopped naming the pinned build even when the digest "
+                         f"matches: {launcher!r}")
     return fails
 
 
@@ -842,6 +900,7 @@ CHECKS = [
     ("A20 --dump-dom       ", check_a20_dump_dom_writes_a_file_and_names_it),
     ("A21 broken icon      ", check_a21_a_broken_icon_is_measured_not_guessed),
     ("A22 missing asset    ", check_a22_a_missing_page_asset_is_reported),
+    ("A23 unpinned launcher ", check_a23_an_unidentified_launcher_is_not_given_a_version),
 ]
 
 # A12, the exit-code map, has no check of its own on purpose: 0, 1, 2, 3 and 4 are each already

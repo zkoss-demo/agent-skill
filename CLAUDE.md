@@ -31,6 +31,18 @@ gemini extension install .
 4. Update `marketplace.json` to include the new skill.
 5. Update `install-skill.sh` and `link-skill.sh` to support the new skill.
 
+## Versioning
+
+Two independent version lines. Do not sync one to the other.
+
+**A skill's version** lives in three places that must always match. Bumping a skill means editing all three:
+
+1. `skills/<skill>/SKILL.md` — `metadata.version`
+2. `marketplace.json` — that skill's `version` entry
+3. the skill's scripts — the `SKILL_VERSION` constant each one sends in its usage ping
+
+**The Gemini extension's version** is `gemini-extension.json` — the version of the packaged extension as a whole, not of any skill inside it. It moves on its own schedule and is deliberately *not* kept in step with a skill bump, so a mismatch there is not drift to fix.
+
 ## Skill Anatomy (SKILL.md)
 
 - **Frontmatter**: `name`, `description`, `context` (fork/inline)

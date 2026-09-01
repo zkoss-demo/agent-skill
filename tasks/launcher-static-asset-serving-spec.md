@@ -1,9 +1,11 @@
 # Requirements: serve static files from the webapp docroot
 
 **Target component:** `zk-preview-launcher` (the ZK preview render helper).
-**Status:** proposed, not implemented.
-**Written:** 2026-08-31. All measurements in this document were taken on that date against the
-published launcher 1.0.2 and are reproducible with the commands given inline.
+**Status:** implemented in launcher 1.0.3 and verified locally on 2026-09-01. §11 records what was
+measured. §7 carries one deliberate non-goal (symbolic links) that started life as a requirement.
+**Written:** 2026-08-31. The §3 "current behaviour" measurements were taken on that date against the
+published launcher **1.0.2**, and are what this document was written to change; the §11 measurements
+were taken against the **1.0.3** build. Both are reproducible with the commands given inline.
 
 This document is self-contained. Everything needed to reproduce the defect, judge the design and
 verify the fix is written out here; nothing is deferred to another document.
@@ -12,13 +14,14 @@ verify the fix is written out here; nothing is deferred to another document.
 
 ## 1. Summary
 
-The preview launcher is handed a webapp docroot and serves `.zul` pages out of it, but it serves
-**no other file from that directory** — not images, not stylesheets, not scripts. A page containing
-`<image src="/img/logo.png"/>` renders with an empty box even when `img/logo.png` exists at exactly
-that path inside the docroot the launcher was given.
+Up to and including launcher **1.0.2**, the preview launcher was handed a webapp docroot and served
+`.zul` pages out of it but **no other file from that directory** — not images, not stylesheets, not
+scripts. A page containing `<image src="/img/logo.png"/>` rendered with an empty box even when
+`img/logo.png` existed at exactly that path inside the docroot the launcher was given.
 
-The request is to add a static file handler for the docroot, confined to it, with the security
-properties spelled out in §6.
+The request was to add a static file handler for the docroot, confined to it, with the security
+properties spelled out in §6. **Launcher 1.0.3 implements it**; §11 records the verification, and
+§7 records the one requirement that was consciously dropped along the way.
 
 ## 2. What the launcher is, and how it is invoked
 
@@ -57,7 +60,10 @@ Reference build used for every measurement below:
 | ZK on the classpath | 10.3.0.1-Eval (zkmax, zkex, zkbind, zul, zk, zhtml, zuti, plus zkcharts 12.2.0.0-Eval) |
 | Docroot used | a Maven `src/main/webapp` directory |
 
-## 3. Current behaviour, measured
+## 3. The behaviour this document was written to change (launcher 1.0.2)
+
+Everything in this section describes **1.0.2**, the build in use when the document was written. It is
+kept as the before-picture and as the reproduction recipe. For what 1.0.3 does, see §11.
 
 Reproduce by starting the launcher on a fixed port against any webapp docroot:
 
@@ -115,15 +121,16 @@ Path traversal, measured against the current build with `curl --path-as-is`:
 | `/spec-probe/../../../../etc/passwd` | 404 |
 | `/%2e%2e/%2e%2e/etc/passwd` | 404 |
 
-These are all safe today only because nothing reads the filesystem for these paths. **Adding a
-static handler removes that accidental safety, which is why §6 is a requirement and not advice.**
+On 1.0.2 these were safe only because nothing read the filesystem for these paths at all. **A static
+handler ends that accidental safety, which is why §6 is a requirement and not advice** — and why the
+encoding cases were re-probed against 1.0.3 in §11 rather than assumed.
 
 ## 4. Why this matters
 
 The consuming tool renders a page to a PNG and asks an automated reviewer to compare that image
-against the design it was built from. Because no docroot asset is ever served, every image on every
-page is blank in that PNG. The reviewer therefore cannot use "an image did not draw" as a signal at
-all — a real broken path and a correct one look identical.
+against the design it was built from. On 1.0.2, because no docroot asset was ever served, every image
+on every page was blank in that PNG. The reviewer therefore could not use "an image did not draw" as
+a signal at all — a real broken path and a correct one looked identical.
 
 The tool's own guidance had to compensate with a blanket instruction to ignore missing assets. In a
 six-run evaluation of that guidance, that instruction was quoted to close a genuine, one-word markup
@@ -203,26 +210,24 @@ The launcher binds to a local port and serves whatever it is pointed at. Today i
 an arbitrary path, so traversal is impossible by construction; a static handler ends that, and these
 requirements replace it.
 
-**S1 — Confinement.** Canonicalise the resolved path (resolving `.`, `..` and symbolic links) and
-serve it only if the canonical path is inside the canonical docroot. Compare on path components, not
-on string prefixes — a docroot of `/home/u/app` must not admit `/home/u/app-secrets/x`.
+**S1 — Confinement of the requested path.** Normalise the resolved path (resolving `.` and `..`)
+and serve it only if the normalised path is inside the docroot. Compare on path components, not on
+string prefixes — a docroot of `/home/u/app` must not admit `/home/u/app-secrets/x`. Symbolic links
+are deliberately **not** resolved as part of this check; see §7.
 
 **S2 — Decode before validating.** Percent-decode the request path first, then validate, so
 `%2e%2e%2f` is rejected on the same code path as `../`. Reject over-long or malformed encodings
 rather than repairing them. Reject any path containing a NUL byte. On Windows, reject backslash as
 a separator rather than normalising it.
 
-**S3 — Symlinks may not escape.** A symlink inside the docroot pointing outside it is not served.
-This follows from S1 only if canonicalisation resolves links — verify it does.
-
-**S4 — `WEB-INF` and `META-INF` are never served.** A request whose resolved path has a
+**S3 — `WEB-INF` and `META-INF` are never served.** A request whose resolved path has a
 `WEB-INF` or `META-INF` component returns `404`, case-insensitively, at any depth. These directories
 hold `web.xml`, `zk.xml`, and in a built webapp the application's own classes and jars.
 
-**S5 — No dotfiles.** Any path component beginning with `.` returns `404`. This keeps `.git/`,
+**S4 — No dotfiles.** Any path component beginning with `.` returns `404`. This keeps `.git/`,
 `.env` and editor state out of reach.
 
-**S6 — Bind to loopback only.** Confirm the listening socket is bound to `127.0.0.1` and not to
+**S5 — Bind to loopback only.** Confirm the listening socket is bound to `127.0.0.1` and not to
 `0.0.0.0`. With static serving added, a wildcard bind would expose a developer's working tree to the
 local network. If the current bind is already loopback, this is a regression test, not a change.
 
@@ -237,12 +242,25 @@ local network. If the current bind is already loopback, this is a regression tes
   by the new static handler. Decide deliberately: either keep it `404`, or render it — but not
   "return the raw file".
 * Directory indexes, by R6.
+* **Symbolic links. Explicitly unsupported, and this is a decision rather than an oversight.**
+  A symlink inside the docroot is followed, so it serves its target even when the target is outside
+  the docroot. Measured on the 1.0.3 build: a link at `<docroot>/assets/passwd-link` pointing at
+  `/etc/passwd` returned `200` with the file's 9196 bytes, and a link at `<docroot>/etclink` pointing
+  at the `/etc` **directory** exposed the whole tree beneath it (`/etclink/passwd`, `/etclink/hosts`).
+  Accepted because the exposure requires someone to have placed an escaping link inside the
+  developer's own project directory, and because the listener is bound to loopback (S5), so nothing
+  off the machine can reach it. Implementers should know this is the known and intended boundary of
+  S1: do not add link resolution to "fix" a report of it without reopening this decision, and do not
+  quietly rely on the absence of links for any stronger claim.
 
 ## 8. Acceptance criteria
 
 Set up: a docroot containing `assets/logo.png` (a valid PNG), `assets/app.css`, `assets/app.js`,
-`page.zul`, `WEB-INF/web.xml`, `.hidden/secret.txt`, and a symlink `assets/escape` pointing at a
-file outside the docroot.
+`page.zul`, `WEB-INF/web.xml`, and `.hidden/secret.txt`.
+
+A16 is deliberately not an escape test — symbolic links are out of scope per §7 — but it is kept as
+a **characterisation** row so the accepted behaviour is asserted rather than assumed. Add a symlink
+`assets/escape` pointing at a file outside the docroot for it.
 
 | # | Request | Expected |
 |---|---|---|
@@ -261,7 +279,7 @@ file outside the docroot.
 | A13 | `GET /WEB-INF/web.xml` | `404` |
 | A14 | `GET /web-inf/web.xml` | `404` (case-insensitive) |
 | A15 | `GET /.hidden/secret.txt` | `404` |
-| A16 | `GET /assets/escape` (symlink out) | `404` |
+| A16 | `GET /assets/escape` (symlink out) | `200`, serving the target's bytes — **the accepted behaviour, not a defect**. Symlinks are out of scope (§7); this row exists so the boundary is asserted and a future change to it is a deliberate one |
 | A17 | `GET /zkau/web/zul/less/font/ZK85Icons.woff` | `200`, `font/woff`, 10648 bytes — unchanged |
 | A18 | listening socket | bound to `127.0.0.1`, not `0.0.0.0` |
 | A19 | a 50 MB asset | served correctly with no `OutOfMemoryError` under the default heap |
@@ -275,10 +293,57 @@ and `X-zk-preview-controller-failure` headers, the no-cache headers, `PREVIEW_PO
 the `--classpath` / `--webapp` / `--port` / `--isolation` / `--controller-timeout` argument surface,
 and the `/zkau/web/**` behaviour including MIME typing.
 
-## 10. Adjacent observation, not part of this request
+## 10. Adjacent observation — also fixed in 1.0.3
 
-`GET /nope.zul` for a `.zul` that does not exist returns **`200` with a zero-byte body**, rather than
-`404`. A caller cannot distinguish "page missing" from "page rendered to nothing", and a browser
-pointed at it sees a blank document with a success status. This is a separate defect in the page
-handler; it is recorded here because it was found during the same measurement, and it should be
-filed and fixed on its own rather than folded into this change.
+On 1.0.2, `GET /nope.zul` for a `.zul` that does not exist returned **`200` with a zero-byte body**
+rather than `404`, so a caller could not distinguish "page missing" from "page rendered to nothing".
+This document originally asked for it to be filed separately. It was fixed in the same 1.0.3 build
+and needs no further action; measured on 2026-09-01:
+
+```
+HTTP/1.1 404
+Content-type: text/plain;charset=UTF-8
+
+HTTP 404: no such page: /nope.zul
+docroot: /path/to/docroot
+```
+
+Naming the docroot in the body is a good call: "no such page" and "wrong docroot" are the two causes,
+and the response now separates them without a second request.
+
+## 11. Verification of the 1.0.3 build
+
+Run on 2026-09-01 against the **published** release asset,
+`https://github.com/zkoss/zkidea/releases/download/v1.0.3/zk-preview-launcher-1.0.3.jar`,
+487,521 bytes, SHA-256 `c4eb3096a59f0cbe59a71deb2ae8df86aeb82475939eaf7c1bee4e49488d2bee`,
+JDK Azul Zulu 24, stock ZK 10.2.1 on the classpath, using the §8 setup.
+
+The results were first obtained against a local pre-release build of the same version whose digest
+was `cdf469c9…`, and were then re-run in full against the published artifact rather than carried
+over. Same version string and same byte count, different digest — a rebuild — so the earlier run
+did not automatically speak for what users download.
+
+**A1–A15 and A17–A20 pass.** Highlights, with the numbers observed:
+
+| Criterion | Observed |
+|---|---|
+| A1 | `200`, `image/png`, 67 bytes, byte-identical to the file on disk (`cmp`) |
+| A2 / A3 | `text/css;charset=UTF-8` and `text/javascript;charset=UTF-8` |
+| A4 | `200`, 1431 bytes of rendered HTML, not the 200-byte source |
+| A8 | `405` with `Allow: GET, HEAD` |
+| A9 | both responses `no-store, no-cache, must-revalidate`; no `ETag`, no `Last-Modified`, never `304` |
+| A17 | `200`, `font/woff`, 10648 bytes — byte-for-byte the 1.0.2 figure |
+| A18 | bound to `127.0.0.1` |
+| A19 | 52,428,800 bytes served in 0.04 s, no `OutOfMemoryError`, server responsive afterwards |
+| A20 | a page with a 240x120 PNG screenshots with the image visible; the same page on 1.0.2 screenshots a broken-image placeholder |
+
+**A16 behaves as §7 now documents** — a symlink out of the docroot is followed and served.
+
+Beyond the A-list, S2's other encodings were probed and all are rejected:
+`/%2e%2e%2f%2e%2e%2fetc/passwd`, `/assets%2f..%2f..%2f..%2f..%2fetc%2fpasswd` and
+`/..%252f..%252fetc/passwd` return `404`; `/WEB-INF%2fweb.xml` and `/%57EB-INF/web.xml` return `404`,
+so neither slash-encoding nor case-encoding evades S3; and a backslash path returns **`400`**, which
+is the reject-rather-than-normalise behaviour S2 asks for.
+
+The consuming tool's own 29-check CLI contract suite passes end to end against 1.0.3 with no
+regression.

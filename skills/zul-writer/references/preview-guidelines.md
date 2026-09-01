@@ -54,7 +54,7 @@ after 7 days. Force a re-resolve with `--refresh`.
 ## How the render helper is resolved
 
 `zk-preview-launcher.jar` is looked up in this order, first hit wins, and the `LAUNCHER:` line in the
-output always names the winner (`1.0.2 (cache)`, `1.0.2 (env ZUL_WRITER_LAUNCHER_JAR)`, …):
+output always names the winner (`1.0.3 (cache)`, `1.0.3 (env ZUL_WRITER_LAUNCHER_JAR)`, …):
 
 | Order | Source | How |
 |---|---|---|
@@ -68,6 +68,13 @@ A missing file at 1 or 2 is a skip (the path is wrong; nothing silently falls ba
 the jar is used anyway — you named that file deliberately, and a jar you built yourself cannot match
 the pin. At 4 it is fatal: nobody chose those bytes, so the partial download is deleted and never
 executed.
+
+**A version on that line is a claim the digest backs.** A jar carries no version of its own — the
+manifest has none and the cache stores it under a plain name — so when the bytes are not the pinned
+ones the line reads `unidentified build sha256:<first 12 hex> (--launcher-jar)` instead of naming a
+release. Worth reading rather than skimming: what the `WARNINGS` asset lines mean depends on which
+launcher ran, since serving files from the docroot arrived in **1.0.3**. On an older jar a missing
+image is the server's limitation; from 1.0.3 it is a missing file.
 
 `--launcher-version <ver>` rolls forward or back without editing the script. A non-default version
 has no digest pinned in the script, so it is verified against the `.sha256` published beside the
@@ -91,13 +98,18 @@ requests the `.zul` *relative to it*. Rules, in order (the output's `DOCROOT:` l
 A fallback rule in the `DOCROOT:` line is itself a hint that the project layout wasn't recognised;
 `--webapp <dir>` overrides it.
 
-**Images and other static files are a different matter, and no docroot will fix them.** The render
-server serves `.zul` pages and ZK classpath resources only — measured, a `.png`, a `.css` and a
-`.js` sitting inside the correctly resolved docroot all return 404 — so a docroot-relative asset is
-blank in every preview whatever the `DOCROOT:` line says. `WARNINGS:` groups those URLs into one
-line that names the limitation, which is worth reading for a path you did not intend but is not
-evidence of a broken page. A `~./` miss is the opposite: it keeps its own line and does mean a jar
-is absent from the classpath.
+**It is also what to check when an image, stylesheet or script 404s.** The render server serves the
+docroot, so a missing asset means there is no file at that path *relative to the docroot the run
+actually used* — usually a wrong path, sometimes a docroot the layout rules guessed. Each one gets
+its own `WARNINGS` line naming the URL. A `~./` miss is a different cause with a different remedy:
+it means a jar is absent from the classpath, so it is a dependency question, not an edit.
+
+This changed with launcher **1.0.3**. Up to 1.0.2 the server served `.zul` pages and ZK classpath
+resources and nothing else — a `.png`, a `.css` and a `.js` sitting inside a correctly resolved
+docroot all returned 404 — so asset misses were reported as one grouped line telling the reader to
+discount them. On a run pinned to an older jar (`--launcher-jar`, or a stale cache) that is still the
+behaviour, and the per-URL lines would overstate the case; the digest-mismatch `WARNINGS` entry is
+what tells you a non-pinned jar is in play.
 
 The `.zul` **must** live inside the docroot. The render server rejects anything resolving outside it,
 so a `../` path cannot work — hence the `outside-docroot` skip below.
@@ -502,7 +514,7 @@ variant, e.g. `--zk-version 10.1.0-jakarta`). Add-ons are not available on this 
 | `ZUL_WRITER_CACHE_DIR` | Relocate the cache (default `~/.cache/zul-writer/`). |
 | `ZUL_WRITER_JAVA` | Pin the JVM used for rendering, without passing `--java` every time. |
 | `ZUL_WRITER_DEBUG=1` | Same as `--debug`, for when the invocation cannot be edited. |
-| `DO_NOT_TRACK=1` | Disable the anonymous usage ping, as with `validate-zul.py`. |
+| `DO_NOT_TRACK=1` | Disable the anonymous usage ping, as with `validate-zul.py`. Per-run, `--dev` does the same. |
 
 Useful flags: `--debug` (see above), `--width`/`--height` (default 1280x900), `--full-page` for the
 whole scrollable page, `--timeout` for slow pages, `--browser-channel chrome|msedge|chromium`,

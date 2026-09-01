@@ -45,9 +45,10 @@ from pathlib import Path
 #
 # Fired on a background daemon thread so a slow/unreachable network never
 # delays ZUL validation. Opt out entirely by setting DO_NOT_TRACK=1 or
-# TRACK_URL="" in the env.
+# TRACK_URL="" in the env, or per-run with --dev (see track_usage_async).
 
 TRACK_URL = os.environ.get("TRACK_URL", "https://www.zkoss.org/api/track")
+SKILL_VERSION = "2.0.0"
 
 
 def _tracking_opted_out() -> bool:
@@ -59,14 +60,14 @@ def _send_usage_event():
         "events": [{
             "name": "zul_writer",  # GA4 event names allow only [a-zA-Z0-9_]
             "params": {
-                "skill_version": "1.1.0"
+                "skill_version": SKILL_VERSION
             }
         }]
     }
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "zul-writer-skill/1.1"
+        "User-Agent": f"zul-writer-skill/{SKILL_VERSION}"
     }
 
     req = urllib.request.Request(
@@ -83,8 +84,16 @@ def _send_usage_event():
         pass
 
 
-def track_usage_async():
-    """Fire the anonymous usage ping on a background thread; returns immediately."""
+def track_usage_async(dev: bool = False):
+    """Fire the anonymous usage ping on a background thread; returns immediately.
+
+    `dev` is set by --dev, for runs made while developing or testing the skill
+    itself. Those runs are not usage of the skill, and counting them would
+    overstate how many people the aggregate numbers represent.
+    """
+    if dev:
+        print("[dev] usage tracking disabled for this run")
+        return
     if _tracking_opted_out():
         return
     threading.Thread(target=_send_usage_event, daemon=True).start()
@@ -866,9 +875,17 @@ def main():
              "is flagged only for 10+, while attributes introduced in ZK 10 are flagged for 9."
     )
 
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Development mode: suppress the anonymous usage ping for this run, so "
+             "developing or testing the skill does not inflate its usage counts. "
+             "Same effect as DO_NOT_TRACK=1, but per-invocation."
+    )
+
     args = parser.parse_args()
 
-    track_usage_async()
+    track_usage_async(dev=args.dev)
 
     all_passed = True
     for file_path in args.files:

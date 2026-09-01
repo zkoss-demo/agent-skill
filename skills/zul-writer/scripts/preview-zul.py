@@ -168,10 +168,10 @@ from pathlib import Path
 #
 # Fired on a background daemon thread so a slow/unreachable network never
 # delays rendering. Opt out entirely by setting DO_NOT_TRACK=1 or
-# TRACK_URL="" in the env.
+# TRACK_URL="" in the env, or per-run with --dev (see track_usage_async).
 
 TRACK_URL = os.environ.get("TRACK_URL", "https://www.zkoss.org/api/track")
-SKILL_VERSION = "1.1.0"
+SKILL_VERSION = "2.0.0"
 
 
 def _tracking_opted_out() -> bool:
@@ -207,8 +207,17 @@ def _send_usage_event():
         pass
 
 
-def track_usage_async():
-    """Fire the anonymous usage ping on a background thread; returns immediately."""
+def track_usage_async(dev: bool = False):
+    """Fire the anonymous usage ping on a background thread; returns immediately.
+
+    `dev` is set by --dev, for runs made while developing or testing the skill
+    itself. Those runs are not usage of the skill, and counting them would
+    overstate how many people the aggregate numbers represent. The notice goes
+    to stderr: stdout here is a parsed contract (PNG:/REPORT: lines).
+    """
+    if dev:
+        print("[dev] usage tracking disabled for this run", file=sys.stderr)
+        return
     if _tracking_opted_out():
         return
     threading.Thread(target=_send_usage_event, daemon=True).start()
@@ -227,8 +236,8 @@ def track_usage_async():
 # which can differ byte-for-byte while being functionally identical.
 #
 # To move to a new launcher release, edit these three constants together.
-LAUNCHER_VERSION = "1.0.2"
-LAUNCHER_SHA256 = "d451589f8d0e447599a96240fb17cef5b39e1575596bdc71a5bd9ad7b0d3fb7e"
+LAUNCHER_VERSION = "1.0.3"
+LAUNCHER_SHA256 = "c4eb3096a59f0cbe59a71deb2ae8df86aeb82475939eaf7c1bee4e49488d2bee"
 LAUNCHER_URL = (
     "https://github.com/zkoss/zkidea/releases/download/"
     f"v{LAUNCHER_VERSION}/zk-preview-launcher-{LAUNCHER_VERSION}.jar"
@@ -499,6 +508,21 @@ def _pointed_at_launcher(jar: Path, version, source, warnings) -> LauncherJar:
                 f"{jar} is not the pinned launcher {LAUNCHER_VERSION} build — expected "
                 f"SHA-256 {LAUNCHER_SHA256}, got {actual}. Used anyway, because it was "
                 f"named explicitly; a render difference may be the jar, not the .zul.")
+            # And do not go on to call it that version on the LAUNCHER: line. The digest is
+            # the only thing that identifies a launcher build -- the jar's manifest carries
+            # no version and the cache stores it under a plain name -- so bytes that are not
+            # the pinned ones are a build this script cannot name. It used to print the
+            # requested version regardless, which meant a run against a locally built 1.0.3
+            # announced itself as 1.0.2.
+            #
+            # Worth more than tidiness now: WARNINGS reads a missing docroot asset as a real
+            # defect, and that reading is only true from launcher 1.0.3 onwards. Anyone
+            # judging those lines has to know what actually ran, and this line is where they
+            # would look.
+            return LauncherJar(jar, f"unidentified build sha256:{actual[:12]}", source)
+    # A caller-supplied --launcher-version has nothing to check against, so it is reported as
+    # given. That is an assertion by the caller rather than a verified fact, and it is the one
+    # remaining way this line can name a version nobody proved.
     return LauncherJar(jar, version, source)
 
 
@@ -1383,6 +1407,7 @@ def _settle(page, warnings):
 LAYOUT_PRINT_CAP = 25       # spec P1-3: cap the printed list, never truncate silently
 LAYOUT_COLLECT_CAP = 200    # bounds the payload crossing the CDP boundary; `total` stays truthful
 CONSOLE_WARNING_CAP = 10    # spec P1-4: console findings are "deduped, capped at 10"
+ASSET_WARNING_CAP = 10      # one line per missing asset, then a truthful "and N more"
 # Deliberately no collect cap beside it. LAYOUT_COLLECT_CAP bounds one payload crossing the
 # CDP boundary in a single page.evaluate; console messages arrive one at a time and are
 # snipped to one line on arrival, so the dedupe alone bounds memory and the "and N more"
@@ -2107,29 +2132,32 @@ def capture(url, out_path: Path, args, warnings, controllers, layout, probes, do
                     probes.append(found)
                     debug("probe", f"{selector}: {found.get('error') or found['total']}")
 
-            # Two causes that need two different things done about them, so they get two
-            # shapes. A /zkau/web/ 404 is diagnostic: the classpath is missing the jar that
-            # would have defined the resource, and that is a defect in the run. Everything
-            # else is the harness: measured on a fixture whose png, css and js all sit inside
-            # the resolved DOCROOT and are all 404, the preview's PreviewHttpServer serves
-            # .zul pages and /zkau/web/ classpath resources and nothing else, even though it
-            # is handed the docroot. So a docroot-relative asset is blank here by construction
-            # and reporting each one as a defect would put false findings on every page that
-            # has a logo. One grouped line instead: it stays honest about the cause while
-            # still naming the URLs, which is what catches a path the author typo'd.
+            # Two causes, two remedies, so two shapes. A /zkau/web/ miss is a classpath
+            # problem: the jar that would have defined the resource is absent, and the answer
+            # is a dependency, not an edit. A docroot miss is a real missing file.
+            #
+            # Launcher 1.0.3 is what makes the second sentence true. Before it, the render
+            # server served .zul pages and /zkau/web/ resources and nothing else -- a png, a
+            # css and a js sitting inside the correctly resolved docroot all returned 404 --
+            # so every docroot asset was blank by construction and these had to be grouped
+            # into one line that told the reader to discount them. They are now genuine
+            # findings, reported one per URL because each one names a different file to go
+            # and look at. Keep this paired with the pinned LAUNCHER_VERSION: on an older
+            # jar passed through --launcher-jar these lines would overstate the case, which
+            # is what the digest-mismatch warning above exists to flag.
             zk_misses = [u for u in dict.fromkeys(missing) if "/zkau/web/" in u]
             page_misses = [u for u in dict.fromkeys(missing) if "/zkau/web/" not in u]
             for url_404 in zk_misses:
                 warnings.append(f"ZK resource not served: {url_404} — an add-on jar may be "
                                 "missing from the classpath, so the image may be misleading")
-            if page_misses:
-                shown = ", ".join(page_misses[:5])
-                more = f" (and {len(page_misses) - 5} more)" if len(page_misses) > 5 else ""
-                warnings.append(
-                    f"{len(page_misses)} docroot asset(s) not served: {shown}{more} — the "
-                    "preview server serves .zul pages and ZK classpath resources only, so "
-                    "these are blank in the image no matter what a real server would do. "
-                    "Worth reading for a path you did not intend; not evidence of a page bug")
+            for url_404 in page_misses[:ASSET_WARNING_CAP]:
+                warnings.append(f"page asset not found: {url_404} — the docroot has no file at "
+                                "that path, so it is blank in the image. Check the path first, "
+                                "then the DOCROOT: line, since a guessed docroot makes a correct "
+                                "path look wrong")
+            if len(page_misses) > ASSET_WARNING_CAP:
+                warnings.append(f"…and {len(page_misses) - ASSET_WARNING_CAP} more missing page "
+                                "assets not listed")
 
             # P1-4 feeds the EXISTING WARNINGS block: the block order is a contract, so no
             # new block and no new exit code. Ungated on `details`, because on the launcher's
@@ -2442,6 +2470,10 @@ def parse_args(argv):
     parser.add_argument("--debug", action="store_true",
                         help="print diagnostics to stderr: the resolved classpath, every helper "
                              "command line, and the renderer's own output. stdout is unchanged.")
+    parser.add_argument("--dev", action="store_true",
+                        help="development mode: suppress the anonymous usage ping for this run, "
+                             "so developing or testing the skill does not inflate its usage "
+                             "counts. Same effect as DO_NOT_TRACK=1, but per-invocation.")
     return parser.parse_args(argv)
 
 
@@ -2600,7 +2632,7 @@ def main(argv=None):
     # runs is what the report is for. resolve() is happy with a path that does not exist.
     REPORT_ZUL = Path(args.zul).expanduser().resolve()
     REPORT_TARGET = report_target(args, REPORT_ZUL)
-    track_usage_async()
+    track_usage_async(dev=args.dev)
     warnings = []
     controllers = {}
     # Not `layout`: Target.layout is the docroot RULE STRING printed on the DOCROOT:

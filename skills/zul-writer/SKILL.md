@@ -11,7 +11,7 @@ compatibility: >
   Requires access to local skills/zul-writer/assets/ and skills/zul-writer/references/ directories.
 metadata:
   author: hawk
-  version: "1.1.0"
+  version: "2.0.0"
 ---
 # ZUL Writer
 
@@ -257,7 +257,7 @@ python3 <skill-base-dir>/scripts/validate-zul.py --zk-version <detected-version>
 (On Windows, use `python` instead of `python3`.)
 
 ### Usage Tracking
-Running this script also fires an anonymous, aggregate usage ping (skill name + version only, no identifier) on a background thread — it never delays or blocks validation. Opt out with `DO_NOT_TRACK=1` or `TRACK_URL=""`.
+Running this script also fires an anonymous, aggregate usage ping (skill name + version only, no identifier) on a background thread — it never delays or blocks validation. Opt out with `DO_NOT_TRACK=1` or `TRACK_URL=""`, or per-run with `--dev` — which is what runs made while developing or testing the skill itself should pass, so they are not counted as usage.
 
 ### Asked only to validate
 
@@ -466,8 +466,10 @@ Three limits worth knowing:
   yours to fix. Its own `N` counts every raised message, while the `WARNINGS` entries are deduped,
   so the two numbers legitimately differ when one complaint repeats.
 - **Browser `Failed to load resource:` lines are deliberately not reported here.** Every page emits
-  one for its missing favicon. A ZK asset that really failed gets its own `WARNINGS` entry, naming
-  the URL.
+  one for its missing favicon, and that line carries no URL, so keeping them would put a finding on
+  every clean page. Anything that really failed gets its own `WARNINGS` entry naming the URL —
+  `ZK resource not served` for a `~./` classpath miss, `page asset not found` for a file the docroot
+  does not have.
 
 `--debug` prints every console level to stderr, including the levels this block filters out — reach
 for it when a page misbehaves and the block is empty.
@@ -493,6 +495,18 @@ Judge **structure**, not pixels and not data. Fix only these:
 - **Wrong component choice** — a data table rendered as a plain stack of labels, a form field that isn't the input type requested.
 - **Broken layout** — content clipped or overflowing, a horizontal scrollbar on a page meant to fit, a region collapsed to zero height, widgets overlapping, an `hflex`/`vflex` that visibly did not take. The `LAYOUT:` block names all of these precisely, with the component and the measurement — fix those first, before anything you are judging by eye.
 - **Raw unstyled HTML** where a ZK component was intended.
+- **An asset the page asked for and did not get.** The preview server serves the docroot, so a
+  `WARNINGS` line naming a missing image, stylesheet or script means the file is not there at that
+  path — a real miss, worth fixing, not a preview limitation. Check the path first and the
+  `DOCROOT:` line second, since a guessed docroot makes correct paths look wrong. A `~./` URL is the
+  other shape: that one means a jar is missing from the classpath, so ask the user about the
+  dependency rather than editing the markup.
+- **A font icon rendered as an empty box** — reported as `icon-not-rendered` in `LAYOUT:`, naming the
+  glyph and the font stack that could not supply it. The class is on a carrier that overrides the
+  icon font; *Icons* in [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md)
+  says which carrier to move it to. This is a one-word markup fix, and it was misdiagnosed three
+  separate ways in an evaluation before it was measured — trust the finding over a theory about
+  webfonts.
 - **A `ZK client error:` entry naming an unknown widget or a failed mount** — the add-on jar's
   CLIENT-side JS package is absent even though the server-side class resolved, which is why the page
   parsed and then came up wrong. Check the `WARNINGS` 404 entries and the classpath, and ask the user
@@ -538,22 +552,6 @@ drive a re-render:
 - **A whole section missing where an `<include>` has a bound `src`** — this one is *not* placeholdered. A constant literal (`src="@load('~./page.zul')"`) is included for real; anything the ViewModel supplies (`src="@load(vm.page)"`) leaves `src` unset, so the include contributes **nothing** and you see a silent gap, not dimmed text. Adding a hard-coded `src` to "fix" the gap breaks the real page.
 - **Anything a Composer or ViewModel would populate** — default values, initial selections, computed labels, i18n text. `apply="..."` composers are no-ops here.
 - **Anything requiring a server round-trip** — button clicks, paging, sorting, tree expansion, selection highlighting, a `<window>` or popup opened by an event. Only the first-paint state exists. Client-side `w:` handlers *do* run, and so does `<zscript>`.
-- **Images and other files a real server would hand out from the docroot** — measured, the preview
-  server serves `.zul` pages and ZK classpath resources and nothing else, so `<image
-  src="/img/logo.png"/>` is blank here regardless of what a real server would do. The `WARNINGS:`
-  block groups those URLs into one line that says so; read them for a path you did not intend, not
-  as a defect in the page.
-  **Two things that look like this and are not, because both are now measured.** A `~./` resource
-  that 404s gets its own `WARNINGS` line and means a jar is missing from the classpath. A font icon
-  that will not draw is reported as `icon-not-rendered` in `LAYOUT:`, naming the glyph and the font
-  stack that failed to supply it; `--probe` on the element shows the same thing element by element
-  if you want to see it, and *Icons* in
-  [references/ui-to-component-mapping.md](references/ui-to-component-mapping.md) says which carrier
-  to move it to. Neither is a preview artifact, and the older wording here — which swept "missing
-  images, fonts or `~./` resources" into one unfixable category — is exactly how an evaluation run
-  came to close a one-word markup bug as impossible and ship a page whose every icon was an empty
-  box. **If the block is silent and something is still missing from the image, that is a defect,
-  not an exemption.**
 - **Theme-dependent colours and spacing** when the theme jar isn't a project dependency.
 - **Exact spacing, font rendering, sub-pixel alignment, or a colour that is merely close** to the mockup.
 - **Data content from the mockup** — sample data will differ. Compare the *shape* of the UI, not the values in it.
