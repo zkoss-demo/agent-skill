@@ -229,6 +229,21 @@ next candidates: **event attributes** declared on only some of the components th
 (`tree onAfterRender`, `tab onSelect`, `group onOpen`, `div onUpload`), and **the `class` alias for
 `sclass`**.
 
+**Two more instances of the model-driven class, measured 2026-09-01** while building seven showcase
+pages. Both are legal ZK that renders correctly, and both are covered by option 2 below — they are
+evidence for it, not new problems:
+
+| Written | Layer 2 says | Renders? | Workaround today |
+|---|---|---|---|
+| `<tree model=…>` whose only child is `<template name="model">` | `treeType`: missing `treecols` or `treechildren` | yes | add an empty `<treechildren/>` |
+| `<listbox>` with literal `<listitem>`s and no `<listhead>` | `listboxType`: missing child element(s) | yes | add a `<listhead>` |
+
+Neither is quarantined, because both have a one-element workaround that costs nothing and the
+showcase pages use it; the workarounds are written into `SKILL.md` Step 2 so an author is not left
+guessing. That is the cheap half of the fix. The expensive half — not needing the workaround — is
+still option 2. Note the second row is **not** model-driven at all, which widens the class: the
+trailing "required children" choices are over-strict even for plainly static markup.
+
 **Why this is worse than ordinary technical debt:** when the skill validates its own examples as broken,
 the agent either wastes turns "fixing" correct code or learns to ignore validation failures. Both are
 bad, and the second destroys the value of every rule in Tier 1.

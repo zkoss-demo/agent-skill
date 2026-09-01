@@ -27,6 +27,13 @@ test/valid/zk-5721.zul
 test/valid/zk-5751.zul
 skills/zul-writer/assets/example-data-management-mvvm.zul
 
+# Two more instances of that same class, measured 2026-09-01, NOT quarantined because each
+# has a one-element workaround that the showcase pages use and SKILL.md Step 2 documents:
+#   * <tree model=...> whose only child is <template name="model">  -> add empty <treechildren/>
+#   * <listbox> with literal <listitem>s and no <listhead>          -> add a <listhead>
+# The second one is not model-driven at all, so the over-strict "required children" choices
+# bite plainly static markup too. See doc/knowledge-roadmap.md §7.
+
 # Left this list on 2026-09-01: test/valid/zk-5793.zul, which was quarantined for
 # "Layer 3 attribute-placement false-positives". The cause was build_attribute_map
 # never traversing xs:simpleContent, so <attribute name="onUpload"> resolved

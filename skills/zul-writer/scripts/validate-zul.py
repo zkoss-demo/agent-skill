@@ -737,18 +737,45 @@ def validate_version_compatibility(file_path: Path, major: int) -> tuple[bool, l
 # --- Layer 6: runtime semantics -------------------------------------------
 # Markup that is legal by every static measure and still dies when the page is built.
 
-# The six components that accept selectedIndex, and the literal child that the index
-# counts. `selectedIndex` is applied while the component tree is built, which is BEFORE
-# any Composer's doAfterCompose and before the MVVM binder loads a model -- so a
-# controller that fills the component later cannot rescue it. That timing is what makes
-# this checkable from the markup alone.
+# `selectedIndex` is applied while the component tree is built, which is BEFORE the
+# component's own literal children are attached, BEFORE any Composer's doAfterCompose and
+# BEFORE the MVVM binder loads a model. That timing is what makes this checkable from the
+# markup alone -- and it is stronger than it looks.
+#
+# Measured by rendering each component with its literal items present (ZK 10.3.0.1):
+#
+#   component    literal items in markup   bound model      outcome
+#   combobox     2 <comboitem>             @load(list)      throws BOTH ways
+#   listbox      2 <listitem>              @load(list)      throws BOTH ways
+#   radiogroup   2 <radio>                 (no model form)  throws
+#   tabbox       2 <tab>                   (no model form)  throws
+#   selectbox    (no literal form)         @load(list)      RENDERS
+#   cardlayout   2 child <div>             (no model form)  RENDERS
+#
+# Exceptions raised: `Out of bound: 0 while size=0` (combobox, listbox),
+# `0 out of 0..-1` (radiogroup), `No tab at all` (tabbox).
+#
+# So for the first four, NEITHER literal items NOR a model rescues the index: counting the
+# children is the wrong model of the timing, and an earlier version of this layer stayed
+# silent on `<combobox selectedIndex="0">` with three comboitems right there in the markup
+# because it counted them. Those four are flagged unconditionally.
+#
+# For selectbox and cardlayout the setter tolerates an index, so they keep the counting
+# rule: flag only when there is nothing at all for the index to point at.
+ALWAYS_THROWS_ON_LITERAL_INDEX = {
+    # component -> how to express the intended selection instead
+    "combobox": 'set value="..." on a readonly combobox, or select from the controller '
+                'once the model is in place',
+    "listbox": 'mark the item with <listitem selected="true">, or select through the '
+               'model (model.addToSelection(...)) after setModel',
+    "radiogroup": 'mark the option with <radio selected="true">',
+    "tabbox": 'mark the tab with <tab selected="true">',
+}
+
+# Components whose setter tolerates the index.
 #   None  -> the index counts arbitrary child components (cardlayout's cards)
 #   set() -> the component has no literal item form at all; it requires a model
-SELECTABLE_ITEM_TAGS = {
-    "combobox": {"comboitem"},
-    "listbox": {"listitem", "listgroup"},
-    "radiogroup": {"radio"},
-    "tabbox": {"tab"},
+TOLERANT_ITEM_TAGS = {
     "selectbox": set(),
     "cardlayout": None,
 }
@@ -758,13 +785,19 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
     """
     Layer 6: legal markup that throws while the page is being built.
 
-    Currently one rule: a literal selectedIndex pointing past the items that exist.
-    An evaluation run shipped `<combobox selectedIndex="0">` with no items; it passed
-    all five layers and the render died with `Out of bound: 0 while size=0`.
+    Currently one rule: a literal selectedIndex on a component that cannot take one yet.
+    An evaluation run shipped `<combobox selectedIndex="0">` with no items; it passed all
+    five layers and the render died with `Out of bound: 0 while size=0`.
 
-    Deliberately silent when a `model` attribute is present. The model's size is not
-    knowable from the markup, and under-reporting is the safe direction for a list the
-    agent is told to trust.
+    For combobox, listbox, radiogroup and tabbox this fires unconditionally, because the
+    index is applied before the children are attached and before any model is set -- see
+    the measured table above. A `model` attribute is NOT an exemption for those four; a
+    model-driven `<listbox model="@load(vm.items)" selectedIndex="0">` throws exactly the
+    same way.
+
+    Selectbox and cardlayout tolerate an index, so for those two the rule stays silent
+    whenever a model is present or enough children exist: under-reporting is the safe
+    direction for a list the agent is told to trust.
     """
     errors = []
     try:
@@ -781,7 +814,8 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
             if not isinstance(elem.tag, str):
                 continue
             tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
-            if tag.lower() not in SELECTABLE_ITEM_TAGS:
+            tag_l = tag.lower()
+            if tag_l not in ALWAYS_THROWS_ON_LITERAL_INDEX and tag_l not in TOLERANT_ITEM_TAGS:
                 continue
 
             raw = None
@@ -800,10 +834,23 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
             if index < 0:
                 continue
 
+            line_str = f"Line {elem.sourceline}: " if use_lxml and hasattr(elem, 'sourceline') else ""
+
+            # These four throw whatever the markup says: neither the literal items nor a
+            # bound model exists yet when the index is applied.
+            if tag_l in ALWAYS_THROWS_ON_LITERAL_INDEX:
+                errors.append(
+                    f"{line_str}selectedIndex=\"{index}\" will throw at render time. "
+                    f"<{tag}> applies the index before its items are attached and before any "
+                    f"model is set, so neither literal items nor model=\"...\" makes it safe -- "
+                    f"{ALWAYS_THROWS_ON_LITERAL_INDEX[tag_l]}."
+                )
+                continue
+
             if any((n.split('}')[-1] if '}' in n else n) == 'model' for n in elem.attrib):
                 continue
 
-            item_tags = SELECTABLE_ITEM_TAGS[tag.lower()]
+            item_tags = TOLERANT_ITEM_TAGS[tag_l]
             if item_tags is None:
                 available = sum(1 for c in elem if isinstance(c.tag, str))
                 what = "child components"
@@ -818,7 +865,6 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
             if available > index:
                 continue
 
-            line_str = f"Line {elem.sourceline}: " if use_lxml and hasattr(elem, 'sourceline') else ""
             if item_tags == set():
                 detail = (f"<{tag}> has no literal item form, so it needs a model. "
                           f"Set the model before selecting, or drop selectedIndex.")

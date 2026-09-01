@@ -335,10 +335,48 @@ is a "does the name exist" question, which is the only kind where reading the ja
 ### 21. Passing validation does not mean the page renders
 
 - `<combobox selectedIndex="0">` passes all five validator layers and dies at render with
-  `Out of bound: 0 while size=0`. Mechanically detectable in source: a selection index on a component
-  with no model.
+  `Out of bound: 0 while size=0`. Mechanically detectable in source — but **not** as "a selection
+  index on a component with no model", which is how this entry first recorded it and how Layer 6
+  was first built. See §21b: the model is irrelevant, and so are the items.
 - `@Wire` with a mismatched field type (an `<a>` wired to a `Label` field) compiles, passes validation,
   renders fine, and throws `ClassCastException` at runtime only when the field is used.
+
+### 21b. A literal `selectedIndex` is applied before the children *and* before the model
+
+Rendered one page per component, each with its literal items present (ZK 10.3.0.1):
+
+| Component | literal items in markup | bound model | outcome |
+|---|---|---|---|
+| `combobox` | 2 `<comboitem>` | `@load(list)` | **throws both ways** |
+| `listbox` | 2 `<listitem>` | `@load(list)` | **throws both ways** |
+| `radiogroup` | 2 `<radio>` | (no model form) | **throws** |
+| `tabbox` | 2 `<tab>` | (no model form) | **throws** |
+| `selectbox` | (no literal form) | `@load(list)` | renders |
+| `cardlayout` | 2 child `<div>` | (no model form) | renders |
+| any of them | — | — | `selectedIndex="-1"` renders |
+
+Exceptions raised: `Out of bound: 0 while size=0` (combobox, listbox), `0 out of 0..-1`
+(radiogroup), `No tab at all` (tabbox).
+
+So for the first four, **neither the literal items nor a model rescues the index** — it is applied
+while the element itself is being built, before its children are attached and long before a binder
+sets a model. Counting the literal items was the wrong model of the timing, and it was the wrong
+model *in the direction that hides the defect*: Layer 6 reported
+`<combobox selectedIndex="0">` with three comboitems right there in the markup as clean, and the
+render died. The same page also showed the second half: `<listbox model="@load(vm.items)"
+selectedIndex="0">` throws identically, so the "a model silences it" exemption was a false
+negative rather than the deliberate under-report it was documented as.
+
+Found by writing exactly that combobox into a showcase page, so it is the shape an author reaches
+for naturally — a sort dropdown that should open on its first option.
+
+Rule: Layer 6 now flags a literal non-negative `selectedIndex` on `combobox`, `listbox`,
+`radiogroup` and `tabbox` unconditionally, names the per-component remedy
+(`value="..."` / `selected="true"` / select after `setModel`), and keeps the counting rule only for
+the two components measured to tolerate an index. Pinned by
+`test/wrong/selectedindex-with-literal-items.zul` (must fail on Layer 6 alone),
+`test/valid/selectedindex-tolerated.zul` (must pass), and six `L6:` checks in
+`test/run-schema-query-tests.py` — two of which previously asserted the refuted behaviour.
 
 ### 22. XML forbids `--` inside a comment, and it bites anyone documenting a `--flag`
 
@@ -357,3 +395,55 @@ Reports "Nothing to compile". `touch` does not help; only deleting the `.class` 
 sits directly inside the skill's edit → compile → `--run-controllers` loop, and matters most for
 `<charts>`, where **a stale `.class` and "the chart never drew at all" look identical** — read the
 `CONTROLLERS:` line first.
+
+---
+
+## Model, template and controller behaviour
+
+### 24. `setModel()` copies the model's own `multiple` flag onto the component
+
+`ListModelList` defaults to single selection, and `Listbox.setModel()` applies the model's flag to
+the listbox — so `setModel(new ListModelList<>(rows))` **silently overrules `multiple="true"` in the
+ZUL**. On a `<listbox checkmark="true">` the visible symptom is that the checkbox column comes back
+as **radio buttons**, which is the only reason it gets noticed at all.
+
+Nothing static sees it: the ZUL is correct, the Java compiles, all seven validator layers pass, and
+the page renders. It surfaced on the extraction pass of a page whose Pass-1 render had square
+checkboxes and whose Pass-2 render had round ones — i.e. only because the same page was rendered
+before and after the data moved, which is the argument for that second render existing.
+
+Fix is on the model, not the component:
+
+```java
+ListModelList<Transaction> model = new ListModelList<>(TRANSACTIONS);
+model.setMultiple(true);
+txList.setModel(model);
+```
+
+Recorded in `references/controller-guidelines.md` §3.
+
+### 25. A template's variable differs between the binder and plain EL, and fails silently
+
+Inside `<template name="model">`:
+
+| Page | Expression that works | The variable |
+|---|---|---|
+| MVVM (binder) | `@load(node.data.name)` | `var="node"` **is** honoured |
+| MVC (plain EL) | `${each.data.name}` | always `each`; a custom `var` is **ignored** |
+
+And what the variable holds depends on the component: for a **grid or listbox** template `each` is
+the item (`${each.action}`); for a **tree** it is the `TreeNode`, so the data is one hop further in
+(`${each.data.action}`).
+
+**The failure mode is the expensive part.** An unresolvable variable renders as empty text, not as
+an error. An MVC tree written `${node.data.name}` produced a tree with correct structure,
+indentation, open/closed state and selection — and every label blank, every `sclass` unset, so the
+node divs measured `0x0` and the only clue was that the `LAYOUT` locator said `div.z-div` where it
+had said `div.tc-node` before extraction. Two edits were spent on it before it was probed.
+
+The probe that settled it is worth copying: put all four candidate expressions in one cell and
+render once. `${each.name}` throws `Property 'name' not found on type org.zkoss.zul.DefaultTreeNode`
+— which names the variable's real type *and* the missing hop in a single message, while the three
+silent forms prove themselves wrong by rendering nothing.
+
+Recorded in `SKILL.md` Step 2 (extraction, action 2) and `references/controller-guidelines.md` §5.

@@ -193,10 +193,21 @@ COMBOBOX_WITH_ITEM = ('<zk>\n  <combobox selectedIndex="0">\n'
 COMBOBOX_WITH_MODEL = '<zk>\n  <combobox selectedIndex="0" model="@load(vm.items)"/>\n</zk>\n'
 COMBOBOX_BOUND_INDEX = '<zk>\n  <combobox selectedIndex="@load(vm.idx)"/>\n</zk>\n'
 COMBOBOX_NO_SELECTION = '<zk>\n  <combobox selectedIndex="-1"/>\n</zk>\n'
+# The listhead is only here to keep Layer 2 quiet: the bundled XSD requires one on a
+# listbox that has literal listitems (a B1-class schema false positive). Without it this
+# fixture would fail two layers and stop isolating Layer 6.
 LISTBOX_INDEX_PAST_END = ('<zk>\n  <listbox selectedIndex="3">\n'
+                          '    <listhead><listheader label="A"/></listhead>\n'
                           '    <listitem label="a"/>\n    <listitem label="b"/>\n'
                           '  </listbox>\n</zk>\n')
 SELECTBOX_NO_MODEL = '<zk>\n  <selectbox selectedIndex="0"/>\n</zk>\n'
+SELECTBOX_WITH_MODEL = '<zk>\n  <selectbox selectedIndex="0" model="@load(vm.items)"/>\n</zk>\n'
+CARDLAYOUT_WITH_CARDS = ('<zk>\n  <cardlayout selectedIndex="0" height="120px">\n'
+                         '    <div>one</div>\n    <div>two</div>\n'
+                         '  </cardlayout>\n</zk>\n')
+CARDLAYOUT_PAST_END = ('<zk>\n  <cardlayout selectedIndex="4" height="120px">\n'
+                       '    <div>one</div>\n    <div>two</div>\n'
+                       '  </cardlayout>\n</zk>\n')
 
 
 def check_the_out_of_bound_case_fires():
@@ -206,17 +217,25 @@ def check_the_out_of_bound_case_fires():
     assert code == 1, code
 
 
-def check_one_literal_item_makes_index_zero_legal():
+def check_literal_items_do_not_make_the_index_legal():
+    """Measured: <combobox selectedIndex="0"> with its comboitems right there in the
+    markup still dies with `Out of bound: 0 while size=0`, because the index is applied
+    before the children are attached. Counting the items was the wrong model of the
+    timing, and it is what made this exact page pass every layer once."""
     out, code = validate(COMBOBOX_WITH_ITEM)
-    assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
-    assert code == 0, code
+    assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
+    assert "before its items are attached" in out, out
+    assert code == 1, code
 
 
-def check_a_model_silences_the_rule():
-    """The model's size is not knowable from markup. Under-reporting is the safe
-    direction for a list the agent is told to trust."""
+def check_a_model_does_not_silence_the_rule():
+    """Measured: <listbox model="@load(vm.items)" selectedIndex="0"> throws the same way.
+    The model is set after construction, so at the moment the index is applied the size is
+    0 whether a model is coming or not. This assertion is the inverse of the one it
+    replaced."""
     out, code = validate(COMBOBOX_WITH_MODEL)
-    assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
+    assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
+    assert code == 1, code
 
 
 def check_a_bound_index_is_not_judged():
@@ -230,7 +249,30 @@ def check_minus_one_is_always_legal():
 
 
 def check_an_index_past_the_last_item_fires():
+    """A listbox fires whatever the index is; the item count no longer changes the
+    verdict, only the wording."""
     out, code = validate(LISTBOX_INDEX_PAST_END)
+    assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
+    assert "before its items are attached" in out, out
+    assert code == 1, code
+
+
+def check_selectbox_with_a_model_is_left_alone():
+    """Measured: selectbox tolerates the index -- <selectbox model="..." selectedIndex="0">
+    renders. So the model exemption survives for the two tolerant components."""
+    out, code = validate(SELECTBOX_WITH_MODEL)
+    assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
+    assert code == 0, code
+
+
+def check_cardlayout_counts_its_cards():
+    """Measured: cardlayout tolerates the index too, so it keeps the counting rule --
+    silent while a card exists at that position, and the range wording when one does not."""
+    out, code = validate(CARDLAYOUT_WITH_CARDS)
+    assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
+    assert code == 0, code
+
+    out, code = validate(CARDLAYOUT_PAST_END)
     assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
     assert "valid: 0-1" in out, out
     assert code == 1, code
@@ -415,12 +457,14 @@ CHECKS = [
     ("L3: pass-through accepted  ", check_layer_3_accepts_documented_pass_through_markup),
     ("describe: no args = usage  ", check_no_arguments_is_still_a_usage_error),
     ("L6: out-of-bound fires     ", check_the_out_of_bound_case_fires),
-    ("L6: one item is legal      ", check_one_literal_item_makes_index_zero_legal),
-    ("L6: a model silences it    ", check_a_model_silences_the_rule),
+    ("L6: literal items no help  ", check_literal_items_do_not_make_the_index_legal),
+    ("L6: a model is no help     ", check_a_model_does_not_silence_the_rule),
     ("L6: bound index skipped    ", check_a_bound_index_is_not_judged),
     ("L6: -1 always legal        ", check_minus_one_is_always_legal),
     ("L6: past the last item     ", check_an_index_past_the_last_item_fires),
     ("L6: model-only component   ", check_a_model_only_component_says_so),
+    ("L6: selectbox tolerates it ", check_selectbox_with_a_model_is_left_alone),
+    ("L6: cardlayout counts cards", check_cardlayout_counts_its_cards),
     ("L7: absent without flag    ", check_layer_7_is_absent_without_the_flag),
     ("L7: wrong type flagged     ", check_a_wrong_field_type_is_flagged),
     ("L7: right type passes      ", check_the_right_field_type_passes),

@@ -8,7 +8,7 @@ cannot reconstruct — **motivation, decisions, and facts that cost a measuremen
 |---|---|
 | [product-rationale.md](product-rationale.md) | Why the preview exists at all (the agent-eyes axis), the governing "facts from scripts, judgement to the AI" principle, the origin of the static-vs-model-driven policy, design reasons behind the preview pipeline, and deferred product/content ideas |
 | [decisions.md](decisions.md) | Settled decisions and deliberate non-goals, each with the rejected alternative and its cost. Includes the preview-pipeline defect triage and the launcher static-asset decisions |
-| [zk-measured-behaviour.md](zk-measured-behaviour.md) | 18 ZK / browser / launcher behaviours established by running something. The most expensive content here to re-obtain |
+| [zk-measured-behaviour.md](zk-measured-behaviour.md) | 27 ZK / browser / launcher / model behaviours established by running something. The most expensive content here to re-obtain |
 | [evaluation.md](evaluation.md) | The six-run end-to-end evaluation: reusable methodology, the nine repeated findings and their status, the method's own blind spots, and why it could not converge |
 | [knowledge-roadmap.md](knowledge-roadmap.md) | Where ZK knowledge should live (check / pre-write lookup / example / prose), the retrieval-precision bug, the corpus version trap, and the unresolved XSD maintenance problem |
 | [effectiveness-measurement.md](effectiveness-measurement.md) | Whether the pre-write lookup and Layers 6/7 give right answers — recall against the recorded failures, precision against 558 external ZUL files, and the two defects that sweep found |

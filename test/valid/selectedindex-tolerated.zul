@@ -1,0 +1,23 @@
+<?page title="Layer 6: the indexes that really do render"?>
+<!--
+  The other half of the Layer 6 rule, so the check cannot be tightened into a blanket ban.
+  Every case here was rendered and came back STATUS: ok.
+
+    selectedIndex="-1"                  the documented "nothing selected" value
+    <selectbox model="..." index>        selectbox's setter tolerates an index
+    <cardlayout index> with cards        counts ordinary child components, which do exist
+
+  MUST PASS validation.
+-->
+<zk>
+    <combobox selectedIndex="-1">
+        <comboitem label="Newest"/>
+    </combobox>
+
+    <selectbox model="${items}" selectedIndex="0"/>
+
+    <cardlayout selectedIndex="0" height="120px">
+        <div>first card</div>
+        <div>second card</div>
+    </cardlayout>
+</zk>

@@ -68,6 +68,17 @@ model.set(0, "Updated");
 *   **Selection**: Use `model.getSelection()` and `model.addToSelection(item)`.
 *   **Sorting**: Implement `org.zkoss.zul.ext.Sortable` in custom models. `ListModelList` supports sorting via `model.sort(comparator, ascending)`.
 
+> [!WARNING]
+> **`setModel()` copies the model's own `multiple` flag onto the component, and `ListModelList` defaults to single selection.** So `setModel(new ListModelList<>(rows))` silently overrules `multiple="true"` in the ZUL — and on a `<listbox checkmark="true">` the checkbox column comes back as **radio buttons**, which is how this gets noticed. Set it on the model, not on the component:
+>
+> ```java
+> ListModelList<Transaction> model = new ListModelList<>(TRANSACTIONS);
+> model.setMultiple(true);   // without this, multiple="true" in the ZUL is lost
+> txList.setModel(model);
+> ```
+>
+> Nothing static catches this: the ZUL is right, the Java compiles, every validator layer passes, and the page renders. Only a `--run-controllers` render shows it, and only if you know what the two shapes look like.
+
 ### 4. Assignment Methods
 
 | Method | Example (ZUL) |
@@ -75,3 +86,16 @@ model.set(0, "Updated");
 | **Composer (MVC)** | `<listbox id="mylist"/>` (wired in Java: `mylist.setModel(model)`) |
 | **Data Binding (MVVM)** | `<listbox model="@init(vm.items)"/>` |
 | **EL Expression** | `<listbox model="${items}"/>` |
+
+### 5. Reading the model inside a `<template name="model">`
+
+The template repeats markup per item, so it needs an expression whichever pattern the page uses — and the variable is **not** the same one in both.
+
+| Page | Write | The variable |
+| :--- | :--- | :--- |
+| MVVM (binder) | `@load(node.data.name)` | `var="node"` is honoured |
+| MVC / plain EL | `${each.data.name}` | always `each`; a custom `var` is **silently ignored** |
+
+What the variable holds also depends on the component: for a **grid or listbox** template `each` is the item itself (`${each.action}`), but for a **tree** it is the `TreeNode`, so the data is one hop further in (`${each.data.action}`).
+
+Getting either half wrong fails quietly. An unresolvable variable renders as **empty text, not an error** — an MVC tree written with `${node.data.name}` came out with correct structure, indentation, open state and selection, and every label blank. `${each.name}` is the useful mistake: it reports `Property 'name' not found on type org.zkoss.zul.DefaultTreeNode`, which names both the variable and the missing hop.

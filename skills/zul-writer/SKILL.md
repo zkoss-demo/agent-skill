@@ -343,6 +343,22 @@ order:
    (`@load(vm.customer.name)`, `model="@load(vm.items)"`). MVC has no ZUL-side expression at all:
    the Composer wires the component by its `id` and calls `setModel(...)`, so the ZUL keeps the
    `id` and gains nothing else.
+
+   **A `<template name="model">` is the exception, and the two patterns read it differently.** A
+   template repeats markup per item, so it needs an expression whichever pattern the page is:
+
+   | Page | Inside the template | The template variable |
+   |---|---|---|
+   | MVVM | `@load(node.data.name)` | the binder honours `var="node"` |
+   | MVC | `${each.data.name}` — plain EL | always `each`; a custom `var` is **silently ignored** |
+
+   Get that the wrong way round and it costs a round, because an unresolvable variable renders as
+   **empty text rather than an error**: `${node.data.name}` on an MVC tree produced a tree with
+   correct structure, indentation, open state and selection, and every label blank. Only a probe
+   with `${each.name}` gave a real message — `Property 'name' not found on type DefaultTreeNode` —
+   which is also what names the second half of the rule: for a **grid or listbox** template `each`
+   is the item itself (`${each.action}`), but for a **tree** it is the `TreeNode`, so the data is
+   one hop further in (`${each.data.action}`).
 3. **Delete the literal rows.** They are not harmless leftovers. Setting a model — bound or through
    `setModel()`, full or empty — **discards the rows written in the markup**, silently and with no
    warning, so the page renders correctly while the markup keeps rows that display nothing. Nobody
@@ -350,6 +366,18 @@ order:
    block measures it for you.
 4. **Change nothing else** — same components, same `sclass`, same `hflex`. Extraction moves values,
    not structure, so if the page shifts afterwards the extraction is what to look at.
+
+**Two schema complaints to expect here**, both false positives of the bundled XSD rather than
+anything wrong with the page — Layer 2 is stricter than ZK is:
+
+- A `<tree>` whose only child is the `<template>` fails: `treeType` demands a `treecols` or
+  `treechildren` the moment the tree has any child at all. Add an empty `<treechildren/>` and it
+  passes. The model still fills the tree, and an empty element is not a literal row.
+- A `<listbox>` carrying literal `<listitem>`s without a `<listhead>` fails the same way. A
+  `<listhead>` is usually wanted anyway.
+
+A `<grid>` with `<columns>` plus a template is accepted as written. See the `B1` group in
+`test/known-failures.txt` for the rest of this class.
 
 Then re-render once with `--run-controllers` to confirm it did not. That render checks the
 extraction, not the layout, so it is not a fix round — and anything it does find is fixed on Pass
@@ -394,11 +422,16 @@ uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --zk-version 10.3.0 p
   to fix rather than noise to pass over; a data-driven `style="@load(...)"` is skipped on purpose.
 - Layer 4: version compatibility checks for the target ZK version — removed/deprecated API for all targets, plus ZK-10-only API (e.g. dropped `<fragment>`, or new `accept`/`responsive` attributes) gated by `--zk-version`. Defaults to `10` if omitted.
 - Layer 6: runtime semantics — markup that is legal by every static measure and still throws while
-  the page is being built. Today that is a literal `selectedIndex` pointing past the items that
-  exist: `<combobox selectedIndex="0"/>` with no items and no model passes Layers 1-5 and dies with
-  `Out of bound: 0 while size=0`. The index is applied before any controller runs, so a Composer
-  filling the component later cannot rescue it. Silent when a `model` is present, since the model's
-  size is not knowable from markup.
+  the page is being built. Today that is a literal `selectedIndex`: `<combobox selectedIndex="0"/>`
+  passes Layers 1-5 and dies with `Out of bound: 0 while size=0`. The index is applied before the
+  component's own children are attached, before any controller runs and before the binder sets a
+  model — so on `combobox`, `listbox`, `radiogroup` and `tabbox` it throws **whatever the markup
+  says**. Writing the items out does not help, and neither does `model="..."`: a model-driven
+  `<listbox model="@load(vm.items)" selectedIndex="0">` throws identically. Express the selection
+  instead — `value="..."` on a readonly combobox, `selected="true"` on the `<listitem>` / `<radio>`
+  / `<tab>`, or a controller call after the model is in place. `selectbox` and `cardlayout` do
+  tolerate an index, so for those two the layer stays quiet unless there is nothing at all to point
+  at, and `selectedIndex="-1"` is always legal.
 - Layer 7: controller cross-check — **only runs when you pass `--controller`** (see Step 4).
 
 ### Prerequisites

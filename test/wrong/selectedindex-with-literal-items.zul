@@ -1,0 +1,53 @@
+<?page title="Layer 6: selectedIndex with the items right there"?>
+<!--
+  Layer 6 regression fixture. Every component below carries a literal selectedIndex AND the
+  items it appears to point at, so an item-counting check reports the page clean. All four
+  throw while the page is built, because the index is applied before the children are
+  attached:
+
+    combobox / listbox   Out of bound: 0 while size=0
+    radiogroup           0 out of 0..-1
+    tabbox               No tab at all
+
+  The listbox additionally carries an EL-bound model beside its literal items, which does not
+  help either: the model is set after construction. That was the false negative this fixture
+  exists to pin; an earlier version of Layer 6 exempted anything with a model attribute.
+
+  Only Layer 6 may fail here. Nothing in this file is meant to trip any other layer, so if a
+  second layer starts failing, this fixture has stopped testing what it is named for.
+
+  MUST FAIL validation.
+-->
+<zk>
+    <combobox selectedIndex="0">
+        <comboitem label="Newest"/>
+        <comboitem label="Oldest"/>
+    </combobox>
+
+    <listbox model="${items}" selectedIndex="0">
+        <!-- The listhead is here only to keep Layer 2 quiet: the bundled XSD requires one on
+             any listbox that has literal listitems, which is a schema false positive of the
+             same class as B1 in test/known-failures.txt. -->
+        <listhead>
+            <listheader label="DATE"/>
+        </listhead>
+        <listitem label="Oct 24, 2023"/>
+        <listitem label="Oct 23, 2023"/>
+    </listbox>
+
+    <radiogroup selectedIndex="0">
+        <radio label="CSS Selector"/>
+        <radio label="XPath"/>
+    </radiogroup>
+
+    <tabbox selectedIndex="1">
+        <tabs>
+            <tab label="Unreconciled"/>
+            <tab label="Reconciled"/>
+        </tabs>
+        <tabpanels>
+            <tabpanel>one</tabpanel>
+            <tabpanel>two</tabpanel>
+        </tabpanels>
+    </tabbox>
+</zk>
