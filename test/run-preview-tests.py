@@ -870,6 +870,77 @@ def check_a23_an_unidentified_launcher_is_not_given_a_version():
     return fails
 
 
+def check_a24_a_model_beside_literal_rows_is_reported():
+    """A24: literal-rows-discarded names the two components with a model, and only those.
+
+    Setting a model discards the rows written in the markup -- measured across four
+    configurations, every time silently and with STATUS: ok. The page therefore renders
+    correctly while its source keeps rows that display nothing, so no amount of looking at
+    the image can find this; only the markup read against the render can.
+
+    The fixture carries its own four negative controls, which is the point of this check.
+    Paging, a collapsed tree node and an unselected tabpanel each legitimately keep a literal
+    row off the page, and a rule that reports any of them has started reporting correct pages.
+    """
+    code, out, _, _ = render(FIXTURES / "literal-rows-discarded.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"literal-rows-discarded: expected exit 0, got {code}\n{out}")
+    found = [e for e in layout_entries(out) if e.startswith("literal-rows-discarded")]
+    for component in ("listbox#discardedList", "grid#discardedGrid"):
+        if not any(component in e for e in found):
+            fails.append(f"literal-rows-discarded: {component} has a model beside literal rows "
+                         f"and was not reported:\n{found}")
+    # Each control names the guard it exists to hold. A failure here is a false positive on a
+    # page that is correct, which is worse than the miss the rule was written to prevent.
+    for control, guard in (("pagedList", "paging renders only the first pageSize rows"),
+                           ("collapsedTree", "a collapsed node hides its children"),
+                           ("hiddenList", "an unselected tabpanel is absent from the DOM"),
+                           ("staticList", "a plain static listbox has no model at all")):
+        if any(control in e for e in found):
+            fails.append(f"literal-rows-discarded: reported {control}, where {guard} -- "
+                         f"the rule is firing on a correct page")
+    if len(found) != 2:
+        fails.append(f"literal-rows-discarded: expected exactly 2 findings, got {len(found)}:\n"
+                     f"{found}")
+    return fails
+
+
+def check_a25_setmodel_is_seen_only_when_the_controller_runs():
+    """A25: the MVC half, where setModel() is in a .java file no ZUL check can read.
+
+    Two renders of one fixture, because the defect only exists in one of them: isolated, the
+    composer never runs, the literal rows draw, and reporting them would be a lie. Under
+    --run-controllers the model replaces them and the same markup is a real defect. A rule
+    that fires in both modes is reading the markup and calling it a measurement.
+    """
+    fails = []
+    fixture = FIXTURES / "literal-rows-setmodel.zul"
+
+    code, out, _, _ = render(fixture)
+    if code != 0:
+        fails.append(f"literal-rows-setmodel (isolated): expected exit 0, got {code}\n{out}")
+    if any(e.startswith("literal-rows-discarded") for e in layout_entries(out)):
+        fails.append("literal-rows-setmodel: reported under CONTROLLERS: skipped, where the "
+                     "composer never ran and the literal rows are on the page")
+
+    code, out, _, _ = render(fixture, "--run-controllers")
+    if code != 0:
+        fails.append(f"literal-rows-setmodel (--run-controllers): expected exit 0, got {code}\n{out}")
+    if value(out, "CONTROLLERS") != "executed":
+        fails.append("literal-rows-setmodel: the composer did not run, so this check proved "
+                     "nothing -- is the showcase compiled?")
+    else:
+        found = [e for e in layout_entries(out) if e.startswith("literal-rows-discarded")]
+        if len(found) != 1:
+            fails.append(f"literal-rows-setmodel: expected one finding under --run-controllers, "
+                         f"got {len(found)}:\n{found}")
+        elif "listbox#modelList" not in found[0]:
+            fails.append(f"literal-rows-setmodel: the finding does not name the wired "
+                         f"listbox: {found[0]!r}")
+    return fails
+
+
 CHECKS = [
     ("usage/no-args        ", check_usage_no_args),
     ("skip/missing-jar     ", check_skip_missing_jar),
@@ -901,6 +972,8 @@ CHECKS = [
     ("A21 broken icon      ", check_a21_a_broken_icon_is_measured_not_guessed),
     ("A22 missing asset    ", check_a22_a_missing_page_asset_is_reported),
     ("A23 unpinned launcher ", check_a23_an_unidentified_launcher_is_not_given_a_version),
+    ("A24 model + literals ", check_a24_a_model_beside_literal_rows_is_reported),
+    ("A25 setModel literals", check_a25_setmodel_is_seen_only_when_the_controller_runs),
 ]
 
 # A12, the exit-code map, has no check of its own on purpose: 0, 1, 2, 3 and 4 are each already

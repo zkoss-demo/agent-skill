@@ -158,6 +158,7 @@ import time
 import traceback
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 
 
@@ -1877,6 +1878,174 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
 }"""
 
 
+# --- Literal rows a model discarded --------------------------------------
+# The one LAYOUT rule that cannot be answered from the DOM alone, because the defect is
+# something the page does NOT contain. Setting a model on a mesh component discards the
+# rows spelled out in the markup -- measured on ZK 10.3: a listbox and a grid, under a
+# bound model and under a Composer's setModel(), with a full model and with an empty one.
+# Four configurations, four times the literal rows were gone, STATUS: ok and not one
+# warning. So the page renders correctly while its source keeps rows that claim to show
+# data they never show, and whoever edits those rows next will change nothing and not
+# know why. Step 5 is a look at the render, and a render is structurally incapable of
+# showing this.
+#
+# Two detectors, because the two halves leave different evidence:
+#
+#   A  the ZUL carries both `model=` and literal rows. Self-contained, exact, and it
+#      fires under isolation too -- the defect is in the source either way.
+#   B  the ZUL has literal rows, no `model=`, and not one of those strings reached the
+#      page. That is a Composer's setModel(), which lives in a .java file this script
+#      never opens. Needs the render, and needs the guards below.
+#
+# The guards come from measuring what else can legitimately keep a literal row off the
+# page (see tasks/zul-writer-data-flow-review.md for the run):
+#
+#   mold="paging"          only the first pageSize rows render     -> caught by ANY_PRESENT
+#   a collapsed tree node  its children do not render               -> caught by ANY_PRESENT
+#   an unselected tabpanel its whole subtree is absent from the DOM -> caught by IN_DOM
+#   a long scrolling list  renders in full; ZK has no render-on-demand without a model
+#
+# Detector B additionally requires an `id`, which is not a hedge: setModel() reaches the
+# component through @Wire, and @Wire matches the ZUL id. Without one there is nothing to
+# look up and nothing to say, so the rule stays quiet rather than guessing.
+
+MESH_ITEMS = {"listbox": {"listitem"}, "grid": {"row"}, "tree": {"treeitem"}}
+LITERAL_TEXT_CAP = 20       # per component, in document order -- see below
+# Document order matters more than the number: paging shows the FIRST pageSize rows, so
+# taking the first N is exactly the slice that proves the literals survived.
+
+_BINDING = re.compile(r"^\s*@\w+\s*\(")     # @load(...), @bind(...), @init(...)
+_EL_EXPR = re.compile(r"\$\{")
+
+
+def _tag(el) -> str:
+    """ZUL's default namespace makes every tag `{http://...}listbox` once parsed."""
+    return el.tag.rsplit("}", 1)[-1] if isinstance(el.tag, str) and "}" in el.tag else str(el.tag)
+
+
+def _literal_strings(item, out):
+    """Every fixed string this row would display, skipping any nested mesh component
+    (its rows are its own component's business) and any binding or EL expression."""
+    for attr in ("label", "value"):
+        text = item.get(attr)
+        if text and not _BINDING.match(text) and not _EL_EXPR.search(text):
+            if text.strip():
+                out.append(text.strip())
+    if item.text and item.text.strip():
+        out.append(item.text.strip())
+    for child in item:
+        if _tag(child) in MESH_ITEMS:
+            continue
+        _literal_strings(child, out)
+
+
+def _literal_rows(component, item_tags):
+    """The component's own literal rows, in document order. `<template>` is skipped: the
+    rows inside it are the model's renderer, not data."""
+    found = []
+
+    def walk(node):
+        for child in node:
+            tag = _tag(child)
+            if tag == "template" or tag in MESH_ITEMS:
+                continue
+            if tag in item_tags:
+                found.append(child)      # not descended into: _literal_strings covers the
+                continue                 # nested treeitems of a tree under their ancestor
+            walk(child)
+
+    walk(component)
+    return found
+
+
+def literal_row_groups(zul: Path):
+    """One entry per mesh component that spells its rows out in the markup.
+
+    Parsing is best-effort by design: a .zul this cannot parse is one validate-zul.py
+    would have failed at Layer 1, and a render must never be lost to a rule that only
+    adds a finding."""
+    try:
+        root = ElementTree.parse(str(zul)).getroot()
+    except Exception as failure:
+        debug("literal rows", f"not parsed: {failure}")
+        return []
+    groups = []
+    for component in root.iter():
+        item_tags = MESH_ITEMS.get(_tag(component))
+        if not item_tags:
+            continue
+        strings = []
+        for row in _literal_rows(component, item_tags):
+            _literal_strings(row, strings)
+            if len(strings) >= LITERAL_TEXT_CAP:
+                break
+        if not strings:
+            continue
+        groups.append({
+            "tag": _tag(component),
+            "id": component.get("id") or "",
+            "sclass": component.get("sclass") or "",
+            "rows": len(_literal_rows(component, item_tags)),
+            "item": sorted(item_tags)[0],
+            "model": component.get("model") or "",
+            "texts": strings[:LITERAL_TEXT_CAP],
+        })
+    debug_lines("literal rows", [f"{g['tag']}#{g['id'] or '-'}: {g['rows']} row(s), "
+                                 f"model={g['model'] or '-'}" for g in groups])
+    return groups
+
+
+# Answers exactly two questions per group, both about presence rather than geometry:
+# is the component in the document at all, and did any of its literal strings reach it.
+# textContent, not innerText, on purpose -- a component hidden by `visible="false"` still
+# holds its text, and "hidden" is not "discarded".
+LITERAL_ROWS_JS = """(groups) => {
+  const zk = window.zk;
+  const text = document.body ? (document.body.textContent || '') : '';
+  const byId = {};
+  const els = document.querySelectorAll('body *');
+  for (let i = 0; i < els.length; i++) {
+    const el = els[i];
+    let w = null;
+    try { w = (zk && zk.Widget && zk.Widget.$) ? zk.Widget.$(el) : null; } catch (e) { w = null; }
+    if (!w || !w.id) continue;
+    try { if (w.$n() !== el) continue; } catch (e) { continue; }
+    if (!(w.id in byId)) byId[w.id] = true;
+  }
+  return groups.map((g) => ({
+    anyPresent: g.texts.some((t) => text.indexOf(t) !== -1),
+    inDom: g.id ? (g.id in byId) : false,
+  }));
+}"""
+
+
+def literal_row_findings(groups, verdicts):
+    """The two detectors, applied to what the page reported back."""
+    findings = []
+    for group, verdict in zip(groups, verdicts):
+        locator = group["tag"]
+        if group["id"]:
+            locator += "#" + group["id"]
+        elif group["sclass"]:
+            locator += "." + group["sclass"].split()[0]
+        rows = f"{group['rows']} literal <{group['item']}>" + ("" if group["rows"] == 1 else "s")
+        if group["model"]:
+            findings.append({
+                "rule": "literal-rows-discarded", "locator": locator,
+                "detail": f'{rows} under model="{group["model"]}" — the model replaces them, '
+                          f"so they never render. Delete them.",
+                "measured": {"rows": group["rows"], "detector": "model-attribute"},
+            })
+        elif verdict.get("inDom") and not verdict.get("anyPresent"):
+            findings.append({
+                "rule": "literal-rows-discarded", "locator": locator,
+                "detail": f"{rows} are written here but none of them reached the page — a "
+                          f"controller set a model, which discards them. Delete them.",
+                "measured": {"rows": group["rows"], "detector": "absent-from-dom"},
+            })
+    return findings
+
+
 # --- ZK client error box -------------------------------------------------
 # ZK's client engine does NOT log to the console: zk.error() hands the message to
 # zk.debugLog (which reaches the console only under zk.debugJS) and then to
@@ -1914,7 +2083,8 @@ def _one_line(text, limit=200):
     return first if len(first) <= limit else first[:limit] + "\u2026"
 
 
-def capture(url, out_path: Path, args, warnings, controllers, layout, probes, dom):
+def capture(url, out_path: Path, args, warnings, controllers, layout, probes, dom,
+            literal_groups=()):
     """Returns (http_status, error_details_or_None).
 
     `controllers` is mutated in place (same idiom as `warnings`) with what the launcher
@@ -2110,6 +2280,21 @@ def capture(url, out_path: Path, args, warnings, controllers, layout, probes, do
                     # is what the SIZE: line reports and what the findings are read against.
                     debug("layout viewport",
                           f"{audited['viewport']['w']}x{audited['viewport']['h']}")
+
+                # Same block, same suppression, but a separate evaluate: this one is the
+                # only rule that needs a question from the .zul, so it has nothing to ask
+                # when the file declared no literal rows -- the common case, and it costs
+                # nothing there. Appended to the audit's findings rather than given a block
+                # of its own, because a reader told to "read the LAYOUT block first" should
+                # not have to learn a second place to look.
+                if literal_groups:
+                    with contextlib.suppress(Exception):
+                        verdicts = page.evaluate(LITERAL_ROWS_JS, literal_groups)
+                        extra = literal_row_findings(literal_groups, verdicts)
+                        layout.setdefault("findings", []).extend(extra)
+                        layout["total"] = layout.get("total", 0) + len(extra)
+                        debug("literal rows", f"{len(extra)} finding(s) from "
+                                              f"{len(literal_groups)} component(s)")
 
                 # After the screenshot for the same reason as the audit above — the PNG is
                 # already on disk, so nothing evaluated here can alter the image it explains.
@@ -2543,7 +2728,8 @@ def render(target: Target, java: Path, jar: Path, args, warnings, controllers, l
     with Launcher(java, jar, launcher_classpath(target.resolved), target.docroot,
                   args.run_controllers, args.controller_timeout) as launcher:
         url = f"http://127.0.0.1:{launcher.port}{target.request_path}"
-        return capture(url, target.out_path, args, warnings, controllers, layout, probes, dom)
+        return capture(url, target.out_path, args, warnings, controllers, layout, probes, dom,
+                       literal_row_groups(target.zul))
 
 
 # The three strings of the text contract (spec P0-2 item 4), keyed by the launcher's token.

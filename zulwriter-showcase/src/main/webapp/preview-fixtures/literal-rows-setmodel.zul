@@ -1,0 +1,18 @@
+<?page title="literal rows discarded by setModel | zul-writer preview fixture"?>
+<!--
+    Fixture for detector B of `literal-rows-discarded`: the MVC half. `setModel()` is in
+    SetModelComposer.java, so nothing in this file says a model is coming — which is exactly
+    why the rule has to compare these literal rows against the rendered page.
+
+    Under the default isolated render the composer never runs, the literal rows draw, and the
+    rule must stay silent. Running the controllers is what makes this a defect.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <vlayout hflex="1" apply="zwriter.previewfixtures.SetModelComposer">
+        <listbox id="modelList" hflex="1" height="200px">
+            <listhead><listheader label="Name"/></listhead>
+            <listitem><listcell label="LEFTOVER-MVC-A"/></listitem>
+            <listitem><listcell label="LEFTOVER-MVC-B"/></listitem>
+        </listbox>
+    </vlayout>
+</zk>

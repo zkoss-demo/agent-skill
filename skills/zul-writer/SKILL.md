@@ -43,6 +43,13 @@ the way past, answers a question they did not ask and costs them a page they wer
 | "Write the ViewModel for this page" | 4 |
 | "Move this page's data into a ViewModel/Composer" | the extraction pass in Step 2 → 4 → 5 with `--run-controllers` |
 | "Add a column to this grid", "make the sidebar narrower" | 2 on the existing file → 3 → 5 if the change is visible |
+| "Build a page for this ViewModel/Composer we already have" | 1 → 5, but there is nothing to extract — see *Model-driven pages* in Step 2 |
+
+**A model-driven page runs Step 5 twice, and the second time is not a fix round.** The numbered
+steps are the order for a page whose data is still in the markup; once Step 5 has settled the
+layout, the extraction pass in Step 2 moves that data into the controller and one more
+`--run-controllers` render checks it. So the shape is 1 → 5, then back to 2 → 4 → 5 once. That last
+loop is easy to forget precisely because it runs backwards through the numbers.
 
 **"Why does this look wrong?" is a diagnosis request, not a validation one.** The two rows sit
 together because they are so easy to confuse: *why won't this page parse* and *why is this icon a
@@ -110,15 +117,31 @@ Present both options with equal weight — do NOT mark either as "(Recommended)"
 - **MVVM**: ViewModel-based with `@bind`/`@command` data binding — testable, requires more ZK familiarity
 - **MVC**: Composer-based with `apply` and wired components — straightforward, beginner-friendly
 
+The line between them is exact, so there is never a page you cannot classify: **MVC applies a
+Composer** (`apply="com.foo.MyComposer"`), **MVVM sets a ViewModel and uses binding syntax**
+(`viewModel="@id('vm') @init('com.foo.MyVM')"` plus `@load`/`@bind`/`@command`). Either one is a
+controller, and it governs the component it is set on **and every descendant of it**.
+
+**Write one pattern per page.** ZK permits mixing them and some projects do, but a mixed page has no
+single answer to "where does this value come from", which is the question both the extraction pass
+and the Step 5 self-review depend on. If the user asks for both, ask which one the page's data
+should follow.
+
 #### 4. Static Data or Model-Driven
 
 Ask this as its own question. It is independent of MVC/MVVM — that choice decides where *behaviour*
 lives, this one decides where *data* lives — and it changes the order the work happens in:
 
-- **Static data**: the text and rows are written in the ZUL (`<label value="Acme Corp"/>`, rows
-  spelled out). Right for a layout, a mockup, a demo, anything whose content is fixed.
-- **Model-driven**: the controller supplies them — a Composer setting values, or a ViewModel the page
-  reads through `@load`/`@bind` and a bound `model`. Right for anything backed by real data.
+- **Static data**: the text and rows are written in the ZUL — `<label value="Acme Corp"/>`, and rows
+  spelled out as `<row>` in a grid, `<listitem>` in a listbox, `<treeitem>` in a tree. Right for a
+  layout, a mockup, a demo, anything whose content is fixed.
+- **Model-driven**: the controller supplies them — a Composer calling `setModel()` on a component it
+  wired, or a ViewModel the page reads through `@load`/`@bind` and a bound `model`. Right for
+  anything backed by real data.
+
+**A component gets its rows from one of these, never both.** Setting a model discards the rows
+written in the markup, silently, so literal rows left beside a model are markup that displays
+nothing at all.
 
 Either answer still gets a controller in Step 4. Model-driven pages are additionally built in two
 passes — see *Model-driven pages* in Step 2.
@@ -193,21 +216,49 @@ of placeholder rows — so column widths, wrapping, card heights and whether a r
 all being judged against text that is not the text the page will hold. That is how a page passes
 Step 5 and still comes out wrong the first time it is run for real.
 
-So when the controller does not exist and compile yet — the usual case for a new page — write the
-first version with literal values, shaped like the data that will replace them: a name of realistic
-length, a price with its real digits, enough rows to fill the region. Literals render as themselves,
-so the Step 5 screenshot is the page the user will actually get. Iterate there until the layout and
-the styling are right.
+**Which of the two paths you are on is a lookup, not a question.** Do not ask the user; the answer
+is in front of you. A page you are writing from nothing needs a controller you have not written yet
+— in ZK a Composer or ViewModel belongs to a page, not to a shared service layer, so a new page
+means a new controller and the two-pass path below. Only an existing `.zul` can already name a class,
+and then you open it: if it exists and compiles, there is nothing to extract — render with
+`--run-controllers` from the start and judge the real data.
 
-Once the layout is settled, extract in one pass: move each literal into the controller as a field,
-getter or list, and replace it in the ZUL with the binding that reads it (`@load(vm.customer.name)`,
-`model="@load(vm.items)"`). Change nothing else — same components, same `sclass`, same `hflex`.
-Extraction moves values, not structure, so if the page shifts afterwards the extraction is what to
-look at; re-render with `--run-controllers` to confirm it did not.
+#### Pass 1 — literal data, real shape
 
-When the controller already exists and compiles — a page bound to a ViewModel the project already
-has — there is nothing to extract. Render with `--run-controllers` from the start and judge the real
-data.
+Write the first version with literal values, shaped like the data that will replace them: a name of
+realistic length, a price with its real digits, enough rows to fill the region. Rows go in as
+markup — `<row>` in a grid, `<listitem>` in a listbox, `<treeitem>` in a tree. Literals render as
+themselves, so the Step 5 screenshot is the page the user will actually get, and this pass is
+*cleaner* than a bound one: with no `@load` anywhere there is not a placeholder on the page.
+
+**The controller you write in Step 4 for this pass holds behaviour, not data** — the event handler,
+the `@Command`, the wiring. Putting the data in it now cancels the whole point of the pass: Step 5
+would render real rows through `--run-controllers` and you would be back to judging the layout
+against text you never checked.
+
+Iterate here until the layout and the styling are right.
+
+#### Pass 2 — extraction, after Step 5 has settled the layout
+
+This is the one action in the workflow that runs **after** Step 5 rather than before it, so it is
+easy to skip. Its trigger is "the layout is settled", which is a Step 5 outcome. Four actions, in
+order:
+
+1. **Move each literal into the controller** as a field, getter or list.
+2. **Point the ZUL at it.** MVVM replaces the value with the binding that reads it
+   (`@load(vm.customer.name)`, `model="@load(vm.items)"`). MVC has no ZUL-side expression at all:
+   the Composer wires the component by its `id` and calls `setModel(...)`, so the ZUL keeps the
+   `id` and gains nothing else.
+3. **Delete the literal rows.** They are not harmless leftovers. Setting a model — bound or through
+   `setModel()`, full or empty — **discards the rows written in the markup**, silently and with no
+   warning, so the page renders correctly while the markup keeps rows that display nothing. Nobody
+   looking at the image can see this, which is why `literal-rows-discarded` in Step 5's `LAYOUT`
+   block measures it for you.
+4. **Change nothing else** — same components, same `sclass`, same `hflex`. Extraction moves values,
+   not structure, so if the page shifts afterwards the extraction is what to look at.
+
+Then re-render once with `--run-controllers` to confirm it did not. That render checks the
+extraction, not the layout, so it sits outside Step 5's two-round budget.
 
 ### Layout & Component Patterns
 
@@ -270,7 +321,8 @@ for the fix, or when fixing it is the task you were already on.
 #### Pattern Consistency
 - **MVC**: Uses `apply` attribute, no MVVM binding expressions
 - **MVVM**: Uses `viewModel` attribute, proper binding syntax
-- No mixing of patterns on same component
+- One pattern for the whole page, not one per component
+- No component carries both a `model` and literal rows — see *Model-driven pages* in Step 2
 
 #### Best Practices
 - IDs are unique within each ID space owner (`<window>`, `<idspace>`)
@@ -290,6 +342,14 @@ wires a component and listens for its event, how a ViewModel declares a `@Comman
 writes to invoke it. Leaving it out withholds the one part that is ZK-specific and hard to guess. So
 include at least one working handler on something the page really has — the Save button, the row
 selection, the search box — acting on the values already in the markup.
+
+**Behaviour now, data later.** Whether the page is static or model-driven, what you write here is
+the page's *behaviour*. On a model-driven page the data is still in the markup at this point and
+belongs there until the layout is settled — so no `setModel()`, no getter backing a bound `model`,
+not yet. Both arrive in the extraction pass (see *Model-driven pages* in Step 2), and this step runs
+a second time to receive them. Writing the data in now is the single easiest way to lose the literal
+pass without noticing: Step 5 would render real rows and the layout would never be judged against
+anything you checked.
 
 ### Controller Generation Guidelines
 
@@ -426,6 +486,16 @@ markup.
 | `escapes-parent` | visible content sticks out of an ancestor that clips, so the overhang is cut | give the parent room, or stop the child overflowing it |
 | `viewport-overflow` | the page is wider than the viewport, so it needs a horizontal scrollbar; the line names the widest offender | remove the fixed width on the named element, or make it `hflex`/percentage |
 | `icon-not-rendered` | a font icon will draw as an empty box: its glyph is there, but the font stack the browser resolved for it cannot supply that glyph | put the icon class on a carrier that keeps the icon font — `iconSclass`, or a plain container — rather than on one whose own `font-family` outranks it |
+| `literal-rows-discarded` | rows spelled out in the markup are not on the page, because setting a model discards them. Usually an extraction that moved the data but left the old rows behind | delete the literal `<listitem>`/`<row>`/`<treeitem>` elements. The model is the page's only source of rows now |
+
+`literal-rows-discarded` is the one rule you cannot check against the PNG, because it is about
+something the page does *not* contain. **The page renders correctly** — the model's rows are all
+there — while the markup keeps rows that display nothing at all, and the next person to edit one of
+those rows will change nothing and not know why. It fires two ways: from the markup alone when a
+`model` attribute sits beside literal rows, and from the render when a Composer's `setModel()`
+(which lives in Java, invisible to any ZUL check) has replaced them. Paging, a collapsed tree node
+and an unselected tab all keep rows off the page legitimately, and the rule is measured against
+each of those, so a finding here is not one of them.
 
 Three things to know before you act on the block:
 
@@ -511,6 +581,11 @@ Judge **structure**, not pixels and not data. Fix only these:
   CLIENT-side JS package is absent even though the server-side class resolved, which is why the page
   parsed and then came up wrong. Check the `WARNINGS` 404 entries and the classpath, and ask the user
   about the dependency — never rewrite working markup for it.
+- **`literal-rows-discarded` in `LAYOUT:`** — delete the literal rows it names. This is the one
+  finding you will not be able to confirm by looking at the image, because the page in the image is
+  correct; the defect is markup that renders nothing. Almost always an extraction that moved the
+  data and left the old rows behind, so check that the controller really does supply them before
+  deleting.
 - **`CONTROLLERS: failed → isolated`** — read the `WARNINGS` entry: it names the failing class and
   the first cause line. A controller exception, a missing class or a blown budget is a defect in the
   **controller** (or a missing build), not in the ZUL. Fix it there and re-render, or report it —

@@ -1,0 +1,88 @@
+<?page title="literal rows a model discards | zul-writer preview fixture"?>
+<!--
+    Fixture for the LAYOUT rule `literal-rows-discarded`, detector A (the ZUL-only one) and
+    both of its guards. Every component here declares literal rows; only the two with a
+    `model` attribute may be reported.
+
+    The guards exist because three other things legitimately keep a literal row off the
+    page, and each one is present below as its own negative control. If a change to the
+    rule makes any of them fire, the rule has started reporting correct pages.
+-->
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <vlayout hflex="1" viewModel="@id('vm') @init('zwriter.previewfixtures.LiteralRowsViewModel')">
+
+        <!-- POSITIVE 1: a bound model beside literal rows. The model wins, so these never draw. -->
+        <listbox id="discardedList" model="@load(vm.items)" hflex="1" height="200px">
+            <listhead><listheader label="Name"/></listhead>
+            <listitem><listcell label="LEFTOVER-LISTITEM-A"/></listitem>
+            <listitem><listcell label="LEFTOVER-LISTITEM-B"/></listitem>
+            <template name="model" var="item">
+                <listitem label="@load(item)"/>
+            </template>
+        </listbox>
+
+        <!-- POSITIVE 2: the same defect on a grid, to keep the rule from becoming listbox-only. -->
+        <grid id="discardedGrid" model="@load(vm.items)" hflex="1" height="200px">
+            <columns><column label="Name"/></columns>
+            <rows>
+                <row><label value="LEFTOVER-ROW-A"/></row>
+            </rows>
+            <template name="model" var="item">
+                <row><label value="@load(item)"/></row>
+            </template>
+        </grid>
+
+        <!-- CONTROL 1: paging renders only the first pageSize rows. Rows 4-9 are absent from
+             the DOM and that is correct, so the "any literal present" guard must hold. -->
+        <listbox id="pagedList" mold="paging" pageSize="3" hflex="1">
+            <listhead><listheader label="Name"/></listhead>
+            <listitem><listcell label="PAGED-ROW-1"/></listitem>
+            <listitem><listcell label="PAGED-ROW-2"/></listitem>
+            <listitem><listcell label="PAGED-ROW-3"/></listitem>
+            <listitem><listcell label="PAGED-ROW-4"/></listitem>
+            <listitem><listcell label="PAGED-ROW-5"/></listitem>
+            <listitem><listcell label="PAGED-ROW-6"/></listitem>
+            <listitem><listcell label="PAGED-ROW-7"/></listitem>
+            <listitem><listcell label="PAGED-ROW-8"/></listitem>
+            <listitem><listcell label="PAGED-ROW-9"/></listitem>
+        </listbox>
+
+        <!-- CONTROL 2: a collapsed tree node keeps its children out of the DOM. Its own row
+             still renders, which is what the "any literal present" guard reads. -->
+        <tree id="collapsedTree" hflex="1" height="200px">
+            <treecols><treecol label="Name"/></treecols>
+            <treechildren>
+                <treeitem open="false">
+                    <treerow><treecell label="TREE-ROOT-COLLAPSED"/></treerow>
+                    <treechildren>
+                        <treeitem><treerow><treecell label="TREE-CHILD-UNSEEN"/></treerow></treeitem>
+                    </treechildren>
+                </treeitem>
+            </treechildren>
+        </tree>
+
+        <!-- CONTROL 3: an unselected tabpanel contributes nothing to the DOM, so this listbox
+             is not there at all. The "component is in the DOM" guard must hold: absent is
+             unjudgeable, not defective. -->
+        <tabbox hflex="1">
+            <tabs><tab label="Shown"/><tab label="Not shown"/></tabs>
+            <tabpanels>
+                <tabpanel><label value="TABPANEL-SELECTED"/></tabpanel>
+                <tabpanel>
+                    <listbox id="hiddenList" hflex="1">
+                        <listhead><listheader label="Name"/></listhead>
+                        <listitem><listcell label="TABBED-ROW-A"/></listitem>
+                        <listitem><listcell label="TABBED-ROW-B"/></listitem>
+                    </listbox>
+                </tabpanel>
+            </tabpanels>
+        </tabbox>
+
+        <!-- CONTROL 4: an ordinary static listbox. No model, every row on the page. -->
+        <listbox id="staticList" hflex="1">
+            <listhead><listheader label="Name"/></listhead>
+            <listitem><listcell label="STATIC-ROW-A"/></listitem>
+            <listitem><listcell label="STATIC-ROW-B"/></listitem>
+        </listbox>
+    </vlayout>
+</zk>

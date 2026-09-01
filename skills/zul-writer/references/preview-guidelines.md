@@ -246,6 +246,29 @@ the audit existed.
 | `escapes-parent` | an element's border box exceeds its `offsetParent`'s padding box by more than 2px while that parent clips, **and something is actually rendered in the strip that gets cut** | give the parent room, or stop the child overflowing |
 | `viewport-overflow` | `documentElement.scrollWidth` exceeds the viewport width; one finding for the page, naming the widest element whose right edge passes the viewport | drop the fixed width on the named element |
 | `icon-not-rendered` | an element's `::before`/`::after` content is a single Private Use Area codepoint — an icon glyph — and the font stack resolved for that pseudo-element reaches no `@font-face` family, so the browser will draw a fallback box | move the icon class to a carrier that keeps the icon font (`iconSclass`, or a plain container), or raise the icon rule's specificity over whatever set the element's own `font-family` |
+| `literal-rows-discarded` | a mesh component spells rows out in the markup while a model supplies its rows — either a `model` attribute in the same file, or a `setModel()` the render proves ran | delete the literal `<listitem>`/`<row>`/`<treeitem>` elements |
+
+**`literal-rows-discarded` is the one rule that reads the `.zul` as well as the DOM**, because the
+defect is something the page does *not* contain. Setting a model discards the rows written in the
+markup — measured on ZK 10.3 across a listbox and a grid, under a bound model and under a Composer's
+`setModel()`, with a full model and with an empty one: four configurations, four times the literal
+rows were gone, `STATUS: ok` and not one warning. The page therefore renders correctly while its
+source keeps rows that display nothing, and no reading of the PNG can find that.
+
+Two detectors, because the two halves leave different evidence. The **`model` attribute** beside
+literal rows is self-contained and exact, so it fires under isolation too — the defect is in the
+source either way. A Composer's **`setModel()`** lives in a `.java` file this script never opens, so
+that half is inferred from the render: the component is in the DOM and not one of its literal
+strings reached the page. It additionally requires the component to have an `id`, which is not a
+hedge — `setModel()` reaches the component through `@Wire`, and `@Wire` matches the ZUL id.
+
+Three things legitimately keep a literal row off the page, and each was measured before the guards
+were written: `mold="paging"` renders only the first `pageSize` rows, a collapsed tree node hides
+its children, and an unselected `<tabpanel>` contributes nothing to the DOM at all. The first two
+always leave at least one literal on the page (page 1; the collapsed node's own row), so **any
+literal present** suppresses the finding; the third is caught by requiring the component to be in
+the DOM. A long scrolling list is not a fourth case — ZK has no render-on-demand without a model, so
+60 literal rows in a 120px box all reach the DOM.
 
 **Every clipper, not just the nearest one.** A text run is visible inside the *intersection* of
 the ancestors that clip it, so a roomy `overflow: hidden` box nested inside a narrow one does not
