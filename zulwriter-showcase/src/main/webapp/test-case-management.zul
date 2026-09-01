@@ -1,0 +1,702 @@
+<?page title="TestFlow Pro — Test Suites"?>
+<zk>
+    <style>
+    /* ===== Page shell ===== */
+    .tc-page{
+        background-color: #ffffff;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .tc-page .z-label{
+        font-family: inherit;
+    }
+
+    /* ===== Top bar ===== */
+    .tc-topbar{
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 12px 26px;
+    }
+    .tc-logo{
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background-color: #1f6feb;
+        color: #ffffff;
+        font-size: 18px;
+        line-height: 42px;
+        text-align: center;
+    }
+    .tc-brand-name{
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        padding-right: 10px;
+    }
+    .tc-nav{
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        border-left: 1px solid #e8eef5;
+        padding-left: 26px;
+    }
+    .tc-page a.tc-navlink{
+        color: #475569;
+        font-size: 17px;
+        text-decoration: none;
+    }
+    .tc-page a.tc-navlink-on{
+        color: #1f6feb;
+        font-weight: 600;
+    }
+    .tc-searchwrap{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+        width: 380px;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        padding: 0 16px;
+    }
+    .tc-search-icon{ color: #94a3b8; font-size: 15px; }
+    .tc-page input.tc-search{
+        flex: 1;
+        border: 0 none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 12px 0;
+        font-size: 16px;
+        color: #0f172a;
+    }
+    .tc-topicon{ color: #64748b; font-size: 18px; }
+    .tc-avatar{
+        width: 40px;
+        height: 40px;
+        border-radius: 20px;
+        background-color: #dbe6f6;
+        color: #475569;
+        font-size: 16px;
+        line-height: 40px;
+        text-align: center;
+    }
+
+    /* ===== Border layout regions ===== */
+    .tc-page .z-borderlayout,
+    .tc-page .z-west,
+    .tc-page .z-center,
+    .tc-page .z-east{
+        background-color: transparent;
+        border: 0 none;
+    }
+    .tc-page .z-west-body,
+    .tc-page .z-center-body,
+    .tc-page .z-east-body{
+        background-color: transparent;
+        border: 0 none;
+    }
+    .tc-page .z-west{ border-right: 1px solid #e8eef5; }
+    .tc-page .z-east{ border-left: 1px solid #e8eef5; }
+    .tc-page .z-center{ background-color: #f8fafc; }
+
+    /* ===== Project explorer (west) ===== */
+    .tc-explorer{
+        display: flex;
+        flex-direction: column;
+        padding: 20px 16px 18px 16px;
+    }
+    .tc-explorer-head{
+        display: flex;
+        align-items: center;
+        padding: 0 8px 18px 8px;
+    }
+    .tc-explorer-title{
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.11em;
+        color: #64748b;
+    }
+    .tc-page button.tc-addicon{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #1f6feb;
+        font-size: 17px;
+        margin-left: auto;
+        padding: 4px 6px;
+    }
+
+    /* ZK puts the indent spacers and the open/close toggle inline before the cell's own
+       children. A block-level node div would drop onto the line below them, taking the
+       indentation with it -- so the cell content is a flex row and the node fills the rest. */
+    .tc-page .tc-tree{
+        border: 0 none;
+        background-color: transparent;
+    }
+    .tc-page .tc-tree .z-treerow,
+    .tc-page .tc-tree .z-treecell{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+    }
+    .tc-page .tc-tree .z-treerow:hover .z-treecell{
+        background-color: transparent;
+    }
+    .tc-page .tc-tree .z-treecell-content{
+        display: flex;
+        align-items: center;
+        padding: 0;
+    }
+    .tc-page .tc-tree .z-tree-icon{
+        flex: 0 0 auto;
+        color: #94a3b8;
+        font-size: 12px;
+    }
+    .tc-node{
+        display: flex;
+        align-items: center;
+        flex: 1;
+        gap: 12px;
+        border-radius: 8px;
+        padding: 10px 10px;
+    }
+    .tc-node-on{
+        background-color: #eff6ff;
+        border-left: 3px solid #1f6feb;
+        padding-left: 7px;
+    }
+    .tc-node-icon{ color: #94a3b8; font-size: 15px; }
+    .tc-node-icon-folder{ color: #e0a415; }
+    .tc-node-icon-on{ color: #1f6feb; }
+    .tc-node-label{ font-size: 16px; color: #334155; }
+    .tc-node-label-on{ color: #1f6feb; font-weight: 600; }
+
+    .tc-explorer-foot{
+        margin-top: auto;
+        padding: 18px 4px 0 4px;
+    }
+    .tc-page button.tc-btn-primary{
+        background-color: #1f6feb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        padding: 15px 20px;
+    }
+
+    /* ===== Test case (center) ===== */
+    .tc-main{ padding: 22px 28px 26px 28px; }
+    .tc-crumbrow{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding-bottom: 14px;
+    }
+    .tc-crumb{ font-size: 15px; color: #64748b; }
+    .tc-crumb-now{ font-size: 15px; font-weight: 600; color: #334155; }
+    .tc-draft{
+        background-color: #fef3c7;
+        border-radius: 5px;
+        color: #b45309;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin-left: auto;
+        padding: 5px 10px;
+    }
+    .tc-histicon{ color: #94a3b8; font-size: 16px; }
+    .tc-titlerow{
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-bottom: 26px;
+    }
+    .tc-title{
+        display: block;
+        font-size: 32px;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+    }
+    .tc-subtitle{
+        display: block;
+        font-size: 16px;
+        color: #64748b;
+        padding-top: 8px;
+    }
+    .tc-page button.tc-btn-ghost{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #334155;
+        font-size: 17px;
+        font-weight: 500;
+        margin-left: auto;
+        padding: 14px 26px;
+    }
+    .tc-page button.tc-btn-run{
+        background-color: #1f6feb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        padding: 14px 26px;
+    }
+
+    /* ===== Steps table ===== */
+    .tc-card{
+        background-color: #ffffff;
+        border: 1px solid #eef2f7;
+        border-radius: 14px;
+    }
+    .tc-page .tc-grid{ border: 0 none; }
+    .tc-page .tc-grid .z-column{
+        background-color: #f8fafc;
+        background-image: none;
+        border-top: 0 none;
+        border-left: 0 none;
+        border-bottom: 1px solid #eef2f7;
+    }
+    .tc-page .tc-grid .z-column-content{
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.11em;
+        padding: 18px 20px;
+    }
+    /* A grid's data cells are td.z-row-inner, not .z-cell. */
+    .tc-page .tc-grid .z-row-inner{
+        background-color: #ffffff;
+        border-bottom: 1px solid #f4f7fb;
+        border-left: 0 none;
+        border-right: 0 none;
+        padding: 20px 20px;
+        vertical-align: middle;
+    }
+    .tc-page .tc-grid .tc-row-on .z-row-inner{
+        background-color: #f4f8ff;
+    }
+    .tc-stepno{ font-size: 17px; color: #64748b; }
+    .tc-stepno-on{ font-size: 17px; font-weight: 700; color: #1f6feb; }
+    .tc-action{ font-size: 17px; font-weight: 700; color: #0f172a; }
+    .tc-expected{ font-size: 16px; color: #475569; }
+    .tc-rowactions{
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+    /* Four of these share the ACTIONS column, so the horizontal padding stays tight:
+       at 8px the row's first button was pushed out of the cell and clipped away. */
+    .tc-page button.tc-rowicon{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #64748b;
+        font-size: 16px;
+        padding: 6px 5px;
+    }
+    .tc-page button.tc-rowicon-edit{ color: #1f6feb; }
+    .tc-page button.tc-rowicon-del{ color: #64748b; }
+    .tc-addstep{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 20px 22px 20px;
+    }
+    .tc-addstep-icon{
+        width: 26px;
+        height: 26px;
+        border-radius: 13px;
+        background-color: #1f6feb;
+        color: #ffffff;
+        font-size: 12px;
+        line-height: 26px;
+        text-align: center;
+    }
+    .tc-page a.tc-addstep-link{
+        color: #1f6feb;
+        font-size: 17px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    /* ===== Step configuration (east) ===== */
+    .tc-config{ padding: 20px 24px 24px 24px; }
+    .tc-config-head{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .tc-config-icon{ color: #1e293b; font-size: 19px; }
+    .tc-config-title{
+        font-size: 21px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .tc-config-sub{
+        display: block;
+        font-size: 15px;
+        color: #94a3b8;
+        padding: 8px 0 24px 0;
+    }
+    .tc-fieldlabel{
+        display: block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.11em;
+        color: #64748b;
+        padding-bottom: 10px;
+    }
+    .tc-field{ padding-bottom: 22px; }
+    .tc-page .tc-input .z-textbox,
+    .tc-page .tc-input .z-combobox-input{
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: none;
+        color: #1e293b;
+        font-size: 16px;
+        padding: 14px 14px;
+    }
+    .tc-hint{
+        display: block;
+        font-size: 13px;
+        color: #94a3b8;
+        padding-top: 8px;
+    }
+    .tc-seg{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .tc-page button.tc-seg-btn{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        color: #475569;
+        font-size: 15px;
+        font-weight: 500;
+        padding: 12px 16px;
+    }
+    .tc-page button.tc-seg-on{
+        background-color: #eff6ff;
+        border-color: #bcd4fb;
+        color: #1f6feb;
+        font-weight: 600;
+    }
+    .tc-locatorrow{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .tc-page button.tc-pickicon{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #64748b;
+        font-size: 16px;
+        padding: 14px 15px;
+    }
+    .tc-togglerow{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 4px 0 26px 0;
+    }
+    .tc-toggle-label{
+        display: block;
+        font-size: 17px;
+        color: #1e293b;
+    }
+    .tc-toggle-sub{
+        display: block;
+        font-size: 13px;
+        color: #94a3b8;
+        padding-top: 5px;
+    }
+    .tc-togglewrap{ margin-left: auto; }
+    .tc-page button.tc-btn-dark{
+        background-color: #0f172a;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        padding: 16px 20px;
+    }
+    .tc-page button.tc-btn-reset{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #334155;
+        font-size: 17px;
+        font-weight: 500;
+        margin-top: 12px;
+        padding: 16px 20px;
+    }
+    .tc-preview{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background-color: #f4f7fb;
+        border-radius: 10px;
+        height: 190px;
+        margin-top: 30px;
+    }
+    .tc-preview-icon{ color: #94a3b8; font-size: 20px; }
+    .tc-preview-label{ font-size: 15px; color: #94a3b8; }
+
+    /* ===== Footer ===== */
+    .tc-footer{
+        display: flex;
+        align-items: center;
+        gap: 26px;
+        border-top: 1px solid #e8eef5;
+        padding: 14px 26px;
+    }
+    .tc-health-dot{
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #16a34a;
+    }
+    .tc-foot-text{ font-size: 14px; color: #64748b; }
+    .tc-foot-right{ margin-left: auto; }
+    </style>
+
+    <div apply="zwriter.TestCaseManagementComposer" sclass="tc-page" hflex="1" vflex="1">
+        <vlayout hflex="1" vflex="1" spacing="0">
+
+            <!-- ===== Top bar ===== -->
+            <div sclass="tc-topbar" hflex="1">
+                <div sclass="tc-logo z-icon-sitemap"/>
+                <label value="TestFlow Pro" sclass="tc-brand-name"/>
+                <div sclass="tc-nav">
+                    <a label="Dashboard" sclass="tc-navlink"/>
+                    <a label="Test Suites" sclass="tc-navlink tc-navlink-on"/>
+                    <a label="Runs" sclass="tc-navlink"/>
+                    <a label="Reports" sclass="tc-navlink"/>
+                </div>
+                <div sclass="tc-searchwrap">
+                    <span sclass="z-icon-search tc-search-icon"/>
+                    <textbox id="searchBox" placeholder="Search tests..." sclass="tc-search"/>
+                </div>
+                <span sclass="z-icon-bell tc-topicon"/>
+                <span sclass="z-icon-cog tc-topicon"/>
+                <div sclass="tc-avatar z-icon-user"/>
+            </div>
+
+            <borderlayout hflex="1" vflex="1">
+
+                <!-- ===== Project explorer ===== -->
+                <west width="320px" border="none">
+                    <div sclass="tc-explorer" hflex="1" vflex="1">
+                        <div sclass="tc-explorer-head" hflex="1">
+                            <label value="PROJECT EXPLORER" sclass="tc-explorer-title"/>
+                            <button id="addSuiteBtn" iconSclass="z-icon-folder-open"
+                                    sclass="tc-addicon"/>
+                        </div>
+
+                        <tree id="suiteTree" sclass="tc-tree" hflex="1" vflex="min">
+                            <!-- Plain EL only ever exposes "each" here, and it is the TreeNode:
+                                 a custom var="..." is silently ignored, which is why expressions
+                                 through it rendered empty rather than failing. Measured with a
+                                 throwaway probe, which reported
+                                 "Property 'name' not found on type DefaultTreeNode" for
+                                 ${each.name}, hence the .data hop. The MVVM binder DOES honour
+                                 var, so the sibling task-master page reads @load(node.data.x). -->
+                            <template name="model">
+                                <treeitem>
+                                    <treerow>
+                                        <treecell>
+                                            <div sclass="${each.data.nodeSclass}">
+                                                <span sclass="${each.data.iconSclass}"/>
+                                                <label value="${each.data.name}"
+                                                       sclass="${each.data.labelSclass}"/>
+                                            </div>
+                                        </treecell>
+                                    </treerow>
+                                </treeitem>
+                            </template>
+                            <!-- Empty on purpose: the model fills it. The bundled XSD requires a
+                                 treecols or treechildren once a tree has any child at all. -->
+                            <treechildren/>
+                        </tree>
+
+                        <div sclass="tc-explorer-foot">
+                            <button id="newCaseBtn" label="New Test Case" iconSclass="z-icon-plus"
+                                    sclass="tc-btn-primary" hflex="1"/>
+                        </div>
+                    </div>
+                </west>
+
+                <!-- ===== The selected test case ===== -->
+                <center border="none" autoscroll="true">
+                    <div sclass="tc-main" hflex="1">
+                        <div sclass="tc-crumbrow" hflex="1">
+                            <label id="breadcrumb"
+                                   value="E-commerce App / Auth Module / Login Test"
+                                   sclass="tc-crumb"/>
+                            <label id="caseState" value="DRAFT" sclass="tc-draft"/>
+                            <span sclass="z-icon-history tc-histicon"/>
+                        </div>
+
+                        <div sclass="tc-titlerow" hflex="1">
+                            <vlayout spacing="0">
+                                <label id="caseTitle" value="Login Test Case" sclass="tc-title"/>
+                                <label id="caseMeta"
+                                       value="TC-102 • Last edited by John Doe 2h ago"
+                                       sclass="tc-subtitle"/>
+                            </vlayout>
+                            <button id="exportBtn" label="Export" sclass="tc-btn-ghost"/>
+                            <button id="runBtn" label="Run Test" iconSclass="z-icon-play"
+                                    sclass="tc-btn-run"/>
+                        </div>
+
+                        <div sclass="tc-card" hflex="1">
+                            <grid id="stepGrid" sclass="tc-grid" hflex="1">
+                                <columns>
+                                    <!-- The centre region is ~880px between the two side
+                                         panels, so the fixed columns are kept tight: at 290 and
+                                         230 the flexible EXPECTED RESULT column fell to ~214px
+                                         and clipped. -->
+                                    <column label="#" width="70px"/>
+                                    <column label="ACTION" width="210px"/>
+                                    <column label="EXPECTED RESULT" hflex="1"/>
+                                    <column label="ACTIONS" width="200px" align="right"/>
+                                </columns>
+                                <!-- One template, filled by setModel() in the composer. The three
+                                     literal rows the layout was judged against are gone: a model
+                                     discards markup rows silently. -->
+                                <template name="model">
+                                    <row sclass="${each.rowSclass}">
+                                        <label value="${each.number}"
+                                               sclass="${each.numberSclass}"/>
+                                        <label value="${each.action}" sclass="tc-action"/>
+                                        <label value="${each.expected}" sclass="tc-expected"/>
+                                        <div sclass="tc-rowactions">
+                                            <button iconSclass="z-icon-arrow-up"
+                                                    sclass="tc-rowicon"
+                                                    visible="${each.editing}"/>
+                                            <button iconSclass="z-icon-arrow-down"
+                                                    sclass="tc-rowicon"
+                                                    visible="${each.editing}"/>
+                                            <button iconSclass="z-icon-pencil"
+                                                    sclass="tc-rowicon tc-rowicon-edit"
+                                                    visible="${each.editing}"/>
+                                            <button iconSclass="z-icon-trash"
+                                                    sclass="tc-rowicon tc-rowicon-del"
+                                                    visible="${each.editing}"/>
+                                        </div>
+                                    </row>
+                                </template>
+                            </grid>
+
+                            <div sclass="tc-addstep" hflex="1">
+                                <div sclass="tc-addstep-icon z-icon-plus"/>
+                                <a id="addStepLink" label="Add New Step"
+                                   sclass="tc-addstep-link"/>
+                            </div>
+                        </div>
+                    </div>
+                </center>
+
+                <!-- ===== Step configuration ===== -->
+                <east width="400px" border="none" autoscroll="true">
+                    <div sclass="tc-config" hflex="1">
+                        <div sclass="tc-config-head">
+                            <span sclass="z-icon-sliders tc-config-icon"/>
+                            <label value="Step Configuration" sclass="tc-config-title"/>
+                        </div>
+                        <label id="configSub" value="Configuring Step #2" sclass="tc-config-sub"/>
+
+                        <div sclass="tc-field" hflex="1">
+                            <label value="ACTION TYPE" sclass="tc-fieldlabel"/>
+                            <combobox id="actionType" sclass="tc-input" readonly="true"
+                                      value="Type Text" hflex="1">
+                                <comboitem label="Type Text"/>
+                                <comboitem label="Click Element"/>
+                                <comboitem label="Assert Text"/>
+                                <comboitem label="Navigate"/>
+                            </combobox>
+                        </div>
+
+                        <div sclass="tc-field" hflex="1">
+                            <label value="INPUT DATA" sclass="tc-fieldlabel"/>
+                            <textbox id="inputData" sclass="tc-input" value="admin_user@test.com"
+                                     hflex="1"/>
+                            <label value="Leave empty if no input is required" sclass="tc-hint"/>
+                        </div>
+
+                        <div sclass="tc-field" hflex="1">
+                            <label value="LOCATOR TYPE" sclass="tc-fieldlabel"/>
+                            <div sclass="tc-seg">
+                                <button id="cssBtn" label="CSS Selector"
+                                        sclass="tc-seg-btn tc-seg-on"/>
+                                <button id="xpathBtn" label="XPath" sclass="tc-seg-btn"/>
+                                <button id="idBtn" label="ID" sclass="tc-seg-btn"/>
+                            </div>
+                        </div>
+
+                        <div sclass="tc-field" hflex="1">
+                            <label value="LOCATOR VALUE" sclass="tc-fieldlabel"/>
+                            <div sclass="tc-locatorrow" hflex="1">
+                                <textbox id="locatorValue" sclass="tc-input"
+                                         value="#username-input" hflex="1"/>
+                                <button id="pickBtn" iconSclass="z-icon-crosshairs"
+                                        sclass="tc-pickicon"/>
+                            </div>
+                        </div>
+
+                        <div sclass="tc-togglerow" hflex="1">
+                            <vlayout spacing="0">
+                                <label value="Screenshot on Failure" sclass="tc-toggle-label"/>
+                                <label value="Capture UI state if step fails"
+                                       sclass="tc-toggle-sub"/>
+                            </vlayout>
+                            <div sclass="tc-togglewrap">
+                                <checkbox id="screenshotToggle" mold="switch" checked="true"/>
+                            </div>
+                        </div>
+
+                        <button id="saveConfigBtn" label="Save Configuration"
+                                sclass="tc-btn-dark" hflex="1"/>
+                        <button id="resetConfigBtn" label="Reset Changes"
+                                sclass="tc-btn-reset" hflex="1"/>
+
+                        <div sclass="tc-preview" hflex="1">
+                            <span sclass="z-icon-picture-o tc-preview-icon"/>
+                            <label value="Preview Element" sclass="tc-preview-label"/>
+                        </div>
+                    </div>
+                </east>
+            </borderlayout>
+
+            <!-- ===== Footer ===== -->
+            <div sclass="tc-footer" hflex="1">
+                <div sclass="tc-health-dot"/>
+                <label id="agentStatus" value="Connected to Cloud Agent" sclass="tc-foot-text"/>
+                <label id="projectName" value="Project: E-commerce_Prod_v2" sclass="tc-foot-text"/>
+                <label id="totalSteps" value="Total Steps: 3"
+                       sclass="tc-foot-text tc-foot-right"/>
+                <label id="estimatedTime" value="Estimated Time: 1m 45s" sclass="tc-foot-text"/>
+            </div>
+        </vlayout>
+    </div>
+</zk>

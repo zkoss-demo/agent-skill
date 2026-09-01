@@ -1,0 +1,225 @@
+<?page title="Compare Revisions"?>
+<zk>
+    <style>
+    /* ===== Page behind the modal ===== */
+    .dc-page{
+        background-color: #f8fafc;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .dc-modal .z-label{
+        font-family: inherit;
+    }
+
+    /* ===== The modal itself ===== */
+    .dc-modal{
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    .dc-modal.z-window{
+        background-color: #ffffff;
+        border: 1px solid #eef2f7;
+        border-radius: 14px;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.10);
+    }
+    .dc-modal .z-window-content{
+        background-color: transparent;
+        border: 0 none;
+        padding: 0;
+    }
+
+    /* ===== Modal header ===== */
+    .dc-head{
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 26px 30px 22px 30px;
+    }
+    .dc-head-icon{ color: #2563eb; font-size: 20px; padding-top: 3px; }
+    .dc-title{
+        display: block;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+    }
+    .dc-sub{ padding-top: 8px; }
+    .dc-sub-text{ font-size: 16px; color: #64748b; }
+    .dc-sub-strong{ font-size: 16px; font-weight: 700; color: #334155; }
+    .dc-modal button.dc-close{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #94a3b8;
+        font-size: 19px;
+        margin-left: auto;
+        padding: 4px 6px;
+    }
+
+    /* ===== Comparison table ===== */
+    .dc-modal .dc-grid{
+        border: 0 none;
+    }
+    .dc-modal .dc-grid .z-column{
+        background-color: #f8fafc;
+        background-image: none;
+        border-top: 1px solid #eef2f7;
+        border-bottom: 1px solid #eef2f7;
+        border-left: 0 none;
+    }
+    .dc-modal .dc-grid .z-column-content{
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        padding: 20px 22px;
+    }
+    /* A grid's data cells are td.z-row-inner -- NOT .z-cell, which is what an explicit cell
+       component renders. Measured out of the rendered DOM after two rules aimed at .z-cell
+       painted nothing at all. */
+    .dc-modal .dc-grid .z-row-inner{
+        background-color: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+        border-left: 0 none;
+        border-right: 0 none;
+        padding: 20px 22px;
+        vertical-align: middle;
+    }
+    /* The FIELD NAME column is a single grey band down the middle of the table. Every row here
+       has exactly three cells, so the middle one is nth-child(2). */
+    .dc-modal .dc-grid .z-row-inner:nth-child(2){
+        background-color: #f8fafc;
+    }
+    .dc-old{ font-size: 16px; color: #475569; }
+    .dc-old-gone{
+        font-size: 16px;
+        color: #94a3b8;
+        text-decoration: line-through;
+    }
+    .dc-old-muted{ font-size: 16px; color: #94a3b8; }
+    .dc-field{
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .dc-flag{
+        background-color: #dbeafe;
+        border-radius: 5px;
+        color: #1d4ed8;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        padding: 4px 9px;
+    }
+    .dc-flagwrap{ padding-top: 9px; text-align: center; }
+    .dc-new{ font-size: 16px; color: #334155; }
+    .dc-new-changed{ font-size: 16px; font-weight: 700; color: #1d4ed8; }
+    .dc-new-alert{ font-size: 16px; font-weight: 700; color: #dc2626; }
+    .dc-new-icon{ color: #2563eb; font-size: 14px; }
+    .dc-new-icon-alert{ color: #dc2626; font-size: 14px; }
+    .dc-avatar{
+        width: 26px;
+        height: 26px;
+        border-radius: 13px;
+        background-color: #dbe6f6;
+        color: #475569;
+        font-size: 11px;
+        line-height: 26px;
+        text-align: center;
+    }
+
+    /* ===== Modal footer ===== */
+    .dc-foot{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-top: 1px solid #eef2f7;
+        padding: 20px 30px 22px 30px;
+    }
+    .dc-foot-icon{ color: #cbd5e1; font-size: 14px; }
+    .dc-foot-note{ font-size: 14px; color: #94a3b8; }
+    .dc-modal button.dc-btn-ghost{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        color: #334155;
+        font-size: 16px;
+        font-weight: 600;
+        margin-left: auto;
+        padding: 13px 22px;
+    }
+    .dc-modal button.dc-btn-dark{
+        background-color: #1e293b;
+        background-image: none;
+        border: 0 none;
+        border-radius: 9px;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 600;
+        padding: 13px 26px;
+    }
+    </style>
+
+    <div sclass="dc-page" hflex="1" vflex="1">
+        <window viewModel="@id('vm') @init('zwriter.DataComparisonViewModel')"
+                mode="modal" width="1275px" border="none" sclass="dc-modal">
+
+            <!-- ===== Header ===== -->
+            <div sclass="dc-head" hflex="1">
+                <span sclass="z-icon-file-text-o dc-head-icon"/>
+                <vlayout spacing="0">
+                    <label value="Compare Revisions" sclass="dc-title"/>
+                    <div sclass="dc-sub">
+                        <label value="Reviewing changes between " sclass="dc-sub-text"/>
+                        <label value="@load(vm.originalVersionLabel)" sclass="dc-sub-strong"/>
+                        <label value=" and " sclass="dc-sub-text"/>
+                        <label value="@load(vm.revisedVersionLabel)" sclass="dc-sub-strong"/>
+                    </div>
+                </vlayout>
+                <button iconSclass="z-icon-times" sclass="dc-close"
+                        onClick="@command('close')"/>
+            </div>
+
+            <!-- ===== Field-by-field comparison ===== -->
+            <grid model="@load(vm.fieldDiffs)" sclass="dc-grid" hflex="1">
+                <columns>
+                    <column label="@load(vm.originalColumnLabel)" hflex="1" align="right"/>
+                    <column label="FIELD NAME" width="340px" align="center"/>
+                    <column label="@load(vm.revisedColumnLabel)" hflex="1" align="left"/>
+                </columns>
+                <template name="model" var="diff">
+                    <row>
+                        <label value="@load(diff.originalValue)"
+                               sclass="@load(diff.originalSclass)"/>
+                        <vlayout spacing="0">
+                            <label value="@load(diff.fieldName)" sclass="dc-field"/>
+                            <div sclass="dc-flagwrap" visible="@load(diff.modified)">
+                                <label value="MODIFIED" sclass="dc-flag"/>
+                            </div>
+                        </vlayout>
+                        <hlayout valign="middle" spacing="8px">
+                            <div sclass="dc-avatar z-icon-user"
+                                 visible="@load(diff.avatarShown)"/>
+                            <label value="@load(diff.revisedValue)"
+                                   sclass="@load(diff.revisedSclass)"/>
+                            <span sclass="@load(diff.revisedIconSclass)"
+                                  visible="@load(diff.revisedIconShown)"/>
+                        </hlayout>
+                    </row>
+                </template>
+            </grid>
+
+            <!-- ===== Footer ===== -->
+            <div sclass="dc-foot" hflex="1">
+                <span sclass="z-icon-info-circle dc-foot-icon"/>
+                <label value="Differences are highlighted for clarity." sclass="dc-foot-note"/>
+                <button label="Download PDF" sclass="dc-btn-ghost"
+                        onClick="@command('downloadPdf')"/>
+                <button label="Done" sclass="dc-btn-dark" onClick="@command('close')"/>
+            </div>
+        </window>
+    </div>
+</zk>

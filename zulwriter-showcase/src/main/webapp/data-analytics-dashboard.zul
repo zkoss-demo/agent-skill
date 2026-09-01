@@ -1,0 +1,624 @@
+<?page title="InsightPro Analytics"?>
+<zk>
+    <style>
+    /* ===== Page shell ===== */
+    .da-page{
+        background-color: #f4f7fb;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .da-page .z-label{
+        font-family: inherit;
+    }
+
+    /* ===== Top bar ===== */
+    .da-topbar{
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 14px 40px;
+    }
+    .da-logo{
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background-color: #2563eb;
+        color: #ffffff;
+        font-size: 19px;
+        line-height: 44px;
+        text-align: center;
+    }
+    .da-brand-name{
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        padding-right: 14px;
+    }
+    .da-nav{
+        display: flex;
+        align-items: center;
+        gap: 34px;
+    }
+    .da-page a.da-navlink{
+        color: #475569;
+        font-size: 17px;
+        text-decoration: none;
+    }
+    .da-page a.da-navlink-on{
+        color: #2563eb;
+        font-weight: 600;
+        border-bottom: 2px solid #2563eb;
+        padding-bottom: 5px;
+    }
+    .da-searchwrap{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+        width: 400px;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0 16px;
+    }
+    .da-search-icon{ color: #94a3b8; font-size: 15px; }
+    .da-page input.da-search{
+        flex: 1;
+        border: 0 none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 13px 0;
+        font-size: 16px;
+        color: #0f172a;
+    }
+    .da-bellbox{
+        position: relative;
+        background-color: #f1f5f9;
+        border-radius: 11px;
+        padding: 12px 14px;
+    }
+    .da-bell{ color: #334155; font-size: 17px; }
+    .da-bell-dot{
+        position: absolute;
+        top: 8px;
+        right: 9px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #ef4444;
+    }
+    .da-userbox{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-left: 1px solid #e8eef5;
+        padding-left: 22px;
+    }
+    .da-user-name{
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+        text-align: right;
+    }
+    .da-user-role{
+        display: block;
+        font-size: 13px;
+        color: #94a3b8;
+        text-align: right;
+    }
+    .da-avatar{
+        width: 44px;
+        height: 44px;
+        border-radius: 22px;
+        background-color: #fde8d7;
+        color: #c05621;
+        font-size: 17px;
+        line-height: 44px;
+        text-align: center;
+    }
+
+    /* ===== Content column ===== */
+    .da-body{ padding: 26px 50px 50px 50px; }
+
+    /* ===== Filter bar ===== */
+    .da-filterbar{
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background-color: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        padding: 20px 22px;
+        margin-bottom: 26px;
+    }
+    .da-filter{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        padding: 0 6px 0 16px;
+    }
+    .da-filter-icon{ color: #64748b; font-size: 15px; }
+    .da-page .da-filter-box .z-combobox-input{
+        border: 0 none;
+        box-shadow: none;
+        color: #1e293b;
+        font-size: 16px;
+        padding: 13px 4px;
+    }
+    .da-page .da-filter-box .z-combobox-button{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #94a3b8;
+    }
+    .da-page button.da-btn-primary{
+        background-color: #2563eb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 11px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        margin-left: auto;
+        padding: 15px 26px;
+    }
+    .da-page button.da-btn-icon{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #94a3b8;
+        font-size: 19px;
+        padding: 12px;
+    }
+
+    /* ===== KPI cards ===== */
+    /* A wrapping 4-across grid: 3 gaps of 24px shared out of the row, so each card is
+       calc(25% - 18px). hflex cannot express "a quarter, and wrap to the next line". */
+    .da-kpirow{
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 24px;
+        padding-bottom: 26px;
+    }
+    .da-kpi{
+        display: flex;
+        flex-direction: column;
+        width: calc(25% - 18px);
+        background-color: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        padding: 24px 26px 26px 26px;
+    }
+    .da-kpi-top{
+        display: flex;
+        align-items: flex-start;
+        padding-bottom: 22px;
+    }
+    .da-kpi-tile{
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        font-size: 18px;
+        line-height: 48px;
+        text-align: center;
+    }
+    .da-tile-blue{ background-color: #e6efff; color: #2563eb; }
+    .da-tile-sky{ background-color: #e6f1fe; color: #0284c7; }
+    .da-tile-amber{ background-color: #fef3c7; color: #d97706; }
+    .da-tile-violet{ background-color: #f3e8ff; color: #9333ea; }
+    .da-kpi-delta{
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: auto;
+    }
+    .da-delta-up{ color: #16a34a; font-size: 16px; font-weight: 600; }
+    .da-delta-down{ color: #ef4444; font-size: 16px; font-weight: 600; }
+    .da-delta-icon-up{ color: #16a34a; font-size: 12px; }
+    .da-delta-icon-down{ color: #ef4444; font-size: 12px; }
+    .da-kpi-label{
+        display: block;
+        font-size: 17px;
+        color: #64748b;
+        padding-bottom: 8px;
+    }
+    .da-kpi-value{
+        display: block;
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+    }
+
+    /* ===== Panels ===== */
+    .da-panel{
+        background-color: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        padding: 24px 26px 22px 26px;
+    }
+    .da-panel-head{
+        display: flex;
+        align-items: flex-start;
+        padding-bottom: 18px;
+    }
+    .da-panel-title{
+        display: block;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .da-panel-sub{
+        display: block;
+        font-size: 15px;
+        color: #94a3b8;
+        padding-top: 6px;
+    }
+    .da-panel-kebab{ margin-left: auto; color: #cbd5e1; font-size: 16px; }
+
+    /* ===== Donut with a centred total ===== */
+    .da-donutwrap{ position: relative; }
+    .da-donut-centre{
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+    }
+    .da-donut-value{
+        font-size: 32px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+    .da-donut-caption{
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        color: #94a3b8;
+    }
+    .da-legend{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        padding-top: 6px;
+    }
+    .da-legend-item{
+        display: flex;
+        align-items: center;
+        gap: 9px;
+    }
+    .da-legend-dot{
+        width: 9px;
+        height: 9px;
+        border-radius: 5px;
+    }
+    .da-dot-north{ background-color: #2563eb; }
+    .da-dot-south{ background-color: #f5b912; }
+    .da-legend-text{ font-size: 15px; color: #334155; }
+
+    /* ===== Density heatmap ===== */
+    .da-heatgrid{
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 11px;
+        padding: 6px 0 16px 0;
+    }
+    .da-heatcell{
+        height: 54px;
+        border-radius: 9px;
+    }
+    .da-heat-1{ background-color: #eef4ff; }
+    .da-heat-2{ background-color: #dbe7fe; }
+    .da-heat-3{ background-color: #c3d8fd; }
+    .da-heat-4{ background-color: #93b8fb; }
+    .da-heat-5{ background-color: #3b7bf6; }
+    .da-heatfoot{
+        display: flex;
+        align-items: center;
+    }
+    .da-heatfoot-label{
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: #94a3b8;
+    }
+    .da-heatfoot-right{ margin-left: auto; }
+
+    /* ===== Department performance table ===== */
+    .da-table-panel{
+        background-color: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        padding: 24px 0 8px 0;
+        margin-top: 26px;
+    }
+    .da-table-head{
+        display: flex;
+        align-items: center;
+        padding: 0 26px 20px 26px;
+    }
+    .da-page .da-grid{
+        border: 0 none;
+    }
+    .da-page .da-grid .z-column{
+        background-color: #ffffff;
+        background-image: none;
+        border-top: 1px solid #eef2f7;
+        border-bottom: 1px solid #eef2f7;
+        border-left: 0 none;
+    }
+    .da-page .da-grid .z-column-content{
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        padding: 18px 26px;
+    }
+    /* A grid's data cells are td.z-row-inner, not .z-cell. */
+    .da-page .da-grid .z-row-inner{
+        background-color: #ffffff;
+        border-bottom: 1px solid #f4f7fb;
+        border-left: 0 none;
+        border-right: 0 none;
+        padding: 22px 26px;
+        vertical-align: middle;
+    }
+    .da-cell{ font-size: 17px; color: #1e293b; }
+    .da-cell-muted{ font-size: 17px; color: #475569; }
+    .da-chip{
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 6px 14px;
+    }
+    .da-chip-active{ background-color: #dcfce7; color: #15803d; }
+    .da-chip-hold{ background-color: #fef3c7; color: #b45309; }
+    .da-perf{
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .da-page .da-perfbar{
+        background-color: #eef2f7;
+        background-image: none;
+        border: 0 none;
+        border-radius: 4px;
+        height: 8px;
+        width: 250px;
+    }
+    .da-page .da-perfbar .z-progressmeter-image{
+        background-color: #2563eb;
+        background-image: none;
+        border-radius: 4px;
+        height: 8px;
+    }
+    .da-page .da-perfbar-hold .z-progressmeter-image{
+        background-color: #f5b912;
+    }
+    .da-perf-value{ font-size: 17px; font-weight: 600; color: #1e293b; }
+    .da-page button.da-rowaction{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #94a3b8;
+        font-size: 16px;
+        padding: 6px;
+    }
+
+    /* ===== Floating action button ===== */
+    .da-page button.da-fab{
+        position: fixed;
+        right: 44px;
+        bottom: 44px;
+        background-color: #2563eb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 30px;
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+        color: #ffffff;
+        font-size: 22px;
+        height: 60px;
+        width: 60px;
+    }
+    </style>
+
+    <div viewModel="@id('vm') @init('zwriter.DataAnalyticsViewModel')" sclass="da-page" hflex="1">
+
+        <!-- ===== Top bar ===== -->
+        <div sclass="da-topbar" hflex="1">
+            <div sclass="da-logo z-icon-bar-chart"/>
+            <label value="InsightPro" sclass="da-brand-name"/>
+            <div sclass="da-nav">
+                <a label="Dashboard" sclass="da-navlink da-navlink-on"/>
+                <a label="Reports" sclass="da-navlink"/>
+                <a label="Inventory" sclass="da-navlink"/>
+                <a label="Settings" sclass="da-navlink"/>
+            </div>
+            <div sclass="da-searchwrap">
+                <span sclass="z-icon-search da-search-icon"/>
+                <textbox placeholder="Search analytics..." sclass="da-search"/>
+            </div>
+            <div sclass="da-bellbox">
+                <span sclass="z-icon-bell da-bell"/>
+                <div sclass="da-bell-dot"/>
+            </div>
+            <div sclass="da-userbox">
+                <vlayout spacing="2px">
+                    <label value="@load(vm.userName)" sclass="da-user-name"/>
+                    <label value="@load(vm.userRole)" sclass="da-user-role"/>
+                </vlayout>
+                <div sclass="da-avatar z-icon-user"/>
+            </div>
+        </div>
+
+        <div sclass="da-body" hflex="1">
+
+            <!-- ===== Filters ===== -->
+            <div sclass="da-filterbar" hflex="1">
+                <div sclass="da-filter">
+                    <span sclass="z-icon-calendar da-filter-icon"/>
+                    <combobox sclass="da-filter-box" readonly="true" value="@load(vm.selectedPeriod)"
+                              width="180px">
+                        <comboitem label="Last 7 Days"/>
+                        <comboitem label="Last 30 Days"/>
+                        <comboitem label="Last 90 Days"/>
+                    </combobox>
+                </div>
+                <div sclass="da-filter">
+                    <span sclass="z-icon-globe da-filter-icon"/>
+                    <combobox sclass="da-filter-box" readonly="true" value="@load(vm.selectedRegion)"
+                              width="180px">
+                        <comboitem label="Global Region"/>
+                        <comboitem label="North"/>
+                        <comboitem label="South"/>
+                    </combobox>
+                </div>
+                <div sclass="da-filter">
+                    <span sclass="z-icon-building-o da-filter-icon"/>
+                    <combobox sclass="da-filter-box" readonly="true" value="@load(vm.selectedDepartment)"
+                              width="200px">
+                        <comboitem label="All Departments"/>
+                        <comboitem label="Engineering"/>
+                        <comboitem label="Marketing"/>
+                        <comboitem label="Sales"/>
+                    </combobox>
+                </div>
+                <button label="Apply Filters" iconSclass="z-icon-filter"
+                        sclass="da-btn-primary" onClick="@command('applyFilters')"/>
+                <button iconSclass="z-icon-refresh" sclass="da-btn-icon"
+                        onClick="@command('refresh')"/>
+            </div>
+
+            <!-- ===== Headline figures ===== -->
+            <div sclass="da-kpirow" hflex="1">
+                <forEach items="@load(vm.kpis)" var="kpi">
+                    <div sclass="da-kpi">
+                        <div sclass="da-kpi-top">
+                            <div sclass="@load(kpi.tileSclass)"/>
+                            <div sclass="da-kpi-delta">
+                                <span sclass="@load(kpi.deltaIconSclass)"/>
+                                <label value="@load(kpi.delta)" sclass="@load(kpi.deltaSclass)"/>
+                            </div>
+                        </div>
+                        <label value="@load(kpi.label)" sclass="da-kpi-label"/>
+                        <label value="@load(kpi.value)" sclass="da-kpi-value"/>
+                    </div>
+                </forEach>
+            </div>
+
+            <!-- ===== Three analysis panels ===== -->
+            <hlayout hflex="1" spacing="24px" valign="top">
+
+                <div sclass="da-panel" hflex="2">
+                    <div sclass="da-panel-head">
+                        <vlayout spacing="0">
+                            <label value="Revenue Trends Over Time" sclass="da-panel-title"/>
+                            <label value="Monthly revenue performance across all regions"
+                                   sclass="da-panel-sub"/>
+                        </vlayout>
+                        <span sclass="z-icon-ellipsis-v da-panel-kebab"/>
+                    </div>
+                    <charts type="area" model="@load(vm.revenueModel)" title=""
+                            legend="@load(vm.noLegend)" credits="@load(vm.noCredits)"
+                            exporting="@load(vm.noExporting)" colors="@load(vm.blueSeries)"
+                            height="330px"/>
+                </div>
+
+                <div sclass="da-panel" hflex="1">
+                    <div sclass="da-panel-head">
+                        <vlayout spacing="0">
+                            <label value="Regional Distribution" sclass="da-panel-title"/>
+                            <label value="Revenue share by territory" sclass="da-panel-sub"/>
+                        </vlayout>
+                        <span sclass="z-icon-ellipsis-v da-panel-kebab"/>
+                    </div>
+                    <div sclass="da-donutwrap" hflex="1">
+                        <charts type="pie" model="@load(vm.regionModel)" title=""
+                                legend="@load(vm.noLegend)" credits="@load(vm.noCredits)"
+                                exporting="@load(vm.noExporting)"
+                                plotOptions="@load(vm.donutPlotOptions)"
+                                colors="@load(vm.regionSeries)" height="290px"/>
+                        <div sclass="da-donut-centre">
+                            <label value="@load(vm.totalShareLabel)" sclass="da-donut-value"/>
+                            <label value="TOTAL" sclass="da-donut-caption"/>
+                        </div>
+                    </div>
+                    <div sclass="da-legend" hflex="1">
+                        <forEach items="@load(vm.regionShares)" var="share">
+                            <div sclass="da-legend-item">
+                                <div sclass="@load(share.dotSclass)"/>
+                                <label value="@load(share.label)" sclass="da-legend-text"/>
+                            </div>
+                        </forEach>
+                    </div>
+                </div>
+
+                <div sclass="da-panel" hflex="1">
+                    <div sclass="da-panel-head">
+                        <vlayout spacing="0">
+                            <label value="Density Heatmap" sclass="da-panel-title"/>
+                            <label value="User activity density across departments"
+                                   sclass="da-panel-sub"/>
+                        </vlayout>
+                        <span sclass="z-icon-ellipsis-v da-panel-kebab"/>
+                    </div>
+                    <div sclass="da-heatgrid" hflex="1">
+                        <forEach items="@load(vm.densityCells)" var="cell">
+                            <div sclass="@load(cell.sclass)" tooltiptext="@load(cell.tooltip)"/>
+                        </forEach>
+                    </div>
+                    <div sclass="da-heatfoot" hflex="1">
+                        <label value="LOW DENSITY" sclass="da-heatfoot-label"/>
+                        <label value="HIGH DENSITY" sclass="da-heatfoot-label da-heatfoot-right"/>
+                    </div>
+                </div>
+            </hlayout>
+
+            <!-- ===== Department performance ===== -->
+            <div sclass="da-table-panel" hflex="1">
+                <div sclass="da-table-head" hflex="1">
+                    <label value="Department Performance" sclass="da-panel-title"/>
+                    <span sclass="z-icon-ellipsis-v da-panel-kebab"/>
+                </div>
+                <grid model="@load(vm.departments)" sclass="da-grid" hflex="1">
+                    <columns>
+                        <column label="DEPARTMENT" hflex="1"/>
+                        <column label="MANAGER" hflex="1"/>
+                        <column label="STATUS" width="200px"/>
+                        <column label="PERFORMANCE" width="420px"/>
+                        <column label="ACTIONS" width="150px" align="right"/>
+                    </columns>
+                    <template name="model" var="dept">
+                        <row>
+                            <label value="@load(dept.name)" sclass="da-cell"/>
+                            <label value="@load(dept.manager)" sclass="da-cell-muted"/>
+                            <label value="@load(dept.statusLabel)"
+                                   sclass="@load(dept.statusSclass)"/>
+                            <div sclass="da-perf">
+                                <progressmeter value="@load(dept.score)"
+                                               sclass="@load(dept.barSclass)"/>
+                                <label value="@load(dept.score)" sclass="da-perf-value"/>
+                            </div>
+                            <button iconSclass="z-icon-pencil" sclass="da-rowaction"
+                                    onClick="@command('editDepartment')"/>
+                        </row>
+                    </template>
+                </grid>
+            </div>
+        </div>
+
+        <button iconSclass="z-icon-plus" sclass="da-fab" onClick="@command('newReport')"/>
+    </div>
+</zk>

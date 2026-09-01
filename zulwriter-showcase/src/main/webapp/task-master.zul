@@ -1,0 +1,528 @@
+<?page title="TaskMaster"?>
+<zk>
+    <style>
+    /* ===== Page shell ===== */
+    .tm-page{
+        background-color: #f8fafc;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .tm-page .z-label{
+        font-family: inherit;
+    }
+
+    /* ===== Sidebar ===== */
+    .tm-sidebar{
+        display: flex;
+        flex-direction: column;
+        background-color: #ffffff;
+        border-right: 1px solid #e8eef5;
+        padding: 26px 20px 24px 20px;
+    }
+    .tm-brand{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 8px 30px 8px;
+    }
+    .tm-logo{
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background-color: #2563eb;
+        color: #ffffff;
+        font-size: 19px;
+        line-height: 44px;
+        text-align: center;
+    }
+    .tm-brand-name{
+        display: block;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .tm-brand-sub{
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.11em;
+        color: #94a3b8;
+    }
+    .tm-navrow{
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-radius: 10px;
+        padding: 12px 12px;
+    }
+    .tm-navrow-icon{ color: #475569; font-size: 17px; }
+    .tm-navrow-label{ font-size: 17px; font-weight: 500; color: #1e293b; }
+    .tm-section{
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        color: #94a3b8;
+        padding: 26px 12px 10px 12px;
+    }
+
+    /* ===== Sidebar tree ===== */
+    /* ZK paints its own borders and row backgrounds; the mockup has none of either. */
+    .tm-page .tm-tree{
+        border: 0 none;
+        background-color: transparent;
+    }
+    .tm-page .tm-tree .z-treecell,
+    .tm-page .tm-tree .z-treerow{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        padding: 0;
+    }
+    .tm-page .tm-tree .z-treerow:hover .z-treecell{
+        background-color: transparent;
+    }
+    /* ZK puts the indent spacers and the open/close toggle inline before the cell's own
+       children. A block-level node div would drop onto the line below them, taking the
+       indentation with it -- so the cell content is a flex row and the node fills the rest. */
+    .tm-page .tm-tree .z-treecell-content{
+        display: flex;
+        align-items: center;
+        padding: 0;
+    }
+    .tm-page .tm-tree .z-tree-icon{
+        flex: 0 0 auto;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+    .tm-node{
+        display: flex;
+        align-items: center;
+        flex: 1;
+        gap: 14px;
+        border-radius: 10px;
+        padding: 11px 12px;
+    }
+    .tm-node-on{ background-color: #eff6ff; }
+    .tm-node-icon{ color: #64748b; font-size: 15px; }
+    .tm-node-icon-open{ color: #2563eb; }
+    .tm-node-label{ font-size: 16px; color: #334155; }
+    .tm-node-label-on{ color: #2563eb; font-weight: 600; }
+
+    /* ===== Sidebar footer ===== */
+    .tm-sidebar-foot{
+        margin-top: auto;
+        padding: 20px 4px 0 4px;
+    }
+    .tm-page button.tm-btn-primary{
+        background-color: #2563eb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 12px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        padding: 16px 20px;
+    }
+
+    /* ===== Top bar ===== */
+    .tm-topbar{
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 18px 40px;
+    }
+    .tm-crumbs{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .tm-page a.tm-crumb{
+        color: #94a3b8;
+        font-size: 16px;
+        text-decoration: none;
+    }
+    .tm-crumb-now{ font-size: 16px; font-weight: 700; color: #0f172a; }
+    .tm-crumb-sep{ color: #cbd5e1; font-size: 12px; }
+    .tm-searchwrap{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+        width: 380px;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0 16px;
+    }
+    .tm-search-icon{ color: #94a3b8; font-size: 15px; }
+    .tm-page input.tm-search{
+        flex: 1;
+        border: 0 none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 13px 0;
+        font-size: 16px;
+        color: #0f172a;
+    }
+    .tm-bellwrap{
+        position: relative;
+        padding: 0 6px;
+    }
+    .tm-bell{ color: #64748b; font-size: 19px; }
+    .tm-bell-dot{
+        position: absolute;
+        top: -3px;
+        right: 2px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #ef4444;
+    }
+    .tm-userbox{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-left: 1px solid #e8eef5;
+        padding-left: 24px;
+    }
+    .tm-user-name{
+        display: block;
+        font-size: 16px;
+        font-weight: 600;
+        text-align: right;
+    }
+    .tm-user-role{
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: #94a3b8;
+        text-align: right;
+    }
+    .tm-avatar{
+        width: 44px;
+        height: 44px;
+        border-radius: 22px;
+        background-color: #dbe6f6;
+        color: #475569;
+        font-size: 17px;
+        line-height: 44px;
+        text-align: center;
+    }
+
+    /* ===== Section header ===== */
+    .tm-head{
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 34px 40px 26px 40px;
+    }
+    .tm-title{
+        display: block;
+        font-size: 32px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+    .tm-subtitle{
+        display: block;
+        font-size: 16px;
+        color: #64748b;
+        padding-top: 6px;
+    }
+    .tm-seg{
+        display: flex;
+        align-items: center;
+        margin-left: auto;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 5px;
+    }
+    .tm-page button.tm-seg-btn{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        border-radius: 9px;
+        color: #475569;
+        font-size: 15px;
+        font-weight: 500;
+        padding: 9px 18px;
+    }
+    .tm-page button.tm-seg-on{
+        background-color: #2563eb;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    .tm-page .tm-sort .z-combobox-input{
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: none;
+        color: #334155;
+        font-size: 15px;
+        padding: 12px 14px;
+    }
+    .tm-page button.tm-addbtn{
+        background-color: #2563eb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 12px;
+        color: #ffffff;
+        font-size: 18px;
+        padding: 13px 15px;
+    }
+
+    /* ===== Card grid ===== */
+    /* A wrapping 4-across grid: 3 gaps of 24px shared out of the row, so each card is
+       calc(25% - 18px). hflex cannot express "a quarter, and wrap to the next line". */
+    .tm-cardgrid{
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 24px;
+        padding: 0 40px 40px 40px;
+    }
+    .tm-card{
+        display: flex;
+        flex-direction: column;
+        width: calc(25% - 18px);
+        background-color: #ffffff;
+        border: 1px solid #eef2f7;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        padding: 22px;
+    }
+    .tm-card-top{
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+    .tm-chip{
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        padding: 6px 11px;
+    }
+    .tm-chip-progress{ background-color: #fef3c7; color: #b45309; }
+    .tm-chip-done{ background-color: #dcfce7; color: #15803d; }
+    .tm-chip-todo{ background-color: #dbeafe; color: #1d4ed8; }
+    .tm-card-kebab{ margin-left: auto; color: #cbd5e1; font-size: 16px; }
+    .tm-card-title{
+        display: block;
+        font-size: 19px;
+        font-weight: 700;
+        line-height: 1.3;
+        color: #0f172a;
+        margin-bottom: 12px;
+    }
+    .tm-card-desc{
+        display: block;
+        font-size: 15px;
+        line-height: 1.5;
+        color: #64748b;
+    }
+    .tm-card-foot{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: auto;
+        padding-top: 22px;
+    }
+    .tm-prio-icon{ font-size: 15px; }
+    .tm-prio-high{ color: #dc2626; }
+    .tm-prio-medium{ color: #2563eb; }
+    .tm-prio-low{ color: #94a3b8; }
+    .tm-prio{
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+    }
+    .tm-prio-label-high{ color: #dc2626; }
+    .tm-prio-label-medium{ color: #2563eb; }
+    .tm-prio-label-low{ color: #64748b; }
+    .tm-avatars{
+        display: flex;
+        margin-left: auto;
+    }
+    .tm-avatar-sm{
+        width: 30px;
+        height: 30px;
+        border-radius: 15px;
+        background-color: #e2e8f0;
+        border: 2px solid #ffffff;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 26px;
+        text-align: center;
+        margin-left: -8px;
+    }
+
+    /* ===== "Create new task" placeholder card ===== */
+    .tm-newcard{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        width: calc(25% - 18px);
+        min-height: 250px;
+        border: 2px dashed #d8e0ea;
+        border-radius: 14px;
+    }
+    .tm-newcard-icon{
+        width: 44px;
+        height: 44px;
+        border-radius: 22px;
+        background-color: #f1f5f9;
+        color: #475569;
+        font-size: 15px;
+        line-height: 44px;
+        text-align: center;
+    }
+    .tm-newcard-label{ font-size: 16px; color: #64748b; }
+    </style>
+
+    <div viewModel="@id('vm') @init('zwriter.TaskMasterViewModel')" sclass="tm-page"
+         hflex="1" vflex="1">
+        <hlayout hflex="1" vflex="1" spacing="0" valign="top">
+
+            <!-- ===== Sidebar ===== -->
+            <div sclass="tm-sidebar" width="360px" vflex="1">
+                <div sclass="tm-brand">
+                    <div sclass="tm-logo z-icon-th-large"/>
+                    <vlayout spacing="2px">
+                        <label value="TaskMaster" sclass="tm-brand-name"/>
+                        <label value="ENTERPRISE V1.2" sclass="tm-brand-sub"/>
+                    </vlayout>
+                </div>
+
+                <div sclass="tm-navrow">
+                    <span sclass="z-icon-th tm-navrow-icon"/>
+                    <label value="Dashboard" sclass="tm-navrow-label"/>
+                </div>
+
+                <label value="WORKSPACES" sclass="tm-section"/>
+
+                <tree model="@load(vm.workspaceModel)" sclass="tm-tree" hflex="1" vflex="min">
+                    <template name="model" var="node">
+                        <treeitem>
+                            <treerow>
+                                <treecell>
+                                    <div sclass="@load(node.data.nodeSclass)">
+                                        <span sclass="@load(node.data.iconSclass)"/>
+                                        <label value="@load(node.data.name)"
+                                               sclass="@load(node.data.labelSclass)"/>
+                                    </div>
+                                </treecell>
+                            </treerow>
+                        </treeitem>
+                    </template>
+                    <!-- Empty on purpose: the model fills it. The bundled XSD requires a
+                         treecols or treechildren once a tree has any child at all. -->
+                    <treechildren/>
+                </tree>
+
+                <div sclass="tm-navrow">
+                    <span sclass="z-icon-bar-chart tm-navrow-icon"/>
+                    <label value="Reports" sclass="tm-navrow-label"/>
+                </div>
+                <div sclass="tm-navrow">
+                    <span sclass="z-icon-cog tm-navrow-icon"/>
+                    <label value="Settings" sclass="tm-navrow-label"/>
+                </div>
+
+                <div sclass="tm-sidebar-foot">
+                    <button label="New Project" iconSclass="z-icon-plus"
+                            sclass="tm-btn-primary" hflex="1"
+                            onClick="@command('newProject')"/>
+                </div>
+            </div>
+
+            <!-- ===== Main column ===== -->
+            <vlayout hflex="1" vflex="1" spacing="0">
+
+                <!-- ===== Top bar ===== -->
+                <div sclass="tm-topbar" hflex="1">
+                    <div sclass="tm-crumbs">
+                        <a label="@load(vm.crumbProject)" sclass="tm-crumb"/>
+                        <span sclass="z-icon-angle-right tm-crumb-sep"/>
+                        <a label="@load(vm.crumbTeam)" sclass="tm-crumb"/>
+                        <span sclass="z-icon-angle-right tm-crumb-sep"/>
+                        <label value="@load(vm.crumbSprint)" sclass="tm-crumb-now"/>
+                    </div>
+                    <div sclass="tm-searchwrap">
+                        <span sclass="z-icon-search tm-search-icon"/>
+                        <textbox placeholder="Search tasks..." sclass="tm-search"/>
+                    </div>
+                    <div sclass="tm-bellwrap">
+                        <span sclass="z-icon-bell tm-bell"/>
+                        <div sclass="tm-bell-dot"/>
+                    </div>
+                    <div sclass="tm-userbox">
+                        <vlayout spacing="2px">
+                            <label value="@load(vm.userName)" sclass="tm-user-name"/>
+                            <label value="@load(vm.userRole)" sclass="tm-user-role"/>
+                        </vlayout>
+                        <div sclass="tm-avatar z-icon-user"/>
+                    </div>
+                </div>
+
+                <!-- ===== Section header ===== -->
+                <div sclass="tm-head" hflex="1">
+                    <vlayout spacing="0">
+                        <label value="Recent Tasks" sclass="tm-title"/>
+                        <label value="Manage your active workload for the current sprint."
+                               sclass="tm-subtitle"/>
+                    </vlayout>
+                    <div sclass="tm-seg">
+                        <button label="Status: All" sclass="tm-seg-btn tm-seg-on"/>
+                        <button label="Priority" sclass="tm-seg-btn"/>
+                        <button label="Due Date" sclass="tm-seg-btn"/>
+                    </div>
+                    <combobox sclass="tm-sort" readonly="true" value="Sort: Newest" width="200px">
+                        <comboitem label="Sort: Newest"/>
+                        <comboitem label="Sort: Oldest"/>
+                        <comboitem label="Sort: Priority"/>
+                    </combobox>
+                    <button iconSclass="z-icon-check-square-o" sclass="tm-addbtn"
+                            onClick="@command('newTask')"/>
+                </div>
+
+                <!-- ===== Task cards ===== -->
+                <div sclass="tm-cardgrid" hflex="1">
+                    <forEach items="@load(vm.tasks)" var="task">
+                        <div sclass="tm-card">
+                            <div sclass="tm-card-top">
+                                <label value="@load(task.statusLabel)"
+                                       sclass="@load(task.statusSclass)"/>
+                                <span sclass="z-icon-ellipsis-v tm-card-kebab"/>
+                            </div>
+                            <label value="@load(task.title)" sclass="tm-card-title"/>
+                            <label value="@load(task.description)" sclass="tm-card-desc"/>
+                            <div sclass="tm-card-foot">
+                                <span sclass="@load(task.priorityIconSclass)"/>
+                                <label value="@load(task.priorityLabel)"
+                                       sclass="@load(task.prioritySclass)"/>
+                                <div sclass="tm-avatars">
+                                    <forEach items="@load(task.assignees)" var="assignee">
+                                        <div sclass="tm-avatar-sm z-icon-user"
+                                             tooltiptext="@load(assignee)"/>
+                                    </forEach>
+                                </div>
+                            </div>
+                        </div>
+                    </forEach>
+
+                    <div sclass="tm-newcard" onClick="@command('newTask')">
+                        <div sclass="tm-newcard-icon z-icon-plus"/>
+                        <label value="Create New Task" sclass="tm-newcard-label"/>
+                    </div>
+                </div>
+            </vlayout>
+        </hlayout>
+    </div>
+</zk>

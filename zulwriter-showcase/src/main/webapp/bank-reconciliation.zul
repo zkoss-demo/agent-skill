@@ -1,0 +1,656 @@
+<?page title="FinCore Recon — Reconciliation"?>
+<zk>
+    <style>
+    /* ===== Page shell ===== */
+    .br-page{
+        background-color: #f7f9fc;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .br-page .z-label{
+        font-family: inherit;
+    }
+    /* Figures and reference codes are tabular in the design, so they get a mono stack. */
+    .br-mono{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    /* ===== Top bar ===== */
+    .br-topbar{
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 14px 32px 0 32px;
+    }
+    .br-logo{
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background-color: #1f6feb;
+        color: #ffffff;
+        font-size: 18px;
+        line-height: 42px;
+        text-align: center;
+    }
+    .br-brand-a{
+        font-size: 23px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+    .br-brand-b{
+        font-size: 23px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #1f6feb;
+    }
+    .br-brandwrap{
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        padding-right: 18px;
+    }
+    .br-nav{
+        display: flex;
+        align-items: flex-end;
+        gap: 36px;
+        align-self: stretch;
+    }
+    .br-page a.br-navlink{
+        color: #475569;
+        font-size: 17px;
+        text-decoration: none;
+        padding-bottom: 18px;
+    }
+    .br-page a.br-navlink-on{
+        color: #1f6feb;
+        font-weight: 600;
+        border-bottom: 3px solid #1f6feb;
+    }
+    .br-topbar-right{
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        margin-left: auto;
+        padding-bottom: 14px;
+    }
+    .br-bell{ color: #64748b; font-size: 19px; }
+    .br-userbox{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-left: 1px solid #e8eef5;
+        padding-left: 22px;
+    }
+    .br-user-name{
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+        text-align: right;
+    }
+    .br-user-role{
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        color: #94a3b8;
+        text-align: right;
+    }
+    .br-initials{
+        width: 42px;
+        height: 42px;
+        border-radius: 21px;
+        background-color: #e6efff;
+        color: #1f6feb;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 42px;
+        text-align: center;
+    }
+
+    /* ===== Balance strip ===== */
+    .br-strip{
+        display: flex;
+        align-items: stretch;
+        gap: 24px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 22px 32px 26px 32px;
+    }
+    .br-stat{
+        border-radius: 12px;
+        padding: 18px 20px 20px 20px;
+    }
+    .br-stat-blue{ background-color: #eff6ff; }
+    .br-stat-green{ background-color: #ecfdf3; }
+    .br-stat-indigo{ background-color: #eef2ff; }
+    .br-stat-label{
+        display: block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        padding-bottom: 10px;
+    }
+    .br-label-blue{ color: #1f6feb; }
+    .br-label-green{ color: #12855a; }
+    .br-label-indigo{ color: #4f46e5; }
+    .br-stat-row{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .br-stat-value{
+        font-size: 31px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+    .br-currency{
+        background-color: #dbe7fb;
+        border-radius: 5px;
+        color: #3b6ea8;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        padding: 4px 8px;
+    }
+    .br-currency-green{ background-color: #d3f3e0; color: #157a52; }
+    .br-warn{ color: #d97706; font-size: 15px; }
+    .br-stat-note{
+        display: block;
+        font-size: 13px;
+        color: #64748b;
+        padding-top: 12px;
+    }
+    .br-page .br-stat-meter{
+        background-color: #dbe4f5;
+        background-image: none;
+        border: 0 none;
+        border-radius: 4px;
+        height: 8px;
+        margin-top: 18px;
+    }
+    .br-page .br-stat-meter .z-progressmeter-image{
+        background-color: #2563eb;
+        background-image: none;
+        border-radius: 4px;
+        height: 8px;
+    }
+
+    /* ===== Balance-strip actions ===== */
+    .br-actions{
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding-top: 6px;
+    }
+    .br-actions-row{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .br-page button.br-btn-primary{
+        background-color: #1f6feb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        padding: 15px 30px;
+    }
+    .br-page button.br-btn-ghost{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #dfe6ef;
+        border-radius: 10px;
+        color: #334155;
+        font-size: 17px;
+        font-weight: 500;
+        padding: 15px 26px;
+    }
+    .br-progress-row{
+        display: flex;
+        align-items: center;
+    }
+    .br-progress-note{ font-size: 15px; color: #64748b; }
+    .br-progress-pct{
+        margin-left: auto;
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    /* ===== Working area ===== */
+    .br-body{ padding: 26px 32px 0 32px; }
+
+    /* ===== Tab strip ===== */
+    .br-page .br-tabbox .z-tabs{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+    }
+    .br-page .br-tabbox .z-tabs-content{
+        background-color: #eef2f7;
+        border-radius: 12px;
+        padding: 5px;
+    }
+    .br-page .br-tabbox .z-tab{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        margin: 0;
+    }
+    .br-page .br-tabbox .z-tab-content{
+        color: #64748b;
+        font-size: 16px;
+        font-weight: 500;
+        padding: 11px 22px;
+    }
+    .br-page .br-tabbox .z-tab-selected{
+        background-color: #ffffff;
+        border-radius: 9px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+    .br-page .br-tabbox .z-tab-selected .z-tab-content{
+        color: #0f172a;
+        font-weight: 700;
+    }
+    .br-page .br-tabbox .z-tabpanels,
+    .br-page .br-tabbox .z-tabpanel{
+        background-color: transparent;
+        border: 0 none;
+        padding: 0;
+    }
+
+    /* ===== Table toolbar ===== */
+    .br-toolbar{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 22px 0 18px 0;
+    }
+    .br-searchwrap{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+        width: 400px;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        padding: 0 16px;
+    }
+    .br-search-icon{ color: #94a3b8; font-size: 15px; }
+    .br-page input.br-search{
+        flex: 1;
+        border: 0 none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 13px 0;
+        font-size: 16px;
+        color: #0f172a;
+    }
+    .br-page button.br-icon-btn{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        color: #64748b;
+        font-size: 17px;
+        padding: 14px 16px;
+    }
+    .br-page button.br-btn-outline{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #dfe6ef;
+        border-radius: 11px;
+        color: #334155;
+        font-size: 16px;
+        font-weight: 600;
+        padding: 14px 22px;
+    }
+
+    /* ===== Transaction table ===== */
+    .br-card{
+        background-color: #ffffff;
+        border: 1px solid #eef2f7;
+        border-radius: 14px;
+        padding-bottom: 6px;
+    }
+    .br-page .br-list{
+        border: 0 none;
+        background-color: transparent;
+    }
+    .br-page .br-list .z-listhead,
+    .br-page .br-list .z-listheader{
+        background-color: #ffffff;
+        background-image: none;
+        border-top: 0 none;
+        border-left: 0 none;
+        border-bottom: 1px solid #eef2f7;
+    }
+    .br-page .br-list .z-listheader-content{
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        padding: 18px 14px;
+    }
+    .br-page .br-list .z-listcell{
+        background-color: transparent;
+        border-left: 0 none;
+        border-bottom: 1px solid #f4f7fb;
+        padding: 16px 14px;
+        vertical-align: middle;
+    }
+    .br-page .br-list .z-listitem-selected .z-listcell{
+        background-color: #fafbfe;
+    }
+    .br-date{ font-size: 15px; color: #334155; }
+    .br-desc{
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .br-desc-sub{
+        display: block;
+        font-size: 14px;
+        color: #64748b;
+        padding-top: 4px;
+    }
+    .br-ref{ font-size: 15px; color: #64748b; }
+    .br-debit{ font-size: 16px; font-weight: 700; color: #dc2626; }
+    .br-credit{ font-size: 16px; font-weight: 700; color: #1f6feb; }
+    .br-nil{ font-size: 16px; color: #cbd5e1; }
+    .br-status{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 6px 13px;
+    }
+    .br-status-pending{ background-color: #fef6e0; }
+    .br-status-matched{ background-color: #e6f7ee; }
+    .br-status-flagged{ background-color: #fdeaea; }
+    .br-status-dot{
+        width: 7px;
+        height: 7px;
+        border-radius: 4px;
+    }
+    .br-dot-pending{ background-color: #e0a415; }
+    .br-dot-matched{ background-color: #16a34a; }
+    .br-dot-flagged{ background-color: #e05252; }
+    .br-status-label{
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+    }
+    .br-status-text-pending{ color: #a1710c; }
+    .br-status-text-matched{ color: #12784a; }
+    .br-status-text-flagged{ color: #b93636; }
+    .br-page a.br-matchid{
+        color: #1f6feb;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .br-page button.br-rowaction{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        color: #94a3b8;
+        font-size: 16px;
+        padding: 6px;
+    }
+    .br-page .br-list .z-paging{
+        background-color: transparent;
+        background-image: none;
+        border: 0 none;
+        padding: 18px 14px;
+        text-align: right;
+    }
+
+    /* ===== Table footer ===== */
+    .br-tablefoot{
+        display: flex;
+        align-items: center;
+        padding: 4px 20px 16px 20px;
+    }
+    .br-count{ font-size: 15px; color: #64748b; }
+    .br-count-strong{ font-size: 15px; font-weight: 700; color: #1e293b; }
+
+    /* ===== Page footer ===== */
+    .br-footer{
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        padding: 26px 32px 22px 32px;
+    }
+    .br-health{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .br-health-dot{
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #16a34a;
+    }
+    .br-health-label{
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #94a3b8;
+    }
+    .br-sysinfo{
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #cbd5e1;
+    }
+    </style>
+
+    <div apply="zwriter.BankReconciliationComposer" sclass="br-page" hflex="1">
+
+        <!-- ===== Top bar ===== -->
+        <div sclass="br-topbar" hflex="1">
+            <div sclass="br-logo z-icon-university"/>
+            <div sclass="br-brandwrap">
+                <label value="FinCore" sclass="br-brand-a"/>
+                <label value="Recon" sclass="br-brand-b"/>
+            </div>
+            <div sclass="br-nav">
+                <a label="Dashboard" sclass="br-navlink"/>
+                <a label="Reconciliation" sclass="br-navlink br-navlink-on"/>
+                <a label="Reporting" sclass="br-navlink"/>
+                <a label="Audit Logs" sclass="br-navlink"/>
+            </div>
+            <div sclass="br-topbar-right">
+                <span sclass="z-icon-bell br-bell"/>
+                <div sclass="br-userbox">
+                    <vlayout spacing="2px">
+                        <label id="userName" value="Sarah Jenkins" sclass="br-user-name"/>
+                        <label id="userRole" value="SENIOR ACCOUNTANT" sclass="br-user-role"/>
+                    </vlayout>
+                    <label id="userInitials" value="SJ" sclass="br-initials"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Balances ===== -->
+        <div sclass="br-strip" hflex="1">
+            <div sclass="br-stat br-stat-blue" hflex="1">
+                <label value="STATEMENT BALANCE" sclass="br-stat-label br-label-blue"/>
+                <div sclass="br-stat-row">
+                    <label id="statementBalance" value="$1,422,904.55"
+                           sclass="br-stat-value br-mono"/>
+                    <label value="USD" sclass="br-currency"/>
+                </div>
+                <label id="statementNote" value="Last synced: 14 mins ago" sclass="br-stat-note"/>
+            </div>
+
+            <div sclass="br-stat br-stat-green" hflex="1">
+                <label value="BOOK BALANCE" sclass="br-stat-label br-label-green"/>
+                <div sclass="br-stat-row">
+                    <label id="bookBalance" value="$1,418,250.20" sclass="br-stat-value br-mono"/>
+                    <label value="USD" sclass="br-currency br-currency-green"/>
+                </div>
+                <label id="bookNote" value="GL Account: 10100-Cash" sclass="br-stat-note"/>
+            </div>
+
+            <div sclass="br-stat br-stat-indigo" hflex="1">
+                <label value="UNRECONCILED DIFFERENCE"
+                       sclass="br-stat-label br-label-indigo"/>
+                <div sclass="br-stat-row">
+                    <label id="difference" value="$4,654.35" sclass="br-stat-value br-mono"/>
+                    <span sclass="z-icon-exclamation-triangle br-warn"/>
+                </div>
+                <progressmeter id="matchMeter" value="90" sclass="br-stat-meter" hflex="1"/>
+            </div>
+
+            <div sclass="br-actions" hflex="1">
+                <div sclass="br-actions-row">
+                    <button id="autoMatchBtn" label="Auto-match" iconSclass="z-icon-bolt"
+                            sclass="br-btn-primary"/>
+                    <button id="finalizeBtn" label="Finalize" sclass="br-btn-ghost"/>
+                </div>
+                <div sclass="br-progress-row">
+                    <label id="matchCount" value="Matches: 142/158" sclass="br-progress-note"/>
+                    <label id="matchPercent" value="90% Complete" sclass="br-progress-pct"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Transactions ===== -->
+        <div sclass="br-body" hflex="1">
+            <tabbox sclass="br-tabbox" hflex="1">
+                <tabs>
+                    <tab id="unreconciledTab" label="Unreconciled (16)"/>
+                    <tab id="reconciledTab" label="Reconciled (142)"/>
+                    <tab id="allTab" label="All Transactions"/>
+                </tabs>
+                <tabpanels>
+                    <!-- The toolbar and the table live inside the panel: both belong to the
+                         dataset the selected tab picks out. -->
+                    <tabpanel>
+                        <div sclass="br-toolbar" hflex="1">
+                            <div sclass="br-searchwrap">
+                                <span sclass="z-icon-search br-search-icon"/>
+                                <textbox id="searchBox" placeholder="Search reference, amount..."
+                                         sclass="br-search"/>
+                            </div>
+                            <button id="filterBtn" iconSclass="z-icon-filter"
+                                    sclass="br-icon-btn"/>
+                            <button id="exportBtn" iconSclass="z-icon-download"
+                                    sclass="br-icon-btn"/>
+                            <button id="adjustmentBtn" label="Adjustment" iconSclass="z-icon-plus"
+                                    sclass="br-btn-outline"/>
+                        </div>
+
+                        <div sclass="br-card" hflex="1">
+                            <listbox id="txList" sclass="br-list" hflex="1" mold="paging"
+                                     pageSize="8" multiple="true" checkmark="true">
+                                <listhead>
+                                    <!-- Wide enough for the date on one line: checkmark="true" puts ZK's checkbox inside
+                                         this first cell, so the column carries both. -->
+                                    <listheader label="DATE" width="230px"/>
+                                    <listheader label="DESCRIPTION" hflex="1"/>
+                                    <listheader label="REFERENCE #" width="220px"/>
+                                    <listheader label="DEBIT (-)" width="170px" align="right"/>
+                                    <listheader label="CREDIT (+)" width="170px" align="right"/>
+                                    <listheader label="STATUS" width="180px"/>
+                                    <listheader label="MATCH ID" width="150px"/>
+                                    <listheader width="70px"/>
+                                </listhead>
+                                <!-- One template, filled by setModel() in the composer. The
+                                     eight literal listitems the layout was judged against are
+                                     gone: a model discards markup rows silently, so leaving them
+                                     would have kept rows here that display nothing. -->
+                                <template name="model">
+                                    <listitem>
+                                        <listcell>
+                                            <label value="${each.date}" sclass="br-date br-mono"/>
+                                        </listcell>
+                                        <listcell>
+                                            <vlayout spacing="0">
+                                                <label value="${each.description}"
+                                                       sclass="br-desc"/>
+                                                <label value="${each.detail}"
+                                                       sclass="br-desc-sub"/>
+                                            </vlayout>
+                                        </listcell>
+                                        <listcell>
+                                            <label value="${each.reference}"
+                                                   sclass="br-ref br-mono"/>
+                                        </listcell>
+                                        <listcell>
+                                            <label value="${each.debitText}"
+                                                   sclass="${each.debitSclass}"/>
+                                        </listcell>
+                                        <listcell>
+                                            <label value="${each.creditText}"
+                                                   sclass="${each.creditSclass}"/>
+                                        </listcell>
+                                        <listcell>
+                                            <div sclass="${each.statusSclass}">
+                                                <div sclass="${each.statusDotSclass}"/>
+                                                <label value="${each.status}"
+                                                       sclass="${each.statusTextSclass}"/>
+                                            </div>
+                                        </listcell>
+                                        <listcell>
+                                            <a label="${each.matchId}" sclass="br-matchid"
+                                               visible="${each.matched}"/>
+                                            <label value="—" sclass="br-nil"
+                                                   visible="${each.unmatched}"/>
+                                        </listcell>
+                                        <listcell>
+                                            <button iconSclass="z-icon-ellipsis-v"
+                                                    sclass="br-rowaction"/>
+                                        </listcell>
+                                    </listitem>
+                                </template>
+                            </listbox>
+
+                            <div sclass="br-tablefoot" hflex="1">
+                                <label id="rangeNote" value="Showing 1 - 8 of 16 transactions"
+                                       sclass="br-count"/>
+                            </div>
+                        </div>
+                    </tabpanel>
+                    <tabpanel>
+                        <div sclass="br-toolbar" hflex="1">
+                            <label value="Reconciled transactions appear here."
+                                   sclass="br-count"/>
+                        </div>
+                    </tabpanel>
+                    <tabpanel>
+                        <div sclass="br-toolbar" hflex="1">
+                            <label value="Every transaction in the period appears here."
+                                   sclass="br-count"/>
+                        </div>
+                    </tabpanel>
+                </tabpanels>
+            </tabbox>
+        </div>
+
+        <!-- ===== Footer ===== -->
+        <div sclass="br-footer" hflex="1">
+            <div sclass="br-health">
+                <div sclass="br-health-dot"/>
+                <label value="BANK SERVER CONNECTED" sclass="br-health-label"/>
+            </div>
+            <div sclass="br-health">
+                <div sclass="br-health-dot"/>
+                <label value="ERP LEDGER SYNCED" sclass="br-health-label"/>
+            </div>
+            <label id="systemInfo" value="SYSTEM V4.2.1 • LATENCY: 24MS" sclass="br-sysinfo"/>
+        </div>
+    </div>
+</zk>

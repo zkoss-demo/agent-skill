@@ -1,220 +1,455 @@
-<?page title="Application Review | GovPortal"?>
+<?page title="GovPortal — Application Review"?>
 <zk>
-	<style>
-		.gp-page { background: #f4f6f9; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #16202c; }
-		.gp-shell { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+    <style>
+    /* ===== Page shell ===== */
+    .ar-page{
+        background-color: #f7f9fc;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .ar-page .z-label{
+        font-family: inherit;
+    }
+    .ar-mono{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
 
-		/* --- top navigation --- */
-		.gp-nav { background: #fff; border-bottom: 1px solid #e6eaf0; padding: 14px 0; }
-		.gp-page .gp-flex-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-		.gp-page .gp-nav-link, .gp-page .gp-footer-link, .gp-brand-name,
-		.gp-crumb-current, .gp-field-value, .gp-page button.gp-btn { white-space: nowrap; }
-		.gp-page .gp-logo { width: 34px; height: 34px; border-radius: 9px; background: #e8f1fe; color: #1877f2;
-			display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
-		.gp-brand-name { font-size: 19px; font-weight: 700; }
-		.gp-page a.gp-nav-link { color: #55637a; font-size: 15px; text-decoration: none; }
-		.gp-page a.gp-nav-link-active { color: #1877f2; font-weight: 600; }
-		.gp-search { position: relative; width: 320px; }
-		.gp-page .gp-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-			color: #9aa7b8; font-size: 14px; z-index: 1; }
-		.gp-page input.gp-search-input { width: 100%; height: 42px; box-sizing: border-box; padding: 0 14px 0 40px;
-			border: 1px solid #e2e7ee; border-radius: 10px; background: #f7f9fc; font-size: 14px; }
-		.gp-page a.gp-icon-btn { color: #33415c; font-size: 17px; text-decoration: none; }
-		.gp-page .gp-avatar { width: 34px; height: 34px; border-radius: 50%; background: #dfe5ee; color: #5a6a80;
-			display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
+    /* ===== Top bar ===== */
+    .ar-topbar{
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 14px 34px;
+    }
+    .ar-logo{
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background-color: #e6efff;
+        color: #1f6feb;
+        font-size: 18px;
+        line-height: 42px;
+        text-align: center;
+    }
+    .ar-brand-name{
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        padding-right: 14px;
+    }
+    .ar-nav{
+        display: flex;
+        align-items: center;
+        gap: 34px;
+    }
+    .ar-page a.ar-navlink{
+        color: #475569;
+        font-size: 17px;
+        text-decoration: none;
+    }
+    .ar-page a.ar-navlink-on{
+        color: #1f6feb;
+        font-weight: 600;
+    }
+    .ar-searchwrap{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+        width: 400px;
+        background-color: #f4f7fb;
+        border-radius: 11px;
+        padding: 0 16px;
+    }
+    .ar-search-icon{ color: #94a3b8; font-size: 15px; }
+    .ar-page input.ar-search{
+        flex: 1;
+        border: 0 none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 13px 0;
+        font-size: 16px;
+        color: #0f172a;
+    }
+    .ar-bellwrap{ position: relative; }
+    .ar-bell{ color: #64748b; font-size: 19px; }
+    .ar-bell-dot{
+        position: absolute;
+        top: -2px;
+        right: -3px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #ef4444;
+    }
+    .ar-avatar{
+        width: 42px;
+        height: 42px;
+        border-radius: 21px;
+        background-color: #e2d3c4;
+        color: #7c5b3b;
+        font-size: 17px;
+        line-height: 42px;
+        text-align: center;
+    }
 
-		/* --- breadcrumb --- */
-		.gp-crumbs { padding: 20px 0 4px; }
-		.gp-page a.gp-crumb-link { color: #5b6b82; font-size: 14px; text-decoration: none; }
-		.gp-crumb-sep { color: #a7b2c2; font-size: 14px; }
-		.gp-crumb-current { color: #16202c; font-size: 14px; }
+    /* ===== Centred content column ===== */
+    .ar-container{
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 30px 0 40px 0;
+    }
+    .ar-crumbs{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 22px;
+    }
+    .ar-page a.ar-crumb{
+        color: #64748b;
+        font-size: 16px;
+        text-decoration: none;
+    }
+    .ar-crumb-sep{ color: #cbd5e1; font-size: 15px; }
+    .ar-crumb-now{ font-size: 16px; color: #334155; }
 
-		/* --- success banner --- */
-		.gp-banner { background: #ecfaf1; border: 1px solid #cfeddc; border-radius: 12px; padding: 22px 26px; margin-top: 14px; }
-		.gp-page .gp-banner-icon { width: 40px; height: 40px; border-radius: 50%; background: #d6f2e0; color: #12a150;
-			display: inline-flex; align-items: center; justify-content: center; font-size: 20px; }
-		.gp-banner-title { font-size: 25px; font-weight: 700; }
-		.gp-banner-sub { color: #55637a; font-size: 14px; }
-		.gp-page .gp-chip { background: #dcecf6; border-radius: 6px; padding: 3px 9px; font-family: monospace;
-			font-size: 13px; font-weight: 600; letter-spacing: .5px; }
+    /* ===== Success banner ===== */
+    .ar-banner{
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        background-color: #eefbf3;
+        border: 1px solid #d3f0de;
+        border-radius: 14px;
+        padding: 26px 30px;
+        margin-bottom: 30px;
+    }
+    .ar-banner-icon{
+        width: 46px;
+        height: 46px;
+        border-radius: 23px;
+        background-color: #d5f2e0;
+        color: #12855a;
+        font-size: 20px;
+        line-height: 46px;
+        text-align: center;
+    }
+    .ar-banner-title{
+        display: block;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+    .ar-banner-refrow{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-top: 10px;
+    }
+    .ar-banner-reflabel{ font-size: 17px; color: #475569; }
+    .ar-refchip{
+        background-color: #e6ecf2;
+        border-radius: 6px;
+        color: #1e293b;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        padding: 5px 10px;
+    }
+    .ar-page button.ar-btn-primary{
+        background-color: #1f6feb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        margin-left: auto;
+        padding: 16px 28px;
+    }
 
-		/* --- summary card --- */
-		.gp-card { background: #fff; border: 1px solid #e6eaf0; border-radius: 12px; margin: 28px 0; }
-		.gp-card-head { padding: 24px 30px; border-bottom: 1px solid #eef1f5; }
-		.gp-card-title { font-size: 20px; font-weight: 700; }
-		.gp-card-subtitle { color: #6b7a8d; font-size: 14px; }
-		.gp-page .gp-badge { background: #e6f0fd; color: #1a6fd4; border-radius: 6px; padding: 5px 11px;
-			font-size: 11px; font-weight: 700; letter-spacing: .8px; }
-		.gp-card-body { padding: 28px 30px 30px; }
-		.gp-hr { border-top: 1px solid #eef1f5; margin: 26px 0; }
-		.gp-section-head { margin-bottom: 20px; }
-		.gp-page .gp-section-icon { color: #1877f2; font-size: 14px; }
-		.gp-section-title { color: #1877f2; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
-		.gp-fieldrow { margin-bottom: 22px; }
-		.gp-field-label { color: #8794a6; font-size: 11px; font-weight: 700; letter-spacing: .9px; }
-		.gp-field-value { font-size: 15px; min-height: 20px; display: inline-block; }
-		.gp-field-value-strong { font-weight: 600; }
-		.gp-page .gp-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-		.gp-page .gp-dot-high { background: #ef4444; }
-		.gp-page .gp-dot-normal { background: #f59e0b; }
-		.gp-page .gp-dot-low { background: #10b981; }
-		.gp-card-foot { background: #f8fafc; border-top: 1px solid #eef1f5; border-radius: 0 0 12px 12px; padding: 18px 30px; }
+    /* ===== Summary card ===== */
+    .ar-card{
+        background-color: #ffffff;
+        border: 1px solid #eef2f7;
+        border-radius: 14px;
+    }
+    .ar-card-head{
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #eef2f7;
+        padding: 26px 30px 24px 30px;
+    }
+    .ar-card-title{
+        display: block;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+    }
+    .ar-card-sub{
+        display: block;
+        font-size: 16px;
+        color: #64748b;
+        padding-top: 8px;
+    }
+    .ar-statechip{
+        background-color: #e6effd;
+        border-radius: 6px;
+        color: #1f6feb;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        margin-left: auto;
+        padding: 6px 12px;
+    }
 
-		/* --- buttons --- */
-		.gp-page button.gp-btn { height: 44px; padding: 0 20px; border-radius: 9px; font-size: 15px; font-weight: 600;
-			background-image: none; box-shadow: none; cursor: pointer; }
-		.gp-page button.gp-btn-primary { background: #1877f2; border: 1px solid #1877f2; color: #fff; }
-		.gp-page button.gp-btn-ghost { background: #fff; border: 1px solid #dde3ec; color: #24324a; }
-		.gp-page button.gp-btn-dark { background: #101b2d; border: 1px solid #101b2d; color: #fff; }
+    /* ===== Field sections ===== */
+    .ar-section{ padding: 28px 30px 6px 30px; }
+    .ar-section-div{
+        border-top: 1px solid #f1f5f9;
+        margin: 22px 30px 0 30px;
+    }
+    .ar-section-head{
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding-bottom: 24px;
+    }
+    .ar-section-icon{ color: #1f6feb; font-size: 15px; }
+    .ar-section-title{
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.11em;
+        color: #1f6feb;
+    }
+    /* Three field blocks across, as the design lays them out. hflex cannot express a
+       three-column grid whose rows wrap, so the columns live in the class. */
+    .ar-fieldgrid{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 30px 40px;
+        padding-bottom: 22px;
+    }
+    .ar-fieldlabel{
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #94a3b8;
+        padding-bottom: 10px;
+    }
+    .ar-fieldvalue{
+        display: block;
+        font-size: 19px;
+        color: #1e293b;
+        line-height: 1.45;
+    }
+    .ar-priorityrow{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .ar-priority-dot{
+        width: 9px;
+        height: 9px;
+        border-radius: 5px;
+        background-color: #ef4444;
+    }
+    .ar-priority-value{
+        font-size: 19px;
+        font-weight: 600;
+        color: #1e293b;
+    }
 
-		/* --- page footer --- */
-		.gp-footer { border-top: 1px solid #e6eaf0; padding: 22px 0 30px; }
-		.gp-footer-text { color: #77859a; font-size: 13px; }
-		.gp-page a.gp-footer-link { color: #77859a; font-size: 13px; text-decoration: none; }
-	</style>
+    /* ===== Card footer ===== */
+    .ar-card-foot{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background-color: #fafbfd;
+        border-top: 1px solid #eef2f7;
+        border-radius: 0 0 14px 14px;
+        padding: 22px 30px;
+    }
+    .ar-page button.ar-btn-ghost{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #334155;
+        font-size: 17px;
+        font-weight: 500;
+        padding: 15px 24px;
+    }
+    .ar-page button.ar-btn-dark{
+        background-color: #0f172a;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        margin-left: auto;
+        padding: 15px 28px;
+    }
 
-	<div sclass="gp-page" hflex="1" vflex="1" apply="zwriter.ApplicationReviewComposer">
+    /* ===== Page footer ===== */
+    .ar-footer{
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 10px 0 34px 0;
+    }
+    .ar-foot-text{ font-size: 15px; color: #94a3b8; }
+    .ar-footlinks{
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        margin-left: auto;
+    }
+    .ar-page a.ar-footlink{
+        color: #64748b;
+        font-size: 15px;
+        text-decoration: none;
+    }
+    </style>
 
-		<!-- top navigation -->
-		<div sclass="gp-nav">
-			<div sclass="gp-shell gp-flex-row">
-				<hlayout valign="middle" spacing="34px">
-						<hlayout valign="middle" spacing="11px">
-						<span sclass="gp-logo z-icon-university"/>
-						<label value="GovPortal" sclass="gp-brand-name"/>
-					</hlayout>
-					<hlayout valign="middle" spacing="30px">
-						<a label="Dashboard" sclass="gp-nav-link"/>
-						<a label="Applications" sclass="gp-nav-link gp-nav-link-active"/>
-						<a label="Documents" sclass="gp-nav-link"/>
-						<a label="Settings" sclass="gp-nav-link"/>
-					</hlayout>
-				</hlayout>
-				<hlayout valign="middle" spacing="20px">
-					<div sclass="gp-search">
-						<span sclass="gp-search-icon z-icon-search"/>
-						<textbox id="searchBox" sclass="gp-search-input" placeholder="Search applications..."/>
-					</div>
-					<a id="notificationsBtn" iconSclass="z-icon-bell" sclass="gp-icon-btn" tooltiptext="Notifications"/>
-					<span sclass="gp-avatar z-icon-user"/>
-				</hlayout>
-			</div>
-		</div>
+    <div apply="zwriter.ApplicationReviewComposer" sclass="ar-page" hflex="1" vflex="1">
 
-		<div sclass="gp-shell">
+        <!-- ===== Top bar ===== -->
+        <div sclass="ar-topbar" hflex="1">
+            <div sclass="ar-logo z-icon-university"/>
+            <label value="GovPortal" sclass="ar-brand-name"/>
+            <div sclass="ar-nav">
+                <a label="Dashboard" sclass="ar-navlink"/>
+                <a label="Applications" sclass="ar-navlink ar-navlink-on"/>
+                <a label="Documents" sclass="ar-navlink"/>
+                <a label="Settings" sclass="ar-navlink"/>
+            </div>
+            <div sclass="ar-searchwrap">
+                <span sclass="z-icon-search ar-search-icon"/>
+                <textbox id="searchBox" placeholder="Search applications..." sclass="ar-search"/>
+            </div>
+            <div sclass="ar-bellwrap">
+                <span sclass="z-icon-bell ar-bell"/>
+                <div sclass="ar-bell-dot"/>
+            </div>
+            <div sclass="ar-avatar z-icon-user"/>
+        </div>
 
-			<!-- breadcrumb -->
-			<hlayout sclass="gp-crumbs" valign="middle" spacing="9px">
-				<a label="Applications" sclass="gp-crumb-link"/>
-				<label value="/" sclass="gp-crumb-sep"/>
-				<label id="breadcrumbCurrent" sclass="gp-crumb-current"/>
-			</hlayout>
+        <!-- ===== Centred content ===== -->
+        <div sclass="ar-container">
 
-			<!-- submission confirmation banner -->
-			<div sclass="gp-banner">
-				<hlayout valign="middle" spacing="18px" hflex="1">
-					<span sclass="gp-banner-icon z-icon-check-circle"/>
-					<vlayout spacing="6px" hflex="1">
-						<label value="Application Submitted Successfully" sclass="gp-banner-title"/>
-						<hlayout valign="middle" spacing="10px">
-							<label value="Reference Number:" sclass="gp-banner-sub"/>
-							<label id="referenceChip" sclass="gp-chip"/>
-						</hlayout>
-					</vlayout>
-					<button id="trackProgressBtn" label="Track Progress" iconSclass="z-icon-eye"
-							sclass="gp-btn gp-btn-primary"/>
-				</hlayout>
-			</div>
+            <div sclass="ar-crumbs">
+                <a label="Applications" sclass="ar-crumb"/>
+                <label value="/" sclass="ar-crumb-sep"/>
+                <label id="crumbCurrent" sclass="ar-crumb-now"/>
+            </div>
 
-			<!-- application summary card -->
-			<div sclass="gp-card">
-				<div sclass="gp-card-head">
-					<hlayout valign="middle" hflex="1">
-						<vlayout spacing="5px" hflex="1">
-							<label value="Application Summary" sclass="gp-card-title"/>
-							<label value="Variant 1: Comprehensive Detail View" sclass="gp-card-subtitle"/>
-						</vlayout>
-						<label id="statusBadge" sclass="gp-badge"/>
-					</hlayout>
-				</div>
+            <!-- ===== Submission banner ===== -->
+            <div sclass="ar-banner" hflex="1">
+                <div sclass="ar-banner-icon z-icon-check"/>
+                <vlayout spacing="0">
+                    <label id="bannerTitle" sclass="ar-banner-title"/>
+                    <div sclass="ar-banner-refrow">
+                        <label value="Reference Number:" sclass="ar-banner-reflabel"/>
+                        <label id="referenceChip" sclass="ar-refchip ar-mono"/>
+                    </div>
+                </vlayout>
+                <button id="trackBtn" label="Track Progress" iconSclass="z-icon-eye"
+                        sclass="ar-btn-primary"/>
+            </div>
 
-				<div sclass="gp-card-body">
-					<hlayout sclass="gp-section-head" valign="middle" spacing="9px">
-						<span sclass="gp-section-icon z-icon-user"/>
-						<label value="PERSONAL INFORMATION" sclass="gp-section-title"/>
-					</hlayout>
-					<hlayout sclass="gp-fieldrow" valign="top" hflex="1" spacing="24px">
-						<vlayout hflex="1" spacing="7px">
-							<label value="FULL NAME" sclass="gp-field-label"/>
-							<label id="fullName" sclass="gp-field-value"/>
-						</vlayout>
-						<vlayout hflex="1" spacing="7px">
-							<label value="DATE OF BIRTH" sclass="gp-field-label"/>
-							<label id="dateOfBirth" sclass="gp-field-value"/>
-						</vlayout>
-						<vlayout hflex="1" spacing="7px">
-							<label value="RESIDENTIAL ADDRESS" sclass="gp-field-label"/>
-							<label id="residentialAddress" sclass="gp-field-value"/>
-						</vlayout>
-					</hlayout>
+            <!-- ===== Application summary ===== -->
+            <div sclass="ar-card" hflex="1">
+                <div sclass="ar-card-head" hflex="1">
+                    <vlayout spacing="0">
+                        <label value="Application Summary" sclass="ar-card-title"/>
+                        <label id="summaryVariant" sclass="ar-card-sub"/>
+                    </vlayout>
+                    <label id="reviewState" sclass="ar-statechip"/>
+                </div>
 
-					<div sclass="gp-hr"/>
+                <div sclass="ar-section" hflex="1">
+                    <div sclass="ar-section-head">
+                        <span sclass="z-icon-user ar-section-icon"/>
+                        <label value="PERSONAL INFORMATION" sclass="ar-section-title"/>
+                    </div>
+                    <div sclass="ar-fieldgrid" hflex="1">
+                        <div>
+                            <label value="FULL NAME" sclass="ar-fieldlabel"/>
+                            <label id="fullName" sclass="ar-fieldvalue"/>
+                        </div>
+                        <div>
+                            <label value="DATE OF BIRTH" sclass="ar-fieldlabel"/>
+                            <label id="dateOfBirth" sclass="ar-fieldvalue"/>
+                        </div>
+                        <div>
+                            <label value="RESIDENTIAL ADDRESS" sclass="ar-fieldlabel"/>
+                            <label id="address" sclass="ar-fieldvalue"/>
+                        </div>
+                    </div>
+                </div>
 
-					<hlayout sclass="gp-section-head" valign="middle" spacing="9px">
-						<span sclass="gp-section-icon z-icon-file-alt"/>
-						<label value="APPLICATION DETAILS" sclass="gp-section-title"/>
-					</hlayout>
-					<hlayout sclass="gp-fieldrow" valign="top" hflex="1" spacing="24px">
-						<vlayout hflex="1" spacing="7px">
-							<label value="APPLICATION TYPE" sclass="gp-field-label"/>
-							<label id="applicationType" sclass="gp-field-value"/>
-						</vlayout>
-						<vlayout hflex="1" spacing="7px">
-							<label value="SUBMISSION DATE" sclass="gp-field-label"/>
-							<label id="submissionDate" sclass="gp-field-value"/>
-						</vlayout>
-						<vlayout hflex="1" spacing="7px">
-							<label value="PRIORITY LEVEL" sclass="gp-field-label"/>
-							<hlayout valign="middle" spacing="9px">
-								<span id="priorityDot" sclass="gp-dot"/>
-								<label id="priorityLevel" sclass="gp-field-value gp-field-value-strong"/>
-							</hlayout>
-						</vlayout>
-					</hlayout>
-					<hlayout sclass="gp-fieldrow" valign="top" hflex="1" spacing="24px">
-						<vlayout hflex="1" spacing="7px">
-							<label value="REVIEWING OFFICE" sclass="gp-field-label"/>
-							<label id="reviewingOffice" sclass="gp-field-value"/>
-						</vlayout>
-						<vlayout hflex="1" spacing="7px">
-							<label value="VERIFICATION ID" sclass="gp-field-label"/>
-							<label id="verificationId" sclass="gp-field-value"/>
-						</vlayout>
-						<div hflex="1"/>
-					</hlayout>
-				</div>
+                <div sclass="ar-section-div"/>
 
-				<div sclass="gp-card-foot gp-flex-row">
-					<hlayout valign="middle" spacing="13px">
-						<button id="printBtn" label="Print Summary" iconSclass="z-icon-print"
-								sclass="gp-btn gp-btn-ghost"/>
-						<button id="downloadPdfBtn" label="Download PDF" iconSclass="z-icon-file-pdf"
-								sclass="gp-btn gp-btn-ghost"/>
-					</hlayout>
-					<button id="homeBtn" label="Return to Home" iconSclass="z-icon-home"
-							sclass="gp-btn gp-btn-dark"/>
-				</div>
-			</div>
+                <div sclass="ar-section" hflex="1">
+                    <div sclass="ar-section-head">
+                        <span sclass="z-icon-file-text-o ar-section-icon"/>
+                        <label value="APPLICATION DETAILS" sclass="ar-section-title"/>
+                    </div>
+                    <div sclass="ar-fieldgrid" hflex="1">
+                        <div>
+                            <label value="APPLICATION TYPE" sclass="ar-fieldlabel"/>
+                            <label id="applicationType" sclass="ar-fieldvalue"/>
+                        </div>
+                        <div>
+                            <label value="SUBMISSION DATE" sclass="ar-fieldlabel"/>
+                            <label id="submissionDate" sclass="ar-fieldvalue"/>
+                        </div>
+                        <div>
+                            <label value="PRIORITY LEVEL" sclass="ar-fieldlabel"/>
+                            <div sclass="ar-priorityrow">
+                                <div sclass="ar-priority-dot"/>
+                                <label id="priorityLevel" sclass="ar-priority-value"/>
+                            </div>
+                        </div>
+                        <div>
+                            <label value="REVIEWING OFFICE" sclass="ar-fieldlabel"/>
+                            <label id="reviewingOffice" sclass="ar-fieldvalue"/>
+                        </div>
+                        <div>
+                            <label value="VERIFICATION ID" sclass="ar-fieldlabel"/>
+                            <label id="verificationId" sclass="ar-fieldvalue"/>
+                        </div>
+                    </div>
+                </div>
 
-			<!-- page footer -->
-			<div sclass="gp-footer gp-flex-row">
-				<label value="© 2023 GovPortal Services. All rights reserved." sclass="gp-footer-text"/>
-				<hlayout valign="middle" spacing="30px">
-					<a label="Privacy Policy" sclass="gp-footer-link"/>
-					<a label="Terms of Service" sclass="gp-footer-link"/>
-					<a label="Contact Support" sclass="gp-footer-link"/>
-				</hlayout>
-			</div>
-		</div>
-	</div>
+                <div sclass="ar-card-foot" hflex="1">
+                    <button id="printBtn" label="Print Summary" iconSclass="z-icon-print"
+                            sclass="ar-btn-ghost"/>
+                    <button id="pdfBtn" label="Download PDF" iconSclass="z-icon-file-pdf-o"
+                            sclass="ar-btn-ghost"/>
+                    <button id="homeBtn" label="Return to Home" iconSclass="z-icon-home"
+                            sclass="ar-btn-dark"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Footer ===== -->
+        <div sclass="ar-footer" hflex="1">
+            <label id="copyright" sclass="ar-foot-text"/>
+            <div sclass="ar-footlinks">
+                <a label="Privacy Policy" sclass="ar-footlink"/>
+                <a label="Terms of Service" sclass="ar-footlink"/>
+                <a label="Contact Support" sclass="ar-footlink"/>
+            </div>
+        </div>
+    </div>
 </zk>

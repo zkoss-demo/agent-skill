@@ -1,0 +1,295 @@
+<?page title="Monthly Feedback Dashboard"?>
+<zk>
+    <style>
+    /* ===== Page shell ===== */
+    .fd-page{
+        background-color: #f8fafc;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .fd-page .z-label{
+        font-family: inherit;
+    }
+
+    /* ===== Top bar ===== */
+    .fd-topbar{
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 16px 40px;
+    }
+    .fd-logo{
+        width: 34px;
+        height: 34px;
+        border-radius: 17px;
+        background-color: #dbeafe;
+        color: #2563eb;
+        font-size: 16px;
+        line-height: 34px;
+        text-align: center;
+    }
+    .fd-brand-name{
+        font-size: 21px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .fd-topbar-right{
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        margin-left: auto;
+    }
+    .fd-bellwrap{ position: relative; }
+    .fd-bell{ color: #334155; font-size: 19px; }
+    .fd-bell-dot{
+        position: absolute;
+        top: -2px;
+        right: -3px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #ef4444;
+    }
+    .fd-avatar{
+        width: 40px;
+        height: 40px;
+        border-radius: 20px;
+        background-color: #fde8d7;
+        color: #c05621;
+        font-size: 16px;
+        line-height: 40px;
+        text-align: center;
+    }
+
+    /* ===== Centred content column ===== */
+    .fd-container{
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 44px 0 56px 0;
+    }
+    .fd-h1{
+        display: block;
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        padding-bottom: 34px;
+    }
+    .fd-h2{
+        display: block;
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        padding-bottom: 26px;
+    }
+    .fd-h3{
+        display: block;
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        padding: 40px 0 22px 0;
+    }
+
+    /* ===== Current month card ===== */
+    .fd-card{
+        background-color: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        padding: 34px 36px 36px 36px;
+    }
+    .fd-meter-head{
+        display: flex;
+        align-items: baseline;
+        padding-bottom: 12px;
+    }
+    .fd-meter-label{ font-size: 16px; color: #334155; }
+    .fd-meter-pct{
+        margin-left: auto;
+        font-size: 16px;
+        font-weight: 700;
+        color: #2563eb;
+    }
+    /* The meter's own track and bar; ZK paints a gradient image on the bar by default. */
+    .fd-page .fd-meter{
+        background-color: #e5e9ef;
+        background-image: none;
+        border: 0 none;
+        border-radius: 5px;
+        height: 10px;
+    }
+    .fd-page .fd-meter .z-progressmeter-image{
+        background-color: #1d7afc;
+        background-image: none;
+        border-radius: 5px;
+        height: 10px;
+    }
+    .fd-note{
+        padding: 26px 0 28px 0;
+        line-height: 1.6;
+    }
+    .fd-note-text{ font-size: 17px; color: #334155; }
+    .fd-note-strong{ font-size: 17px; font-weight: 700; color: #0f172a; }
+    .fd-page button.fd-btn-primary{
+        background-color: #2646eb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 600;
+        padding: 15px 26px;
+    }
+
+    /* ===== Summary stat cards ===== */
+    .fd-statcard{
+        background-color: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        padding: 28px 30px 22px 30px;
+    }
+    .fd-statcard-head{
+        display: flex;
+        align-items: center;
+        padding-bottom: 20px;
+    }
+    .fd-statcard-title{
+        font-size: 21px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .fd-statcard-icon{
+        margin-left: auto;
+        font-size: 17px;
+    }
+    .fd-icon-blue{ color: #2563eb; }
+    .fd-icon-purple{ color: #a855f7; }
+    .fd-bignum{
+        display: flex;
+        align-items: baseline;
+        gap: 2px;
+    }
+    .fd-bignum-value{
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+    }
+    .fd-bignum-unit{
+        font-size: 22px;
+        font-weight: 700;
+        color: #94a3b8;
+    }
+    .fd-delta{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 0 6px 0;
+    }
+    .fd-delta-period{ font-size: 15px; color: #64748b; }
+    .fd-delta-icon{ color: #16a34a; font-size: 13px; }
+    .fd-delta-value{ font-size: 15px; font-weight: 600; color: #16a34a; }
+
+    /* ===== Footer ===== */
+    .fd-footer{
+        background-color: #ffffff;
+        border-top: 1px solid #e8eef5;
+        padding: 26px 40px;
+        text-align: center;
+    }
+    .fd-foot-text{ font-size: 15px; color: #64748b; }
+    </style>
+
+    <div viewModel="@id('vm') @init('zwriter.FeedbackDashboardViewModel')" sclass="fd-page"
+         hflex="1">
+
+        <!-- ===== Top bar ===== -->
+        <div sclass="fd-topbar" hflex="1">
+            <div sclass="fd-logo z-icon-pie-chart"/>
+            <label value="Feedback Central" sclass="fd-brand-name"/>
+            <div sclass="fd-topbar-right">
+                <div sclass="fd-bellwrap">
+                    <span sclass="z-icon-bell fd-bell"/>
+                    <div sclass="fd-bell-dot"/>
+                </div>
+                <div sclass="fd-avatar z-icon-user"/>
+            </div>
+        </div>
+
+        <!-- ===== Centred content ===== -->
+        <div sclass="fd-container">
+            <label value="Monthly Feedback Dashboard" sclass="fd-h1"/>
+
+            <!-- ===== This month ===== -->
+            <div sclass="fd-card">
+                <label value="Current Month's Feedback" sclass="fd-h2"/>
+
+                <div sclass="fd-meter-head">
+                    <label value="Feedback Submission Progress" sclass="fd-meter-label"/>
+                    <label value="@load(vm.progressLabel)" sclass="fd-meter-pct"/>
+                </div>
+                <progressmeter value="@load(vm.progressPercent)" sclass="fd-meter" hflex="1"/>
+
+                <div sclass="fd-note">
+                    <label value="Please submit your feedback for " sclass="fd-note-text"/>
+                    <label value="@load(vm.currentPeriod)" sclass="fd-note-strong"/>
+                    <label sclass="fd-note-text"
+                           value=" by the end of the day. Your insights are valuable and help us improve the workplace."/>
+                </div>
+
+                <button label="Submit Feedback" iconSclass="z-icon-paper-plane"
+                        sclass="fd-btn-primary" onClick="@command('submitFeedback')"/>
+            </div>
+
+            <!-- ===== Previous months ===== -->
+            <label value="Previous Months' Feedback Summary" sclass="fd-h3"/>
+
+            <hlayout hflex="1" spacing="24px" valign="top">
+                <div sclass="fd-statcard" hflex="1">
+                    <div sclass="fd-statcard-head">
+                        <label value="Overall Satisfaction Trends" sclass="fd-statcard-title"/>
+                        <span sclass="z-icon-line-chart fd-statcard-icon fd-icon-blue"/>
+                    </div>
+                    <div sclass="fd-bignum">
+                        <label value="@load(vm.satisfactionScore)" sclass="fd-bignum-value"/>
+                        <label value="/5" sclass="fd-bignum-unit"/>
+                    </div>
+                    <div sclass="fd-delta">
+                        <label value="Last 6 Months" sclass="fd-delta-period"/>
+                        <span sclass="z-icon-arrow-up fd-delta-icon"/>
+                        <label value="@load(vm.satisfactionDelta)" sclass="fd-delta-value"/>
+                    </div>
+                    <charts type="column" model="@load(vm.satisfactionModel)" title=""
+                            legend="@load(vm.noLegend)" credits="@load(vm.noCredits)"
+                            exporting="@load(vm.noExporting)" colors="@load(vm.blueSeries)"
+                            height="300px"/>
+                </div>
+
+                <div sclass="fd-statcard" hflex="1">
+                    <div sclass="fd-statcard-head">
+                        <label value="Feedback Themes" sclass="fd-statcard-title"/>
+                        <span sclass="z-icon-clone fd-statcard-icon fd-icon-purple"/>
+                    </div>
+                    <div sclass="fd-bignum">
+                        <label value="@load(vm.themeCount)" sclass="fd-bignum-value"/>
+                    </div>
+                    <div sclass="fd-delta">
+                        <label value="Last 6 Months" sclass="fd-delta-period"/>
+                        <span sclass="z-icon-arrow-up fd-delta-icon"/>
+                        <label value="@load(vm.themesDelta)" sclass="fd-delta-value"/>
+                    </div>
+                    <charts type="areaspline" model="@load(vm.themesModel)" title=""
+                            legend="@load(vm.noLegend)" credits="@load(vm.noCredits)"
+                            exporting="@load(vm.noExporting)" colors="@load(vm.purpleSeries)"
+                            height="300px"/>
+                </div>
+            </hlayout>
+        </div>
+
+        <!-- ===== Footer ===== -->
+        <div sclass="fd-footer" hflex="1">
+            <label value="© 2023 Company Name. All rights reserved." sclass="fd-foot-text"/>
+        </div>
+    </div>
+</zk>

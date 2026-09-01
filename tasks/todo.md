@@ -1,98 +1,129 @@
-# Plan: pre-write schema lookup + the last two Tier-1 checks
+# Showcase gallery: generate ZULs for the remaining mockups
 
-Both items come from [doc/knowledge-roadmap.md](../doc/knowledge-roadmap.md) §5, items 1 and 2 — the two
-highest-leverage entries because they move knowledge *before* the write instead of detecting a defect
-after it, and each costs a round today.
+## Context
 
-Governing constraint from the rest of the project: **the default output of `validate-zul.py` must stay
-byte-identical.** Layer count and text are a contract the corpus job and the skill instructions both
-depend on. Every new behaviour is therefore opt-in.
+`zulwriter-showcase/ui-screenshots/` holds 9 mockups. Two already have pages:
 
----
+| Mockup | Page | Pattern | Data |
+|---|---|---|---|
+| AppTracker.png | `app-tracker.zul` | MVC | literal |
+| enterprise kanban board.png | `kanban-board.zul` | MVVM | literal |
 
-## Item A — turn the bundled `zul.xsd` into a pre-write lookup
+The remaining 7 are to be generated: half MVC, half MVVM, **all model-driven**.
 
-The skill ships a 183 KB schema and only uses it as a checker, which answers *after* the mistake at the
-cost of a round. Two of six evaluation runs invented "read the schema first" on their own and both said
-it saved them; the skill never suggests it.
+## Step 1 answers (shared across all 7 pages)
 
-Shape: a `--describe` mode on `validate-zul.py` rather than a new script. It already owns the XSD and
-already has `build_attribute_map()`, so a separate script means either duplicating ~120 lines of schema
-parsing or importing across a hyphenated filename. One tool, two roles.
+| Question | Answer | Source |
+|---|---|---|
+| 1. ZK version | **10.3.0.1-Eval** | `zulwriter-showcase/pom.xml` `<zk.version>` |
+| 2. Page purpose | per page, read from the mockup | the images |
+| 3. MVC / MVVM | **user-specified: half and half** | user's message (overrides `detect-pattern.py`, which reported `mixed (MVC 7, MVVM 4)` → `USE: mvc`) |
+| 4. Static or model-driven | **model-driven, all 7** | user's message |
+| 5. Layout | per page, derived from the mockup | the images |
+| 6. ZK Charts | **available** — `org.zkoss.chart:zkcharts:12.2.0.0-Eval` is already a dependency | `pom.xml` |
+| 7. Theme / density | **keep the project theme** (no `iceblue_c` switch) | switching repaints every existing page |
 
-1. **`--describe <component>`** prints whether the component exists at the target version and what
-   attributes it accepts.
-   → verify: `--describe charts` lists `className` and `zclass` and **not** `sclass`;
-   `--describe togglebutton` reports it does not exist.
-2. **`files` becomes optional only in describe mode.**
-   → verify: a bare invocation with no arguments still exits 2 with a usage error, exactly as today.
-3. **No usage ping in describe mode**, for D19's reason — a lookup is not a skill run, and a third
-   emitter per run breaks the trend line at the version boundary.
-   → verify: `TRACK_URL` pointed at a local listener receives nothing for `--describe`.
-4. **Version-aware**, reusing the existing tables rather than inventing a second source of truth:
-   `REMOVED_COMPONENTS`, `REMOVED_ATTRIBUTES`, `NEW_IN_ZK10_ATTRIBUTES`.
-   → verify: `--describe fragment --zk-version 9` says available; `--zk-version 10` says removed.
-5. **`SKILL.md` Step 2 gains the instruction to use it.** Without the prose the flag goes unused — the
-   evaluation's plainest lesson.
-   → verify: the wording names the trigger ("before using a component or attribute you have not used
-   before"), not just the command.
+No defaults from the *"when there is no one to ask"* table were needed: every question was
+answered by the user, the build file, or the mockup.
 
-## Item B — the last two Tier-1 mechanical checks
+## Pattern assignment
 
-6. **`selectedIndex` on a component that has nothing to index.** Passes all five layers today and dies
-   at render with `Out of bound: 0 while size=0`. Deterministic in the ZUL alone: flag
-   `selectedIndex="N"` when the component has no `model=` **and** fewer than N+1 literal item children.
-   Fires in the existing Layer 3.
-   → verify: `<combobox selectedIndex="0"/>` fails; one `<comboitem>` present passes; `model=` present
-   passes.
-7. **`@Wire` field type vs. component type.** Compiles, validates, renders, then throws
-   `ClassCastException` at runtime only when the field is used — invisible to every existing layer and
-   to the render. Needs the Java, so it is a new **Layer 6**, running *only* when `--controller` is
-   passed, keeping default output unchanged.
-   → verify: `@Wire Label x;` against `<a id="x"/>` is flagged; `@Wire A x;` is not; `@Wire Component x;`
-   is not; an unresolvable case is silent.
-8. **Fixtures and tests.**
-   → verify: `test/run-regression.py` reports 0 drift, and a new `test/run-schema-query-tests.py` passes.
+Balanced across the whole gallery (9 pages → MVC 4, MVVM 5).
 
----
+| # | Mockup | New page | Pattern | Model-driven via |
+|---|---|---|---|---|
+| 1 | Task Master.png | `task-master.zul` | MVVM | `<tree model>` + `<forEach items="@load(vm.tasks)">` cards |
+| 2 | Feedback Dashboard.png | `feedback-dashboard.zul` | MVVM | `<charts model>` ×2 + bound progress/labels |
+| 3 | Data Comparison Modal.png | `data-comparison-modal.zul` | MVVM | `<grid model>` + `<template name="model">` |
+| 4 | Data Analytics Dashboard.png | `data-analytics-dashboard.zul` | MVVM | `<forEach>` KPI cards + `<charts model>` ×2 + `<grid model>` |
+| 5 | Bank Reconciliation Dashboard.png | `bank-reconciliation.zul` | MVC | Composer `setModel()` on a wired `<listbox>` |
+| 6 | Test Case Management.png | `test-case-management.zul` | MVC | Composer `setModel()` on a wired `<tree>` + `<grid>` |
+| 7 | Application Review.png | `application-review.zul` | MVC | Composer sets the wired detail labels |
 
-## Review — all eight steps done
+## Verified before writing any markup
 
-| Step | Outcome |
-|---|---|
-| 1 `--describe` | `--describe charts --attr sclass` → *NOT accepted*, offering `zclass`/`className`; `--describe togglebutton` → *NOT FOUND*, offering `toolbarbutton` |
-| 2 optional file arg | a bare invocation still exits **2** with `the following arguments are required: files` |
-| 3 no ping | describe returns before `track_usage_async` is ever reached |
-| 4 version-aware | `fragment --zk-version 9` → *existed in ZK 9, removed in ZK 10*, exit 0; `--zk-version 10` → *REMOVED*, exit 1 |
-| 5 Step 2 prose | guideline 3 added, plus a routing-table row and the `zk-doc` server-name fix |
-| 6 Layer 6 | fires on the empty combobox and on an index past the last item; silent for one literal item, a bound index, `-1`, and a present `model` |
-| 7 Layer 7 | catches `@Wire A` on a `<label>` in a real composer, naming line 39 — the declaration, not the annotation |
-| 8 tests | `run-schema-query-tests.py` **25/25**; `run-regression.py` 33 files 0 drift; `run-pattern-tests.py` 7/7 |
+- `<forEach items="@load(vm.x)" var="y">` repeats a ViewModel collection — probed with a throwaway
+  page + ViewModel, rendered `CONTROLLERS: executed`, 3 cards laid out across an `hlayout`.
+  Probe files deleted afterwards.
+- `<forEach>` schema: accepts `begin, end, items, step, var, varStatus`.
+- `<charts>` takes `className`/`zclass`, **not** `sclass`; takes `model`; no `width` needed (100% by default).
+- zkcharts models present in the jar: `DefaultCategoryModel`, `DefaultXYModel`, `DefaultPieModel`.
+- Icon classes go on `<span>`/`<div>` carriers or `iconSclass` — never on `<label>`.
+- Toolchain: `withjdk.sh 17 mvn -o compile`, then `withjdk.sh 17 uv run .../preview-zul.py`.
+  Default `java` on this machine is 11, which the preview rejects.
 
-**Two defects found and fixed during implementation, both by testing rather than by review:**
+## Per-page procedure
 
-1. **`--describe` gave a confidently wrong answer for a removed component.** `<fragment>` is absent
-   from the bundled 10.x schema, so the first version reported "not a ZUL component at this version"
-   — flatly wrong for a ZK 9 target, where it is valid. Absence and removal look identical in this
-   file and mean opposite things, so removal is now checked *first*. This is precisely the failure
-   mode the project's own evaluation punished hardest: a wrong answer is worse than no answer.
-2. **Layer 7 reported the wrong line number.** Comments were being stripped, which shifted every
-   offset after the first comment — a real field at line 39 was reported as line 27. Comments are now
-   blanked in place, preserving offsets, and the report anchors on the *type token* rather than on
-   `@Wire`, because the type is what has to change.
+For each page, in order:
 
-**False-positive check, since that is the whole risk of Layer 7:** run against every controller in the
-repository that uses `@Wire` — five files, 30 fields — **zero findings**. Then one field's type was
-flipped in a real composer and the rule caught it with the correct diagnosis and fix.
+1. Visual analysis of the mockup → component/layout plan.
+2. **Pass 1** — write the ZUL with literal data, shaped like the real data.
+3. Validate: `validate-zul.py --zk-version 10.3.0.1-Eval --dev <page>`.
+4. Write the controller — **behaviour only**, no data.
+5. Render at the mockup's width (`--width 1600`, `--width 1280` for Feedback Dashboard, whose PNG is
+   a 2× export) and self-review. Fix rounds until the layout is settled (budget: 4).
+6. **Pass 2** — extract the literals into the controller, point the ZUL at them, delete the literal
+   rows.
+7. Validate with `--controller` (Layer 7), then re-render with `--run-controllers` once.
 
-**Default output shape:** diffed against the committed validator over four files. Exit codes identical;
-the only change anywhere is the single new `Layer 6` line.
+## Checklist
 
-### Silence rules for item 7 — decided before writing, not after
+- [x] Toolchain + schema + `<forEach>` probe
+- [x] `task-master.zul` + `TaskMasterViewModel` (MVVM)
+- [x] `feedback-dashboard.zul` + `FeedbackDashboardViewModel` (MVVM)
+- [x] `data-comparison-modal.zul` + `DataComparisonViewModel` (MVVM)
+- [x] `data-analytics-dashboard.zul` + `DataAnalyticsViewModel` (MVVM)
+- [x] `bank-reconciliation.zul` + `BankReconciliationComposer` (MVC)
+- [x] `test-case-management.zul` + `TestCaseManagementComposer` (MVC)
+- [x] `application-review.zul` + `ApplicationReviewComposer` (MVC)
 
-The rule reports only what it can establish. It stays silent when the field type is a known base class
-(`Component`, `HtmlBasedComponent`, `XulElement`, `LabelElement`, `LabelImageElement`, `InputElement`,
-…), when the type is generic or a collection, when the id is not in the ZUL (it may be built at
-runtime), when the `@Wire` carries a selector that is not a plain `#id`, or when either side does not
-resolve to a known component. Under-reporting is the safe direction for a list the agent is told to
-trust — the same principle the `escapes-parent` rule already follows.
+## Open question for the user
+
+The two pre-existing pages (`app-tracker.zul`, `kanban-board.zul`) hold their data as literal
+markup, not model-driven. Converting them was not asked for and is not in this scope — see the
+report's decision section.
+
+## Review
+
+All seven pages built, both passes each. Every page passes validator layers 1-7 (with
+`--controller`), and `mvn clean compile` is green.
+
+| Page | Pattern | Pass 1 fix rounds | Pass 2 fix rounds |
+|---|---|---|---|
+| `task-master.zul` | MVVM | 1 (tree indentation + duplicate carets) | 0 |
+| `feedback-dashboard.zul` | MVVM | 0 | 0 |
+| `data-comparison-modal.zul` | MVVM | 2 (middle-column tint; 1st aimed at the wrong selector) | 0 |
+| `data-analytics-dashboard.zul` | MVVM | 0 | 0 |
+| `bank-reconciliation.zul` | MVC | 1 (DATE column wrapped, doubling row height) | 1 (model reset multi-select; % truncation) |
+| `test-case-management.zul` | MVC | 2 (3 folders open vs design; column clipping) | 2 (tree template EL; `--` in an XML comment) |
+| `application-review.zul` | MVC | 1 (page background did not fill the viewport) | 0 |
+
+No page reached the four-round backstop in either pass.
+
+### Things measured along the way, worth keeping
+
+1. **A grid's data cells are `td.z-row-inner`, not `.z-cell`.** Two rules aimed at `.z-cell`
+   painted nothing at all; the DOM dump settled it. `.z-cell` is what an explicit `cell`
+   component renders.
+2. **A tree template's EL variable is always `each`, and it is the `TreeNode`.** A custom
+   `var="..."` is silently ignored on the plain-EL (MVC) path, so expressions through it render
+   empty instead of failing — which is why this cost two rounds before being probed. The MVVM
+   binder *does* honour `var`. So: MVC writes `${each.data.x}`, MVVM writes `@load(node.data.x)`.
+3. **`selectedIndex="0"` on a `<combobox>` throws even when the markup has `<comboitem>`
+   children** — the attribute is applied before the children exist. Layer 6 only fires when there
+   are no items in the markup at all, so it passed this page and the render caught it. Use
+   `value="..."` on a readonly combobox instead.
+4. **`Listbox.setModel()` copies the model's own `multiple` flag onto the listbox**, and
+   `ListModelList` defaults to single selection — silently overruling `multiple="true"` in the
+   ZUL and turning a `checkmark` column into radio buttons. Call `model.setMultiple(true)`.
+5. **The bundled XSD rejects a model-driven `<tree>` whose only child is a `<template>`** —
+   `treeType` requires a `treecols` or `treechildren` once the tree has any child. An empty
+   `<treechildren/>` satisfies it and the model still fills the tree.
+6. **ZK Charts chrome must come from the controller, not from ZUL text.** `legend="false"` throws
+   `ClassCastException` (it wants a `Legend` object); `colors="#3b82f6"` finds no setter. Bind
+   `Legend` / `Credits` / `Exporting` / `List<Color>` / `PlotOptions` from the controller instead.
+   `yAxis` is *not* usable: Layer 3 rejects it on `<charts>`, so axis chrome stays ZK-default.
+7. **`<forEach items="@load(vm.x)" var="y">`** repeats a ViewModel collection and is the way to
+   build a wrapping card grid from a model — no model-bearing component required.
+8. **`<checkbox mold="switch">`** is a real ZK 10 mold (confirmed in `zul.jar`'s `lang.xml`), and
+   renders the design's toggle without any custom CSS.
