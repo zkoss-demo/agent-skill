@@ -26,8 +26,12 @@ agent-skill/
 ├── CLAUDE.md             # Claude Code guidance file
 ├── skills/               # Canonical skill location (real files)
 │   └── zul-writer/      
+├── doc/                  # Design rationale, decisions, measured ZK behaviour, open items
 └── .github/skills/       # GitHub Copilot / Cursor skills (symlinked)
 ```
+
+See [doc/README.md](doc/README.md) for why the skill is shaped the way it is, what has been decided and
+deliberately ruled out, and what is still open.
 
 ## Installation
 

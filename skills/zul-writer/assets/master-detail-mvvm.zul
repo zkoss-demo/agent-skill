@@ -1,9 +1,11 @@
 <zk>
     <style>
         .md-detail-title { font-weight: bold; font-size: 16px; }
+        .md-detail-empty { color: #888; }
     </style>
     <hlayout vflex="1" hflex="1">
-        <!-- Master list -->
+        <!-- Master list. Bindings match MyViewModel.Item in this same
+             directory: getItems(), getSelectedItem(), and Item's id/label. -->
         <listbox model="@load(vm.items)"
                  selectedItem="@bind(vm.selectedItem)"
                  hflex="1" vflex="1">
@@ -11,16 +13,27 @@
                 <listheader label="Name"/>
             </listhead>
             <template name="model" var="item">
-                <listitem label="@load(item.name)"/>
+                <listitem label="@load(item.label)"/>
             </template>
         </listbox>
 
-        <!-- Detail panel -->
-        <vlayout hflex="2" vflex="1"
-                 visible="@load(not empty vm.selectedItem)">
-            <label value="@load(vm.selectedItem.name)" sclass="md-detail-title"/>
-            <separator/>
-            <label value="@load(vm.selectedItem.description)"/>
+        <!-- Detail panel. The pane itself is always visible so that selecting
+             a row does not re-flow the page: hiding the whole hflex="2" pane
+             makes the master list render full-width on load and snap back to a
+             third of the width on the first click. Swap the contents instead. -->
+        <vlayout hflex="2" vflex="1">
+            <label value="Select an item to see its details."
+                   sclass="md-detail-empty"
+                   visible="@load(empty vm.selectedItem)"/>
+
+            <vlayout visible="@load(not empty vm.selectedItem)">
+                <label value="@load(vm.selectedItem.label)" sclass="md-detail-title"/>
+                <separator/>
+                <hlayout>
+                    <label value="ID:"/>
+                    <label value="@load(vm.selectedItem.id)"/>
+                </hlayout>
+            </vlayout>
         </vlayout>
     </hlayout>
 </zk>
