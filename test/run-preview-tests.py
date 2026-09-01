@@ -941,6 +941,71 @@ def check_a25_setmodel_is_seen_only_when_the_controller_runs():
     return fails
 
 
+def state_entries(stdout):
+    """The STATE items, as raw `state | locator` strings. One pipe, where a LAYOUT finding
+    has two -- which is why layout_entries() cannot pick these up by accident."""
+    return [l.strip()[2:] for l in stdout.splitlines()
+            if l.startswith("  - ") and l.count("|") == 1]
+
+
+def check_a26_collapsible_state_is_enumerated():
+    """A26: every collapsible component is listed with the state it actually shipped in.
+
+    This block claims nothing about right and wrong -- whether a closed groupbox is correct
+    lives in the mockup, not in the page -- so what it has to get right is the reading itself.
+    The fixture's ids say what each one should report, and the four components state
+    themselves four different ways in the DOM (`z-groupbox-collapsed` when CLOSED,
+    `z-nav-open` and `z-detail-open` when OPEN, and the tree's marker on its icon rather than
+    on the item), so a reading that drifts to the DOM would invert at least one of them.
+
+    The two negative controls are leaves. A treeitem with no children cannot collapse, and
+    listing it would pad the one block whose whole value is being short enough to compare
+    against a design by eye.
+    """
+    code, out, _, _ = render(FIXTURES / "collapsible-state.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"collapsible-state: expected exit 0, got {code}\n{out}")
+    found = state_entries(out)
+    expected = {"groupbox#gbOpen": "open", "groupbox#gbClosed": "closed",
+                "nav#navOpen": "open", "nav#navClosed": "closed",
+                "detail#detOpen": "open", "detail#detClosed": "closed",
+                "treeitem#tiOpen": "open", "treeitem#tiClosed": "closed"}
+    for locator, state in expected.items():
+        hit = [e for e in found if e.endswith(locator)]
+        if not hit:
+            fails.append(f"collapsible-state: {locator} was not enumerated:\n{found}")
+        elif not hit[0].startswith(state):
+            fails.append(f"collapsible-state: {locator} reported as {hit[0]!r}, "
+                         f"but the fixture ships it {state}")
+    # A leaf has no children to hide, so its `open` is an implementation detail, not a state
+    # anyone can compare with a design.
+    if any("tiLeaf" in e for e in found):
+        fails.append(f"collapsible-state: reported treeitem#tiLeaf, which has no children "
+                     f"and cannot collapse:\n{found}")
+    if len(found) != len(expected):
+        fails.append(f"collapsible-state: expected exactly {len(expected)} items, "
+                     f"got {len(found)}:\n{found}")
+    header = value(out, "STATE")
+    if header != f"{len(expected)} collapsible (4 open, 4 closed)":
+        fails.append(f"collapsible-state: the header must count what the list shows, got {header!r}")
+    return fails
+
+
+def check_a26b_a_page_without_one_has_no_state_block():
+    """A26b: the block is omitted entirely when there is nothing collapsible, so every page
+    that had no such component prints exactly what it printed before this existed. A block
+    that appears saying `0 collapsible` would be a new line on every page in exchange for no
+    information."""
+    code, out, _, _ = render(GOLDEN)
+    fails = []
+    if code != 0:
+        fails.append(f"golden page: expected exit 0, got {code}\n{out}")
+    if "STATE" in blocks(out):
+        fails.append(f"the golden page has nothing collapsible but printed a STATE block:\n{out}")
+    return fails
+
+
 CHECKS = [
     ("usage/no-args        ", check_usage_no_args),
     ("skip/missing-jar     ", check_skip_missing_jar),
@@ -974,6 +1039,8 @@ CHECKS = [
     ("A23 unpinned launcher ", check_a23_an_unidentified_launcher_is_not_given_a_version),
     ("A24 model + literals ", check_a24_a_model_beside_literal_rows_is_reported),
     ("A25 setModel literals", check_a25_setmodel_is_seen_only_when_the_controller_runs),
+    ("A26 collapsible state", check_a26_collapsible_state_is_enumerated),
+    ("A26b no state block  ", check_a26b_a_page_without_one_has_no_state_block),
 ]
 
 # A12, the exit-code map, has no check of its own on purpose: 0, 1, 2, 3 and 4 are each already

@@ -81,6 +81,12 @@ captured region, so a finding may name something the screenshot does not show. I
 omitted when there is nothing to report, and it never changes the exit code unless
 --fail-on-layout is passed.
 
+STATE: entries are the opposite kind of thing: an enumeration, never a verdict. It lists
+every groupbox, nav, detail and tree branch that can collapse, with the state it actually
+shipped in, because whether a collapsed component is correct lives in the mockup and not
+in the page. Compare the list against the design; a mismatch is a one-attribute fix
+(`open`). Omitted when the page has nothing collapsible.
+
 PROBE: and DOM: are the rendered DOM, and they exist because the served response is not
 it: ZK sends a `zkmx([...])` bootstrap that restates the .zul, and the client engine builds
 the real markup afterwards. So the class names, the fonts and the boxes only exist in the
@@ -2046,6 +2052,155 @@ def literal_row_findings(groups, verdicts):
     return findings
 
 
+# --- Collapsible state ---------------------------------------------------
+# Not findings, and deliberately not in the LAYOUT block: nothing here is wrong. A
+# groupbox that ships closed is either exactly what the mockup showed or the opposite
+# of it, and no measurement can tell those apart — the intended state exists only in
+# the design. So the render ENUMERATES and the comparison stays with whoever holds the
+# mockup. That turns "spot the difference against a PNG", which is the check an agent
+# quietly skips, into "compare two short lists", which is the one it does not.
+#
+# Four components, ruled in rather than derived: groupbox, nav, detail, treeitem. Every
+# other way a ZK page hides content — an unselected tab, a paged grid, a scrolled region
+# — hides it as part of doing its job, and listing those would bury the four that
+# genuinely ship in the wrong state.
+#
+# The state is read from the ZK widget rather than from the DOM, because these four mark
+# themselves four different ways. Measured on preview-fixtures/collapsible-state.zul
+# against ZK 10.3:
+#   groupbox   `z-groupbox-collapsed` on the root when CLOSED, no marker when open
+#   nav        `z-nav-open` when OPEN, no marker when closed
+#   detail     `z-detail-open` on `.z-detail-outer`, which is not the widget root
+#   treeitem   `z-tree-open` / `z-tree-close` on the toggle ICON, not on the item
+# One property replaces four conventions, and a theme cannot rename a property.
+STATE_PRINT_CAP = 20        # same truthful-tail rule as the LAYOUT block
+STATE_COLLECT_CAP = 200     # bounds one payload crossing the CDP boundary; `total` stays exact
+
+STATE_JS = """(collectCap) => {
+  const zk = window.zk;
+  const WANTED = {groupbox: 1, nav: 1, detail: 1, treeitem: 1};
+  const items = [];
+  // Counted over every match, not over the collected slice: above the cap the
+  // header would otherwise split a true total into two numbers that do not sum to it.
+  let total = 0, opened = 0;
+
+  const widgetOf = (el) => {
+    try { return (zk && zk.Widget && zk.Widget.$) ? zk.Widget.$(el) : null; } catch (e) { return null; }
+  };
+  const zulTag = (w) => {
+    const cls = String(w.className || w.widgetName || '');
+    const last = cls.substring(cls.lastIndexOf('.') + 1);
+    return last ? last.toLowerCase() : '';
+  };
+  const prop = (w, name) => {
+    const cap = name.charAt(0).toUpperCase() + name.slice(1);
+    for (const getter of ['get' + cap, 'is' + cap]) {
+      try {
+        if (typeof w[getter] === 'function') {
+          const v = w[getter]();
+          if (v != null && String(v) !== '') return String(v);
+        }
+      } catch (e) {}
+    }
+    try {
+      const f = w['_' + name];
+      if (f != null && String(f) !== '') return String(f);
+    } catch (e) {}
+    return '';
+  };
+  const snip = (s, n) => (s.length > n ? s.slice(0, n - 1) + '\\u2026' : s);
+  const ownText = (el) => {
+    const out = [];
+    for (let i = 0; i < el.childNodes.length; i++) {
+      const n = el.childNodes[i];
+      if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) out.push(n.nodeValue);
+    }
+    return out.join(' ').replace(/\\s+/g, ' ').trim();
+  };
+  // Same rule as the LAYOUT locator: the author's own id when there is one, never a
+  // generated one, so the line always names something findable in the .zul.
+  const locator = (w, tag, el) => {
+    if (w.id && w.id !== w.uuid) return tag + '#' + w.id;
+    for (const attr of ['title', 'label', 'value']) {
+      const v = prop(w, attr);
+      if (v) return tag + '[' + attr + '="' + snip(v, 40) + '"]';
+    }
+    const t = snip((el.textContent || '').replace(/\\s+/g, ' ').trim() || ownText(el), 30);
+    return t ? tag + ' "' + t + '"' : tag;
+  };
+
+  // A treeitem with no children cannot collapse, so reporting its `open` would be noise in
+  // the one block whose whole value is being short enough to read. There is no
+  // getTreechildren() to ask (measured: undefined on ZK 10.3) -- an item that can collapse
+  // carries its Treechildren as its last child widget, and a leaf's last child is its own
+  // Treerow.
+  const collapsible = (w, tag) => {
+    if (tag !== 'treeitem') return true;
+    try {
+      return !!w.lastChild && zulTag(w.lastChild) === 'treechildren';
+    } catch (e) { return false; }
+  };
+
+  // A Treeitem shares its <tr> with its Treerow, and zk.Widget.$() resolves that node to the
+  // INNER widget -- so the item is never a root of its own and a plain scan misses every one.
+  // Reached through the row it owns instead. (Measured; this is the only one of the four that
+  // is not simply the widget on the element.)
+  const subject = (w, tag) => {
+    if (tag === 'treerow' && w.parent && zulTag(w.parent) === 'treeitem') {
+      return [w.parent, 'treeitem'];
+    }
+    return [w, tag];
+  };
+
+  const isOpen = (w) => {
+    const raw = prop(w, 'open');
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return null;                       // not a state this build exposes; reported as unknown
+  };
+
+  const all = document.querySelectorAll('body *');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    const w = widgetOf(el);
+    if (!w) continue;
+    // Widget ROOTS only: without this every inner node of a groupbox reports the same
+    // groupbox again.
+    let root = false;
+    try { root = w.$n() === el; } catch (e) { root = false; }
+    if (!root) continue;
+    const [sw, tag] = subject(w, zulTag(w));
+    if (!WANTED[tag]) continue;
+    if (!collapsible(sw, tag)) continue;
+    const open = isOpen(sw);
+    if (open === null) continue;
+    total++;
+    if (open) opened++;
+    if (items.length < collectCap) {
+      items.push({state: open ? 'open' : 'closed', locator: locator(sw, tag, el)});
+    }
+  }
+  return {total: total, open: opened, items: items};
+}"""
+
+
+def emit_state(state):
+    """Omitted entirely when the page has no collapsible components, so a page without
+    one prints exactly what it printed before this block existed."""
+    items = state.get("items") or []
+    if not items:
+        return
+    total = state.get("total", len(items))
+    opened = state.get("open", sum(1 for i in items if i["state"] == "open"))
+    emit("STATE", f"{total} collapsible ({opened} open, {total - opened} closed)")
+    shown = items[:STATE_PRINT_CAP]
+    for item in shown:
+        print(f"  - {item['state'].ljust(6)} | {item['locator']}")
+    # Never a silent truncation: the header counts every one, so the difference is stated.
+    if total > len(shown):
+        print(f"  ... and {total - len(shown)} more")
+
+
 # --- ZK client error box -------------------------------------------------
 # ZK's client engine does NOT log to the console: zk.error() hands the message to
 # zk.debugLog (which reaches the console only under zk.debugJS) and then to
@@ -2083,7 +2238,7 @@ def _one_line(text, limit=200):
     return first if len(first) <= limit else first[:limit] + "\u2026"
 
 
-def capture(url, out_path: Path, args, warnings, controllers, layout, probes, dom,
+def capture(url, out_path: Path, args, warnings, controllers, layout, state, probes, dom,
             literal_groups=()):
     """Returns (http_status, error_details_or_None).
 
@@ -2296,6 +2451,18 @@ def capture(url, out_path: Path, args, warnings, controllers, layout, probes, do
                         debug("literal rows", f"{len(extra)} finding(s) from "
                                               f"{len(literal_groups)} component(s)")
 
+                # Its own evaluate and its own block, because these are not findings: the
+                # LAYOUT block is things the browser measured as wrong, and a collapsed
+                # groupbox is not wrong, it is a fact someone has to compare with the design.
+                # Same suppression as the audit -- a bug in the enumeration must never cost
+                # the caller a render that worked.
+                with contextlib.suppress(Exception):
+                    enumerated = page.evaluate(STATE_JS, STATE_COLLECT_CAP)
+                    state["total"] = enumerated["total"]
+                    state["open"] = enumerated["open"]
+                    state["items"] = enumerated["items"]
+                    debug("collapsible", f"{enumerated['total']} component(s)")
+
                 # After the screenshot for the same reason as the audit above — the PNG is
                 # already on disk, so nothing evaluated here can alter the image it explains.
                 # Skipped on the launcher's error page: that box would be our own diagnostic
@@ -2491,7 +2658,7 @@ def report_skeleton():
     than the work, and `warnings` is always an array."""
     return {"status": None, "exitCode": None, "zul": None, "screenshot": None, "size": None,
             "docroot": None, "classpath": None, "zk": None, "launcher": None,
-            "controllers": None, "layout": None, "probe": None, "domDump": None,
+            "controllers": None, "layout": None, "state": None, "probe": None, "domDump": None,
             "warnings": [], "error": None}
 
 
@@ -2512,7 +2679,7 @@ def write_report(obj):
 
 
 def report_for_run(exit_code, args, target: "Target", launcher, warnings, controllers,
-                   layout, details, probes, dom):
+                   layout, state, details, probes, dom):
     """Exits 0, 1 and 4 — every one of them a render that reached the browser. Built from the
     same objects report_success/report_render_error print from, so text and JSON cannot drift.
     Called from main() and not from those two, because exit 4 is only known after the LAYOUT
@@ -2550,6 +2717,12 @@ def report_for_run(exit_code, args, target: "Target", launcher, warnings, contro
         # The COLLECT cap (200), not the print cap (25): a JSON consumer that got the printed
         # 25 with no way to tell would be reading a silent truncation, which nothing here does.
         layout={"total": layout.get("total", 0), "findings": layout.get("findings") or []},
+        # Null when the render never got to enumerate; an empty list means "asked, and this
+        # page has none" — the same distinction `probe` draws, and the one that separates a
+        # page with nothing collapsible from a run that never looked.
+        state=({"total": state.get("total", 0), "open": state.get("open", 0),
+                "items": state.get("items") or []}
+               if state else None),
         # Null when the flag was not passed, which is not the same claim as "asked and found
         # nothing" -- an empty array. The text block draws the same distinction by omitting
         # the PROBE: block entirely in the first case and printing "0 matches" in the second.
@@ -2723,12 +2896,12 @@ def resolve_request(zul: Path, args, resolved):
 
 
 def render(target: Target, java: Path, jar: Path, args, warnings, controllers, layout,
-           probes, dom):
+           state, probes, dom):
     """Steps 5-7: the launcher lives exactly as long as the capture needs it."""
     with Launcher(java, jar, launcher_classpath(target.resolved), target.docroot,
                   args.run_controllers, args.controller_timeout) as launcher:
         url = f"http://127.0.0.1:{launcher.port}{target.request_path}"
-        return capture(url, target.out_path, args, warnings, controllers, layout, probes, dom,
+        return capture(url, target.out_path, args, warnings, controllers, layout, state, probes, dom,
                        literal_row_groups(target.zul))
 
 
@@ -2783,7 +2956,7 @@ def report_render_error(target: Target, args, details, warnings, controllers_val
 
 
 def report_success(target: Target, args, launcher: LauncherJar, warnings, controllers_value,
-                   layout, probes, dom):
+                   layout, state, probes, dom):
     resolved = target.resolved
     zk_jars = [j.name for j in resolved["jars"] if re.match(r"zk-\d", j.name)]
     emit("STATUS", "ok")
@@ -2801,6 +2974,7 @@ def report_success(target: Target, args, launcher: LauncherJar, warnings, contro
     emit("LAUNCHER", f"{launcher.version} ({launcher.source})")
     emit("CONTROLLERS", controllers_value)
     emit_layout(layout)
+    emit_state(state)
     emit_probe(probes)
     emit_warnings(warnings)
     if args.fail_on_layout and (layout.get("findings") or []):
@@ -2826,7 +3000,7 @@ def main(argv=None):
     layout_findings = {"total": 0, "findings": []}
     # Mutated in place by capture(), the same idiom as `warnings` and `layout_findings`:
     # both are properties of the render rather than of the process.
-    probes, dom = [], {}
+    probes, dom, state = [], {}, {}
 
     zul = locate_zul(args.zul)
     resolved = resolve_classpath(zul, args, warnings)                       # 1
@@ -2843,7 +3017,7 @@ def main(argv=None):
     launcher = resolve_launcher(args.launcher_jar, args.launcher_version,   # 4
                                warnings)
     status, details = render(target, java, launcher.path, args, warnings,  # 5-7
-                             controllers, layout_findings, probes, dom)
+                             controllers, layout_findings, state, probes, dom)
 
     # Computed once, before either report: it can append a warning of its own.
     controllers_value = controllers_line(args, controllers, launcher, warnings)
@@ -2854,11 +3028,11 @@ def main(argv=None):
             raise Skipped(f"the render server answered HTTP {status} for {request_path}",
                           "check that the .zul path is correct relative to the docroot")
         code = report_success(target, args, launcher, warnings, controllers_value,
-                             layout_findings, probes, dom)
+                             layout_findings, state, probes, dom)
     # Last, and after the exit code exists: --fail-on-layout's 4 is decided on
     # report_success's final line, and REPORT: is the only line allowed after WARNINGS.
     write_report(report_for_run(code, args, target, launcher, warnings, controllers,
-                                layout_findings, details, probes, dom))
+                                layout_findings, state, details, probes, dom))
     return code
 
 

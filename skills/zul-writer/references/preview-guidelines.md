@@ -329,6 +329,49 @@ when there are more, a final `  ... and N more` line accounts for the rest. The 
 nothing else: the same findings are reported without it, and `STATUS: ok` still prints with it — exit
 1 stays reserved for a real defect in the .zul.
 
+## Collapsible state (the `STATE:` block)
+
+An enumeration, not an audit. `LAYOUT:` reports what the browser measured as wrong; this block
+reports something no measurement can rule on — whether a component that rendered collapsed was
+*meant* to. That answer lives in the mockup, so the block's job is to make the comparison cheap:
+
+```
+STATE: 3 collapsible (1 open, 2 closed)
+  - open   | groupbox#gbFilters
+  - closed | groupbox[title="Advanced"]
+  - closed | treeitem#tiSettings
+```
+
+**Scope: `groupbox`, `nav`, `detail`, `treeitem`.** These four hide content while the page is
+still doing exactly what it was told, and a wrong `open` on any of them survives a screenshot
+review because the reviewer would have to notice something absent. An unselected tab, a paged
+grid and a scrolled region hide content too, but as part of their function, so they are out —
+the block's value is being short enough to read line by line.
+
+**A `treeitem` is listed only when it has children.** A leaf cannot collapse.
+
+**State is read from the ZK widget, not the DOM.** The four mark themselves four different ways
+— measured on `preview-fixtures/collapsible-state.zul` against ZK 10.3:
+
+| Component | DOM marker |
+|---|---|
+| `groupbox` | `z-groupbox-collapsed` on the root when **closed**; nothing when open |
+| `nav` | `z-nav-open` when **open**; nothing when closed |
+| `detail` | `z-detail-open` on `.z-detail-outer`, which is not the widget root |
+| `treeitem` | `z-tree-open` / `z-tree-close` on the toggle **icon**, not on the item |
+
+One widget property replaces four conventions, and a theme can restyle a class but not rename a
+property. A `treeitem` also needs one extra step: it shares its `<tr>` with its `Treerow`, and
+`zk.Widget.$()` resolves that node to the row, so the item is reached as the row's parent.
+
+**A collapsed branch hides its descendants from the block.** ZK does not render the children of
+a closed `treeitem` at all, so nothing inside one can be enumerated. The block describes the
+page as it currently stands, which is also all the viewer can see.
+
+**Omitted entirely when the page has nothing collapsible**, on the same rule as `LAYOUT:`.
+Caps match too: 20 items printed, 200 collected, and a `  ... and N more` line whenever the
+header's total exceeds what was shown.
+
 ## Console and client-error warnings
 
 Two browser-side channels feed the existing `WARNINGS:` block. Neither adds a block and neither
@@ -513,6 +556,10 @@ actually holds rather than by the hand-written example:
   with no way for the reader to tell — a silent truncation, which nothing else in this tool does. The
   array carries the collected set; `total` is the true count from the audit, exactly as on the
   `LAYOUT:` header.
+- **`state` is null when the render never enumerated, and `{"total": 0, "items": []}` when it
+  looked and the page has none.** The same distinction `probe` draws: "asked and found nothing" is
+  a fact about the page, "never asked" is a fact about the run, and a consumer that cannot tell
+  them apart will read a failed render as a page with no collapsible components.
 - **`classpath.cached` is derived, not reported.** The resolver appends `" (cached)"` to its own kind
   string, which is what `CLASSPATH: maven (cached), …` prints; `source` is that string with the
   suffix removed and `cached` is whether it was there.

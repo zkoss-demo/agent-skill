@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every collapsible component the STATE: block enumerates, in both states, so one
+     render proves the reading is right: each id says what it should be reported as. -->
+<zk>
+    <vlayout hflex="1" spacing="12px">
+
+        <groupbox id="gbOpen" title="Filters (should read open)" open="true" width="420px">
+            <label value="Visible because the groupbox is open."/>
+        </groupbox>
+
+        <groupbox id="gbClosed" title="Advanced (should read closed)" open="false" width="420px">
+            <label value="Hidden because the groupbox is closed."/>
+        </groupbox>
+
+        <navbar id="sideNav" orient="vertical" width="420px">
+            <nav id="navOpen" label="Reports (should read open)" open="true">
+                <navitem label="Daily"/>
+                <navitem label="Weekly"/>
+            </nav>
+            <nav id="navClosed" label="Admin (should read closed)" open="false">
+                <navitem label="Users"/>
+            </nav>
+        </navbar>
+
+        <grid id="orders" width="420px">
+            <columns>
+                <column label="Order"/>
+                <column label="Total"/>
+            </columns>
+            <rows>
+                <row>
+                    <detail id="detOpen" open="true">
+                        <label value="Line items, shown because the detail is open."/>
+                    </detail>
+                    <label value="SO-1001"/>
+                    <label value="1,200"/>
+                </row>
+                <row>
+                    <detail id="detClosed" open="false">
+                        <label value="Line items, hidden because the detail is closed."/>
+                    </detail>
+                    <label value="SO-1002"/>
+                    <label value="880"/>
+                </row>
+            </rows>
+        </grid>
+
+        <tree id="navTree" width="420px" height="220px">
+            <treecols>
+                <treecol label="Section"/>
+            </treecols>
+            <treechildren>
+                <treeitem id="tiOpen" open="true">
+                    <treerow>
+                        <treecell label="Dashboards (should read open)"/>
+                    </treerow>
+                    <treechildren>
+                        <treeitem>
+                            <treerow>
+                                <treecell label="Sales"/>
+                            </treerow>
+                        </treeitem>
+                    </treechildren>
+                </treeitem>
+                <treeitem id="tiClosed" open="false">
+                    <treerow>
+                        <treecell label="Settings (should read closed)"/>
+                    </treerow>
+                    <treechildren>
+                        <treeitem>
+                            <treerow>
+                                <treecell label="Users"/>
+                            </treerow>
+                        </treeitem>
+                    </treechildren>
+                </treeitem>
+                <treeitem id="tiLeaf">
+                    <treerow>
+                        <treecell label="About (a leaf, not collapsible)"/>
+                    </treerow>
+                </treeitem>
+            </treechildren>
+        </tree>
+
+    </vlayout>
+</zk>

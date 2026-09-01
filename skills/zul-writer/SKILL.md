@@ -581,6 +581,44 @@ Under `CONTROLLERS: skipped (isolated)`, a `clipped-text` finding on placeholder
 in a narrow column) is measured against the placeholder, not against your real data — check it
 against a `--run-controllers` render before widening a column for it.
 
+### `STATE:` — what shipped collapsed
+
+Nothing in this block is a defect, which is why it is not in `LAYOUT:`. A groupbox that
+rendered closed is either exactly what the design showed or the opposite of it, and the page
+cannot tell you which — the intended state exists only in the mockup or in what the user asked
+for. So the render lists the states and you do the comparison:
+
+```
+STATE: 3 collapsible (1 open, 2 closed)
+  - open   | groupbox#gbFilters
+  - closed | groupbox[title="Advanced"]
+  - closed | treeitem#tiSettings
+```
+
+**Read it against the design, one line at a time.** This is the whole reason the block exists.
+Judging collapse by eye means noticing something that is *not on the screen*, which is the
+check that gets skipped — an evaluation run shipped a sidebar tree fully expanded against a
+mockup that showed it collapsed, and said nothing. Two short lists are comparable in a way a
+screenshot and a memory are not.
+
+Four components are listed: **`groupbox`, `nav`, `detail`, and `treeitem`** — everything whose
+content can be hidden while the page is still doing exactly what it was told. A `treeitem` with
+no children is left out, because a leaf cannot collapse. Deliberately absent: an unselected
+tab, a paged grid, a scrolled region. Those also hide content, but hiding it is their job, and
+listing them would bury the four that ship in the wrong state.
+
+Three things to know before you act on it:
+
+- **A closed item hides its descendants from this block too.** ZK does not render the children
+  of a collapsed branch at all, so a `treeitem` inside a closed one cannot be listed — it does
+  not exist yet. What you get is the state of everything currently on the page, which is also
+  all the user can see.
+- **It is omitted entirely when the page has nothing collapsible**, like `LAYOUT:`. No block
+  means the question does not arise.
+- **A difference here is a real defect, and the fix is the `open` attribute** — one attribute,
+  no layout change. If neither the design nor the request says which state a component should
+  be in, leave it alone and say so: an `open` nobody asked about is not yours to change.
+
 ### `WARNINGS:` — console and client errors
 
 Three entry shapes in the `WARNINGS:` block come from the browser rather than from the launcher:
@@ -655,6 +693,10 @@ Judge **structure**, not pixels and not data. Fix only these:
   correct; the defect is markup that renders nothing. Almost always an extraction that moved the
   data and left the old rows behind, so check that the controller really does supply them before
   deleting.
+- **A `STATE:` line that disagrees with the design** — a groupbox, `nav`, `detail` or tree branch
+  that shipped open where the mockup shows it closed, or the reverse. The fix is the `open`
+  attribute and nothing else. Where neither the design nor the request says which state it should
+  be in, leave it and say so.
 - **`CONTROLLERS: failed → isolated`** — read the `WARNINGS` entry: it names the failing class and
   the first cause line. A controller exception, a missing class or a blown budget is a defect in the
   **controller** (or a missing build), not in the ZUL. Fix it there and re-render, or report it —
