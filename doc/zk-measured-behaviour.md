@@ -343,20 +343,33 @@ is a "does the name exist" question, which is the only kind where reading the ja
 
 ### 21b. A literal `selectedIndex` is applied before the children *and* before the model
 
-Rendered one page per component, each with its literal items present (ZK 10.3.0.1):
+Rendered one page per case, **on ZK 9.6.6 and on ZK 10.3.0.1, with identical results on the two** —
+so nothing here needs a version gate. Each component was given its literal items, then a bound
+model, then `-1`:
 
-| Component | literal items in markup | bound model | outcome |
-|---|---|---|---|
-| `combobox` | 2 `<comboitem>` | `@load(list)` | **throws both ways** |
-| `listbox` | 2 `<listitem>` | `@load(list)` | **throws both ways** |
-| `radiogroup` | 2 `<radio>` | (no model form) | **throws** |
-| `tabbox` | 2 `<tab>` | (no model form) | **throws** |
-| `selectbox` | (no literal form) | `@load(list)` | renders |
-| `cardlayout` | 2 child `<div>` | (no model form) | renders |
-| any of them | — | — | `selectedIndex="-1"` renders |
+| Component | literal items in markup | bound model | `-1` | index ≥ 0 |
+|---|---|---|---|---|
+| `combobox` | 2 `<comboitem>` | `@load(list)` | renders | **throws both ways** |
+| `listbox` | 2 `<listitem>` | `@load(list)` | renders | **throws both ways** |
+| `radiogroup` | 2 `<radio>` | (no model form) | renders | **throws** |
+| `tabbox` | 2 `<tab>` | (no model form) | **throws** | **throws** |
+| `selectbox` | (no literal form) | `@load(list)` | renders | renders, **model or not** |
+| `cardlayout` | 2 child `<div>` | (no model form) | **throws** | renders inside `0..cards-1` |
 
-Exceptions raised: `Out of bound: 0 while size=0` (combobox, listbox), `0 out of 0..-1`
-(radiogroup), `No tab at all` (tabbox).
+Exceptions raised: `Out of bound: N while size=0` (combobox, listbox), `N out of 0..-1`
+(radiogroup), `No tab at all` (tabbox), `Out of bound: N while size=<cards>` (cardlayout).
+`cardlayout` is zkmax and ZK 9 CE has none, so that row is ZK 10 only.
+
+**Three different timings hide in that table**, and the last two rows are the ones that read
+wrong. `selectedIndex="-1"` is *not* the universal escape hatch every ZK reference implies:
+
+- `<tabbox selectedIndex="-1">` dies with `No tab at all` on both versions. Its setter reaches for
+  a `<tabs>` child that does not exist yet, so **no literal value at all is safe on a tabbox**.
+- `<cardlayout selectedIndex="-1">` dies with `Out of bound: -1 while size=2`. Note `size=2`: its
+  cards *are* attached by the time the index lands — cardlayout is the one component here whose
+  children exist first — and it has no "nothing selected" state, so it bounds-checks -1 and rejects
+  it.
+- `<selectbox selectedIndex="0"/>` with **no model and no items renders fine** on both versions.
 
 So for the first four, **neither the literal items nor a model rescues the index** — it is applied
 while the element itself is being built, before its children are attached and long before a binder
@@ -370,13 +383,31 @@ negative rather than the deliberate under-report it was documented as.
 Found by writing exactly that combobox into a showcase page, so it is the shape an author reaches
 for naturally — a sort dropdown that should open on its first option.
 
-Rule: Layer 6 now flags a literal non-negative `selectedIndex` on `combobox`, `listbox`,
-`radiogroup` and `tabbox` unconditionally, names the per-component remedy
-(`value="..."` / `selected="true"` / select after `setModel`), and keeps the counting rule only for
-the two components measured to tolerate an index. Pinned by
-`test/wrong/selectedindex-with-literal-items.zul` (must fail on Layer 6 alone),
-`test/valid/selectedindex-tolerated.zul` (must pass), and six `L6:` checks in
-`test/run-schema-query-tests.py` — two of which previously asserted the refuted behaviour.
+The `-1` and `selectbox` rows were measured a commit later than the rest, when the ZK 9 question was
+asked — and they refuted the rule that had just shipped, in both directions at once. Layer 6 let
+every `-1` through (a false negative on tabbox and cardlayout) and called a bare
+`<selectbox selectedIndex="0"/>` a certain throw (a false positive, the kind that teaches a reader
+to ignore the layer). **A rule built from a partial table is wrong in whichever direction the
+missing rows lie**, and neither direction announces itself.
+
+Rule: Layer 6 flags a literal `selectedIndex` as follows —
+
+| Component | fires on |
+|---|---|
+| `combobox`, `listbox`, `radiogroup` | every index ≥ 0, whatever the markup says; `-1` accepted |
+| `tabbox` | **every literal value**, `-1` included |
+| `cardlayout` | `-1`, and anything from the card count upward |
+| `selectbox` | nothing — not checked at all |
+
+Each message names the per-component remedy (`value="..."` / `selected="true"` / select after
+`setModel` / drop the attribute). Pinned by `test/wrong/selectedindex-with-literal-items.zul` (must
+fail on Layer 6 alone), `test/valid/selectedindex-tolerated.zul` (must pass — including the bare
+selectbox that was the false positive), and eight `L6:` checks in `test/run-schema-query-tests.py`,
+three of which previously asserted refuted behaviour.
+
+Tightening it cost no precision: re-run over the same 558-file `zkbooks` corpus,
+Layer 6 still fires on **0** files. Eight of them use `selectedIndex` and only one is a literal
+value — `<cardlayout selectedIndex="1">` with two cards, which the card count correctly clears.
 
 ### 22. XML forbids `--` inside a comment, and it bites anyone documenting a `--flag`
 

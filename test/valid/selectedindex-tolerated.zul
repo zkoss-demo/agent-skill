@@ -1,10 +1,16 @@
 <?page title="Layer 6: the indexes that really do render"?>
 <!--
   The other half of the Layer 6 rule, so the check cannot be tightened into a blanket ban.
-  Every case here was rendered and came back STATUS: ok.
+  Every case here was rendered and came back STATUS: ok, on ZK 9.6.6 and on ZK 10.3.0.1.
 
-    selectedIndex="-1"                  the documented "nothing selected" value
-    <selectbox model="..." index>        selectbox's setter tolerates an index
+    selectedIndex="-1"                  "nothing selected", on the components that have
+                                        such a state; tabbox and cardlayout do not, and
+                                        they belong in the wrong/ fixture instead
+    <selectbox index> with a model       selectbox's setter tolerates an index
+    <selectbox index> with NO model      it tolerates that too, which is why selectbox is
+                                        no longer checked at all. This line pins a real
+                                        false positive: Layer 6 used to call it a certain
+                                        throw and the page renders fine.
     <cardlayout index> with cards        counts ordinary child components, which do exist
 
   MUST PASS validation.
@@ -15,6 +21,8 @@
     </combobox>
 
     <selectbox model="${items}" selectedIndex="0"/>
+
+    <selectbox selectedIndex="0"/>
 
     <cardlayout selectedIndex="0" height="120px">
         <div>first card</div>

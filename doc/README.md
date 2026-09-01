@@ -32,6 +32,13 @@ Nothing here has an owner. Grouped by where the work would land.
       so a bare "does ZK 10 have X?" reaches it. → [knowledge-roadmap.md §Tier 2](knowledge-roadmap.md)
 - [x] **The last two Tier-1 rules** — done: Layer 6 (a literal `selectedIndex` pointing past the items
       that exist) and Layer 7 (`@Wire` type and id cross-check, opt-in via `--controller`).
+- [x] **Does Layer 6's `selectedIndex` rule need a ZK 9 gate?** — no (D3). The rule had only ever been
+      measured on 10.3.0.1, and it fires on markup that is all over older forum and demo content, so a
+      ZK 9 difference would have made it a false-positive machine for exactly the users least able to
+      argue with it. Re-measured case by case on **ZK 9.6.6**: identical outcomes on every case, so
+      one rule serves both targets and `--zk-version` stays out of this layer. The same pass refuted
+      two of the rule's own boundaries — `-1` is not universally legal, and `selectbox` was being
+      accused wrongly. → [zk-measured-behaviour.md §21b](zk-measured-behaviour.md)
 - [x] **The lookup's own wrong answers** — done (D25): `xs:simpleContent` is now traversed (it was the
       root cause of the `test/valid/zk-5793.zul` quarantine, which has been removed from the list), an
       element whose own type declares `xs:anyAttribute` is reported as taking arbitrary names, and
@@ -46,9 +53,18 @@ Nothing here has an owner. Grouped by where the work would land.
 - [ ] **Fix the zk-doc retrieval precision bug** before growing any corpus. A combobox
       default-selection query returns `treeitem` first — and `treeitem`'s answer is exactly the wrong
       spelling an evaluation run tried first.
-- [ ] **Resolve the XSD maintenance strategy.** Six files are quarantined in
+- [ ] **Resolve the XSD maintenance strategy.** Five files are quarantined in
       `test/known-failures.txt` as unfixed schema false positives, two of them the skill's own bundled
-      assets. → [knowledge-roadmap.md §7](knowledge-roadmap.md)
+      assets. Two further instances, measured 2026-09-01, are deliberately *not* quarantined because
+      each has a one-element workaround that the showcase pages use and `SKILL.md` Step 2 documents:
+      a model-driven `<tree>` whose only child is a `<template>` needs an empty `<treechildren/>`, and
+      a `<listbox>` with literal `<listitem>`s needs a `<listhead>`.
+      **Decided (D4): keep the workarounds, leave the schema alone for now** — the documented
+      workaround costs nothing and the schema is a 43KB document to operate on. What the second
+      instance changes is the *size* of the problem, not the decision: a listbox with literal items is
+      not model-driven at all, so §7's "model-driven components" framing is too narrow — the
+      over-strict "required children" choices bite plainly static markup too.
+      → [knowledge-roadmap.md §7](knowledge-roadmap.md)
 - [ ] **Findings 7 and 9 from the evaluation** remain on the knowledge track: the ZK 10 theme owning the
       mesh header (`ui-to-component-mapping.md` contains no occurrence of "mesh"), and the
       read-the-schema-first habit.

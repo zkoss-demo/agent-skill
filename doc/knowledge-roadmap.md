@@ -260,3 +260,10 @@ Options, in order of preference:
    found in review and both remaining quarantined assets.
 3. Either way, the regression corpus in CI is what makes schema surgery safe — **do that first**, which is
    already the case.
+
+**Decided 2026-09-01 (D4): not yet.** Option 2 was on the table, with the regression net in place and
+the two new instances as fresh evidence, and it was deliberately deferred: the documented workarounds
+cost an author one element each, while option 2 is surgery on a 43KB document whose precision is the
+foundation of both tiers. The state to preserve is that this is a *recorded* deferral, not a forgotten
+item — it stays on the open list in [README.md](README.md) with the evidence attached, so the next
+person to pick it up starts from the table above rather than from another afternoon's review.

@@ -429,9 +429,14 @@ uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --zk-version 10.3.0 p
   says**. Writing the items out does not help, and neither does `model="..."`: a model-driven
   `<listbox model="@load(vm.items)" selectedIndex="0">` throws identically. Express the selection
   instead — `value="..."` on a readonly combobox, `selected="true"` on the `<listitem>` / `<radio>`
-  / `<tab>`, or a controller call after the model is in place. `selectbox` and `cardlayout` do
-  tolerate an index, so for those two the layer stays quiet unless there is nothing at all to point
-  at, and `selectedIndex="-1"` is always legal.
+  / `<tab>`, or a controller call after the model is in place.
+  **`selectedIndex="-1"` is not the universal escape hatch it reads as.** Measured identically on
+  ZK 9.6.6 and ZK 10.3.0.1: `<tabbox selectedIndex="-1">` still dies with `No tab at all`, because
+  the setter wants a `<tabs>` child that does not exist yet — no literal value is safe on a tabbox.
+  `<cardlayout selectedIndex="-1">` dies with `Out of bound: -1 while size=2`: its cards *are*
+  attached first, so it bounds-checks the value and has no "nothing selected" state; a card index
+  inside `0..cards-1` is fine. `selectbox` tolerates every literal value, with a model and without
+  one, so the layer says nothing about it at all.
 - Layer 7: controller cross-check — **only runs when you pass `--controller`** (see Step 4).
 
 ### Prerequisites

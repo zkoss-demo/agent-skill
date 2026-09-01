@@ -107,13 +107,20 @@ the version trap behaving exactly as predicted, not a defect at the ZK 10 target
 
 ## 3. Layer 6 — runtime semantics
 
-- **Recall**: fires on the recorded defect form, naming the cause and three ways out —
-  `selectedIndex="0" will throw at render time. <combobox> declares no <comboitem> and no model, so
-  index 0 has nothing to point at.`
+- **Recall**: fires on the recorded defect form, naming the cause and the way out —
+  `selectedIndex="0" will throw at render time. <combobox> applies the index before its items are
+  attached and before any model is set, so neither literal items nor model="..." makes it safe --
+  set value="..." on a readonly combobox, or select from the controller once the model is in place.`
 - **Precision**: run over all 558 `zkbooks` files. Layer 6 was reached on 555 (3 aborted at an earlier
   layer) and **fired on 0**. The corpus contains 8 files using `selectedIndex`, only one of them a
   literal value; the rest are `@bind`/`@load` expressions, and the rule stayed silent on all of them as
   designed.
+- **Precision holds after the rule was tightened.** The 2026-09-01 rewrite made the rule fire
+  unconditionally on four components (see [zk-measured-behaviour.md §21b](zk-measured-behaviour.md)),
+  which is exactly the change that could have cost precision. Re-measured on the same corpus: the
+  rule cannot fire on a file with no `selectedIndex`, so only those 8 files were re-run, and Layer 6
+  still fires on **0**. The one literal value, `<cardlayout selectedIndex="1">` with two cards, is
+  cleared by the card count — the one component whose children really are attached first.
 
 Frequency in real code cannot be measured this way — documentation examples are written correct. Layer
 6's case rests on catching the recorded defect while never accusing 555 real files, and both hold.

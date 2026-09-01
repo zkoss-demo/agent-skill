@@ -208,6 +208,13 @@ CARDLAYOUT_WITH_CARDS = ('<zk>\n  <cardlayout selectedIndex="0" height="120px">\
 CARDLAYOUT_PAST_END = ('<zk>\n  <cardlayout selectedIndex="4" height="120px">\n'
                        '    <div>one</div>\n    <div>two</div>\n'
                        '  </cardlayout>\n</zk>\n')
+CARDLAYOUT_NO_SELECTION = ('<zk>\n  <cardlayout selectedIndex="-1" height="120px">\n'
+                           '    <div>one</div>\n    <div>two</div>\n'
+                           '  </cardlayout>\n</zk>\n')
+TABBOX_NO_SELECTION = ('<zk>\n  <tabbox selectedIndex="-1">\n'
+                       '    <tabs><tab label="One"/></tabs>\n'
+                       '    <tabpanels><tabpanel>one</tabpanel></tabpanels>\n'
+                       '  </tabbox>\n</zk>\n')
 
 
 def check_the_out_of_bound_case_fires():
@@ -243,9 +250,25 @@ def check_a_bound_index_is_not_judged():
     assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
 
 
-def check_minus_one_is_always_legal():
+def check_minus_one_means_nothing_selected():
     out, _ = validate(COMBOBOX_NO_SELECTION)
     assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
+
+
+def check_minus_one_is_not_a_universal_escape_hatch():
+    """Measured on ZK 9.6.6 and ZK 10.3.0.1: two components reject -1 as well, for opposite
+    reasons -- tabbox reaches for a <tabs> child that does not exist yet ("No tab at all"),
+    and cardlayout bounds-checks -1 against cards that do ("Out of bound: -1 while size=2").
+    The rule read "-1 is always legal" until those two were rendered."""
+    out, code = validate(TABBOX_NO_SELECTION)
+    assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
+    assert 'no "nothing selected" state' in out, out
+    assert code == 1, code
+
+    out, code = validate(CARDLAYOUT_NO_SELECTION)
+    assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
+    assert 'no "nothing selected" state' in out, out
+    assert code == 1, code
 
 
 def check_an_index_past_the_last_item_fires():
@@ -257,17 +280,23 @@ def check_an_index_past_the_last_item_fires():
     assert code == 1, code
 
 
-def check_selectbox_with_a_model_is_left_alone():
-    """Measured: selectbox tolerates the index -- <selectbox model="..." selectedIndex="0">
-    renders. So the model exemption survives for the two tolerant components."""
+def check_selectbox_is_not_judged_at_all():
+    """Measured on both versions: selectbox tolerates the index with a model AND without one,
+    so this layer says nothing about it. The no-model half is a false positive that shipped --
+    Layer 6 called `<selectbox selectedIndex="0"/>` a certain throw and the page renders."""
     out, code = validate(SELECTBOX_WITH_MODEL)
+    assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
+    assert code == 0, code
+
+    out, code = validate(SELECTBOX_NO_MODEL)
     assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
     assert code == 0, code
 
 
 def check_cardlayout_counts_its_cards():
-    """Measured: cardlayout tolerates the index too, so it keeps the counting rule --
-    silent while a card exists at that position, and the range wording when one does not."""
+    """Measured: cardlayout is the one component whose children are attached before the index
+    is applied -- its own exception counts them (`size=2`) -- so for it the card count is the
+    real bound: silent inside 0..cards-1, the range wording past the end."""
     out, code = validate(CARDLAYOUT_WITH_CARDS)
     assert "Layer 6: Runtime Semantics... ✓ PASS" in out, out
     assert code == 0, code
@@ -278,12 +307,14 @@ def check_cardlayout_counts_its_cards():
     assert code == 1, code
 
 
-def check_a_model_only_component_says_so():
-    """<selectbox> has no literal item form at all, so the advice is 'add a
-    model', not 'add items'."""
-    out, code = validate(SELECTBOX_NO_MODEL)
-    assert "Layer 6: Runtime Semantics... ✗ FAIL" in out, out
-    assert "needs a model" in out, out
+def check_the_advice_names_the_component_it_is_for():
+    """The message has to carry the replacement, not just the complaint -- a reader who is
+    told the index throws still has to express the selection somehow."""
+    out, _ = validate(COMBOBOX_WITH_ITEM)
+    assert 'value="..."' in out, out
+
+    out, _ = validate(LISTBOX_INDEX_PAST_END)
+    assert "addToSelection" in out, out
 
 
 # --- Layer 7: controller cross-check --------------------------------------
@@ -460,10 +491,11 @@ CHECKS = [
     ("L6: literal items no help  ", check_literal_items_do_not_make_the_index_legal),
     ("L6: a model is no help     ", check_a_model_does_not_silence_the_rule),
     ("L6: bound index skipped    ", check_a_bound_index_is_not_judged),
-    ("L6: -1 always legal        ", check_minus_one_is_always_legal),
+    ("L6: -1 = nothing selected  ", check_minus_one_means_nothing_selected),
+    ("L6: -1 not universal       ", check_minus_one_is_not_a_universal_escape_hatch),
     ("L6: past the last item     ", check_an_index_past_the_last_item_fires),
-    ("L6: model-only component   ", check_a_model_only_component_says_so),
-    ("L6: selectbox tolerates it ", check_selectbox_with_a_model_is_left_alone),
+    ("L6: advice names the fix   ", check_the_advice_names_the_component_it_is_for),
+    ("L6: selectbox not judged   ", check_selectbox_is_not_judged_at_all),
     ("L6: cardlayout counts cards", check_cardlayout_counts_its_cards),
     ("L7: absent without flag    ", check_layer_7_is_absent_without_the_flag),
     ("L7: wrong type flagged     ", check_a_wrong_field_type_is_flagged),

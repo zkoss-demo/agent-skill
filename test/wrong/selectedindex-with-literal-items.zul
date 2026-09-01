@@ -13,6 +13,13 @@
   help either: the model is set after construction. That was the false negative this fixture
   exists to pin; an earlier version of Layer 6 exempted anything with a model attribute.
 
+  The last two cases are the components with no "nothing selected" state, where even -1 dies,
+  for opposite reasons:
+
+    tabbox      No tab at all           the setter wants a <tabs> child that is not there yet
+    cardlayout  Out of bound: -1 while size=2
+                                        its cards ARE attached, and -1 fails the bounds check
+
   Only Layer 6 may fail here. Nothing in this file is meant to trip any other layer, so if a
   second layer starts failing, this fixture has stopped testing what it is named for.
 
@@ -50,4 +57,18 @@
             <tabpanel>two</tabpanel>
         </tabpanels>
     </tabbox>
+
+    <tabbox selectedIndex="-1">
+        <tabs>
+            <tab label="Summary"/>
+        </tabs>
+        <tabpanels>
+            <tabpanel>one</tabpanel>
+        </tabpanels>
+    </tabbox>
+
+    <cardlayout selectedIndex="-1" height="120px">
+        <div>first card</div>
+        <div>second card</div>
+    </cardlayout>
 </zk>

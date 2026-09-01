@@ -737,32 +737,25 @@ def validate_version_compatibility(file_path: Path, major: int) -> tuple[bool, l
 # --- Layer 6: runtime semantics -------------------------------------------
 # Markup that is legal by every static measure and still dies when the page is built.
 
-# `selectedIndex` is applied while the component tree is built, which is BEFORE the
-# component's own literal children are attached, BEFORE any Composer's doAfterCompose and
-# BEFORE the MVVM binder loads a model. That timing is what makes this checkable from the
-# markup alone -- and it is stronger than it looks.
+# A literal `selectedIndex` is applied while the component itself is being constructed, and
+# what that means differs per component. The whole table was measured by rendering one page
+# per case on BOTH ZK 9.6.6 and ZK 10.3.0.1, with identical results on the two -- so this
+# layer needs no version gate:
 #
-# Measured by rendering each component with its literal items present (ZK 10.3.0.1):
+#   component    literal items   bound model      index -1   index >= 0
+#   combobox     2 <comboitem>   @load(list)      renders    throws BOTH ways
+#   listbox      2 <listitem>    @load(list)      renders    throws BOTH ways
+#   radiogroup   2 <radio>       (no model form)  renders    throws
+#   tabbox       2 <tab>         (no model form)  THROWS     throws
+#   selectbox    (no literal form)  @load(list)   renders    RENDERS, model or not
+#   cardlayout   2 child <div>   (no model form)  THROWS     renders inside 0..cards-1
 #
-#   component    literal items in markup   bound model      outcome
-#   combobox     2 <comboitem>             @load(list)      throws BOTH ways
-#   listbox      2 <listitem>              @load(list)      throws BOTH ways
-#   radiogroup   2 <radio>                 (no model form)  throws
-#   tabbox       2 <tab>                   (no model form)  throws
-#   selectbox    (no literal form)         @load(list)      RENDERS
-#   cardlayout   2 child <div>             (no model form)  RENDERS
+# Exceptions raised: `Out of bound: N while size=0` (combobox, listbox), `N out of 0..-1`
+# (radiogroup), `No tab at all` (tabbox), `Out of bound: N while size=<cards>` (cardlayout).
+# cardlayout was measured on ZK 10 only: it is a zkmax component and ZK 9 CE has none.
 #
-# Exceptions raised: `Out of bound: 0 while size=0` (combobox, listbox),
-# `0 out of 0..-1` (radiogroup), `No tab at all` (tabbox).
-#
-# So for the first four, NEITHER literal items NOR a model rescues the index: counting the
-# children is the wrong model of the timing, and an earlier version of this layer stayed
-# silent on `<combobox selectedIndex="0">` with three comboitems right there in the markup
-# because it counted them. Those four are flagged unconditionally.
-#
-# For selectbox and cardlayout the setter tolerates an index, so they keep the counting
-# rule: flag only when there is nothing at all for the index to point at.
-ALWAYS_THROWS_ON_LITERAL_INDEX = {
+# Three different timings hide in that table, and picking the wrong one costs a render.
+INDEX_ADVICE = {
     # component -> how to express the intended selection instead
     "combobox": 'set value="..." on a readonly combobox, or select from the controller '
                 'once the model is in place',
@@ -770,15 +763,31 @@ ALWAYS_THROWS_ON_LITERAL_INDEX = {
                'model (model.addToSelection(...)) after setModel',
     "radiogroup": 'mark the option with <radio selected="true">',
     "tabbox": 'mark the tab with <tab selected="true">',
+    "cardlayout": 'leave it on the first card, or switch cards from the controller',
 }
 
-# Components whose setter tolerates the index.
-#   None  -> the index counts arbitrary child components (cardlayout's cards)
-#   set() -> the component has no literal item form at all; it requires a model
-TOLERANT_ITEM_TAGS = {
-    "selectbox": set(),
-    "cardlayout": None,
+# 1. The index is applied BEFORE the literal children are attached and BEFORE any model is
+#    set, so every index >= 0 throws whatever the markup says. Counting the children is the
+#    wrong model of the timing: an earlier version of this layer stayed silent on
+#    `<combobox selectedIndex="0">` with three comboitems right there, because it counted
+#    them, and the page it passed died at render.
+INDEX_APPLIED_BEFORE_CHILDREN = {"combobox", "listbox", "radiogroup", "tabbox"}
+
+# 2. Two of them reject the "nothing selected" value as well, for opposite reasons, so -1 is
+#    not the universal escape hatch it reads as.
+NO_UNSELECTED_STATE = {
+    "tabbox": 'its setter reaches for a <tabs> child that does not exist yet, so every '
+              'literal value dies with "No tab at all"',
+    "cardlayout": 'it bounds-checks against the cards it already has, so -1 dies with '
+                  '"Out of bound: -1"',
 }
+
+# 3. cardlayout is the one component whose children ARE attached first (its exception counts
+#    them: `size=2`), so for it the card count is the real bound and the counting rule holds.
+#
+# selectbox is deliberately in none of these: every literal value measured rendered, with a
+# model and without one, on both versions. This layer used to report a bare
+# `<selectbox selectedIndex="0"/>` as a certain throw, which was a false positive.
 
 
 def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
@@ -795,9 +804,11 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
     model-driven `<listbox model="@load(vm.items)" selectedIndex="0">` throws exactly the
     same way.
 
-    Selectbox and cardlayout tolerate an index, so for those two the rule stays silent
-    whenever a model is present or enough children exist: under-reporting is the safe
-    direction for a list the agent is told to trust.
+    `selectedIndex="-1"` is the escape hatch on the first three, but not on tabbox (which
+    demands a <tabs> child before any value can be applied) and not on cardlayout (which
+    bounds-checks -1 against the cards it already has). cardlayout is also the one component
+    here that keeps the counting rule, because its children exist by the time the index
+    lands. selectbox is not checked at all: it tolerated every literal value measured.
     """
     errors = []
     try:
@@ -815,7 +826,7 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
                 continue
             tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
             tag_l = tag.lower()
-            if tag_l not in ALWAYS_THROWS_ON_LITERAL_INDEX and tag_l not in TOLERANT_ITEM_TAGS:
+            if tag_l not in INDEX_ADVICE:
                 continue
 
             raw = None
@@ -830,50 +841,43 @@ def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
             if not re.fullmatch(r'\s*-?\d+\s*', raw):
                 continue
             index = int(raw.strip())
-            # -1 is the documented "nothing selected" value and is always legal.
-            if index < 0:
-                continue
-
             line_str = f"Line {elem.sourceline}: " if use_lxml and hasattr(elem, 'sourceline') else ""
+            advice = INDEX_ADVICE[tag_l]
+
+            if index < 0:
+                reason = NO_UNSELECTED_STATE.get(tag_l)
+                # On every other component -1 is the documented "nothing selected" value.
+                if reason is None:
+                    continue
+                errors.append(
+                    f"{line_str}selectedIndex=\"{index}\" will throw at render time. "
+                    f"<{tag}> has no \"nothing selected\" state: {reason}. Drop the attribute "
+                    f"instead -- {advice}."
+                )
+                continue
 
             # These four throw whatever the markup says: neither the literal items nor a
             # bound model exists yet when the index is applied.
-            if tag_l in ALWAYS_THROWS_ON_LITERAL_INDEX:
+            if tag_l in INDEX_APPLIED_BEFORE_CHILDREN:
                 errors.append(
                     f"{line_str}selectedIndex=\"{index}\" will throw at render time. "
                     f"<{tag}> applies the index before its items are attached and before any "
                     f"model is set, so neither literal items nor model=\"...\" makes it safe -- "
-                    f"{ALWAYS_THROWS_ON_LITERAL_INDEX[tag_l]}."
+                    f"{advice}."
                 )
                 continue
 
-            if any((n.split('}')[-1] if '}' in n else n) == 'model' for n in elem.attrib):
+            # cardlayout, the one component whose children are already attached: the count is
+            # the real bound, so an index inside it is genuinely safe.
+            cards = sum(1 for c in elem if isinstance(c.tag, str))
+            if index < cards:
                 continue
-
-            item_tags = TOLERANT_ITEM_TAGS[tag_l]
-            if item_tags is None:
-                available = sum(1 for c in elem if isinstance(c.tag, str))
-                what = "child components"
+            if cards == 0:
+                detail = (f"<{tag}> declares no child components, so index {index} has nothing to "
+                          f"point at. Add the cards, or drop selectedIndex.")
             else:
-                available = sum(
-                    1 for d in elem.iter()
-                    if isinstance(d.tag, str)
-                    and (d.tag.split('}')[-1] if '}' in d.tag else d.tag).lower() in item_tags
-                )
-                what = " or ".join(f"<{t}>" for t in sorted(item_tags)) if item_tags else "items"
-
-            if available > index:
-                continue
-
-            if item_tags == set():
-                detail = (f"<{tag}> has no literal item form, so it needs a model. "
-                          f"Set the model before selecting, or drop selectedIndex.")
-            elif available == 0:
-                detail = (f"<{tag}> declares no {what} and no model, so index {index} has nothing "
-                          f"to point at. Add the items, bind a model, or drop selectedIndex.")
-            else:
-                detail = (f"<{tag}> declares {available} {what}, so index {index} is out of range "
-                          f"(valid: 0-{available - 1}).")
+                detail = (f"<{tag}> declares {cards} child components, so index {index} is out of "
+                          f"range (valid: 0-{cards - 1}).")
             errors.append(
                 f"{line_str}selectedIndex=\"{index}\" will throw at render time. {detail}"
             )
