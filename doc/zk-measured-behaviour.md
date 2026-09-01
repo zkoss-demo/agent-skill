@@ -402,8 +402,12 @@ Rule: Layer 6 flags a literal `selectedIndex` as follows —
 Each message names the per-component remedy (`value="..."` / `selected="true"` / select after
 `setModel` / drop the attribute). Pinned by `test/wrong/selectedindex-with-literal-items.zul` (must
 fail on Layer 6 alone), `test/valid/selectedindex-tolerated.zul` (must pass — including the bare
-selectbox that was the false positive), and eight `L6:` checks in `test/run-schema-query-tests.py`,
-three of which previously asserted refuted behaviour.
+selectbox that was the false positive), and ten `L6:` checks in `test/run-schema-query-tests.py`,
+three of which have had to be rewritten after the behaviour they asserted was refuted.
+
+The table is now closed over what the schema even permits: `selectedIndex` is declared on exactly
+six complexTypes in `assets/zul.xsd` (`combobox`, `listbox`, `radiogroup`, `tabbox`, `selectbox`,
+`cardlayout`), and all six are in the table above. The one cell still open is `cardlayout` on ZK 9 EE.
 
 Tightening it cost no precision: re-run over the same 558-file `zkbooks` corpus,
 Layer 6 still fires on **0** files. Eight of them use `selectedIndex` and only one is a literal
