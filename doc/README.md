@@ -155,7 +155,11 @@ Nothing here has an owner. Grouped by where the work would land.
 
 ### Live constraint, not a task
 
-- **The skill version stays at 2.0.0 until the branch converges.** When it moves, all three places move
-  together: `SKILL.md` `metadata.version`, `marketplace.json`, and the `SKILL_VERSION` constant in each
-  script. Changing one alone is drift. `gemini-extension.json` is a separate line and is not expected to
-  follow. → [decisions.md §D20](decisions.md)
+- **The three version places move together, or not at all**: `SKILL.md` `metadata.version`,
+  `marketplace.json`, and the `SKILL_VERSION` constant in each script. Changing one alone is drift.
+  `gemini-extension.json` is a separate line and is not expected to follow.
+  → [decisions.md §D20](decisions.md)
+- The condition the earlier wording waited on has happened. This entry used to read *"the version stays
+  at 2.0.0 until the branch converges"*; the work converged into `main` and **2.0.0 is tagged
+  `v2.0.0`**, so the number is a released point rather than a held one. The next change to any of the
+  three places is a version bump, and it moves all three.
