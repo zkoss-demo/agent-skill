@@ -1,0 +1,50 @@
+<?page title="Customer Master-Detail | ZUL Writer Showcase"?>
+<zk xmlns="http://www.zkoss.org/2005/zul">
+    <hlayout vflex="1" hflex="1"
+             viewModel="@id('vm') @init('zwriter.lab.CustomerViewModel')">
+        <!-- Master list -->
+        <listbox model="@load(vm.items)"
+                 selectedItem="@bind(vm.selectedItem)"
+                 hflex="1" vflex="1">
+            <listhead>
+                <listheader label="Name"/>
+            </listhead>
+            <template name="model" var="item">
+                <listitem label="@load(item.name)"/>
+            </template>
+        </listbox>
+
+        <!-- Detail panel. The pane itself always keeps its share of the width;
+             only its contents swap, so selecting a customer does not resize the
+             master list. -->
+        <vlayout hflex="2" vflex="1" style="padding: 8px">
+            <label value="Select a customer to see their details."
+                   visible="@load(empty vm.selectedItem)"
+                   style="color: #6b7a8d"/>
+
+            <vlayout spacing="6px" visible="@load(not empty vm.selectedItem)">
+                <label value="@load(vm.selectedItem.name)"
+                       style="font-weight: bold; font-size: 16px"/>
+                <separator/>
+                <hlayout>
+                    <div width="80px">
+                        <label value="Email" style="color: #6b7a8d"/>
+                    </div>
+                    <label value="@load(vm.selectedItem.email)"/>
+                </hlayout>
+                <hlayout>
+                    <div width="80px">
+                        <label value="Phone" style="color: #6b7a8d"/>
+                    </div>
+                    <label value="@load(vm.selectedItem.phone)"/>
+                </hlayout>
+                <hlayout>
+                    <div width="80px">
+                        <label value="Address" style="color: #6b7a8d"/>
+                    </div>
+                    <label value="@load(vm.selectedItem.address)"/>
+                </hlayout>
+            </vlayout>
+        </vlayout>
+    </hlayout>
+</zk>
