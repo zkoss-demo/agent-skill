@@ -140,6 +140,34 @@ are not expected in `articleContent.zul` at all.
 The repository-internal sweep could not have found this: none of its five controllers declares a nested
 component class. This is the value of measuring against outside code.
 
+**Fixed (D26).** Both halves of the check now skip any `@Wire` field not declared in the outermost
+class body — a nested class carrying `@Wire` is its own component with its own tree, so neither half can
+say anything true about it. Nesting depth is counted on a copy of the source with comments *and* string
+literals blanked in place, because a `{` inside `"a { brace"` would otherwise read as a nested class and
+silence every field after it. Re-measured the same way: **0 findings over zkbooks' 192 pairs and 140
+`@Wire` fields, and 0 over this repository's 16 pairs and 64 fields.** Layer 7 is opt-in, so the default
+output is untouched — 39 of 39 corpus files byte-identical.
+
+Not attempted, and worth knowing before trusting the render instead: **the NPE this rule predicts is
+mostly invisible to a preview.** Measured with two probes that differ only in where the null field is
+used:
+
+| Where the field is used | default render | `--run-controllers` | Layer 7 |
+|---|---|---|---|
+| in `doAfterCompose` | `STATUS: ok`, exit 0 — nothing | `CONTROLLERS: failed → isolated` + a warning naming the field | caught |
+| only in an event handler | `STATUS: ok` — nothing | **`CONTROLLERS: executed`, `STATUS: ok`, exit 0, no warning** | caught |
+
+The second row is the point: the preview never clicks anything, so that code path never runs. The page
+renders perfectly and throws on the user's first click. Controller execution is also opt-in
+(`--run-controllers` defaults off), and when a controller does throw the run still reports `STATUS: ok`
+with exit 0 — a warning, not a failure.
+
+Where the render *does* fire, the message is better than expected — Java's helpful NullPointerException
+names the field: `Cannot invoke "org.zkoss.zul.Label.setValue(String)" because "this.totalsLabel" is
+null`. What it never says is *why* the field is null, and four different causes produce that identical
+message: no component declares the id, the composer is applied somewhere else, the id is in another ID
+space, or the ZUL's id is misspelled. Layer 7 distinguishes the first and names the file and line.
+
 ## 5. What this does and does not establish
 
 Established: the lookup answers 4 of 6 recorded selection failures correctly and cheaply; it is clean on

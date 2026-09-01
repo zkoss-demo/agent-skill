@@ -351,6 +351,57 @@ def check_a_class_selector_is_declined():
     assert "Layer 7: Controller Cross-Check... ✓ PASS" in out, out
 
 
+NESTED_WIRE = """package x;
+import org.zkoss.zk.ui.select.annotation.Wire;
+public class C {
+    @Wire private org.zkoss.zul.Label statusValue;
+    public class Editor extends org.zkoss.zul.Window {
+        @Wire private org.zkoss.zul.Textbox ghostField;
+    }
+}
+"""
+
+TOP_LEVEL_WIRE = """package x;
+import org.zkoss.zk.ui.select.annotation.Wire;
+public class C {
+    @Wire private org.zkoss.zul.Textbox ghostField;
+}
+"""
+
+BRACE_IN_STRING_WIRE = """package x;
+import org.zkoss.zk.ui.select.annotation.Wire;
+public class C {
+    private String pattern = "a { brace in a literal";
+    @Wire private org.zkoss.zul.Textbox ghostField;
+}
+"""
+
+LABEL_PAGE = '<zk>\n  <label id="statusValue" value="x"/>\n</zk>\n'
+
+
+def check_a_nested_class_field_is_skipped():
+    """A composer may declare a nested class that is itself a component, building
+    its own UI in Java. Its @Wire fields belong to that tree, not to this ZUL.
+    Measured on ZK's own docs: 2 false accusations out of 170 fields, all this shape.
+    Paired with the same field at the top level, which must still be reported."""
+    out, code = validate(LABEL_PAGE, controller_text=NESTED_WIRE)
+    assert "ghostField" not in out, out
+    assert code == 0, out
+
+    out, code = validate(LABEL_PAGE, controller_text=TOP_LEVEL_WIRE)
+    assert "ghostField" in out and "no component" in out, out
+    assert code == 1, out
+
+
+def check_a_brace_inside_a_string_does_not_hide_a_field():
+    """Nesting depth is counted on a copy with literals blanked. Without that, a
+    '{' inside a string would look like a nested class and silence everything
+    after it -- the same class of bug as the earlier line-number shift."""
+    out, code = validate(LABEL_PAGE, controller_text=BRACE_IN_STRING_WIRE)
+    assert "ghostField" in out, out
+    assert code == 1, out
+
+
 CHECKS = [
     ("describe: charts/sclass    ", check_the_charts_sclass_case),
     ("describe: unknown component", check_a_component_that_does_not_exist),
@@ -382,6 +433,8 @@ CHECKS = [
     ("L7: collection field       ", check_a_collection_field_is_skipped),
     ("L7: #id selector honoured  ", check_an_id_selector_is_honoured),
     ("L7: .class selector declined", check_a_class_selector_is_declined),
+    ("L7: nested class skipped   ", check_a_nested_class_field_is_skipped),
+    ("L7: brace in a string      ", check_a_brace_inside_a_string_does_not_hide_a_field),
 ]
 
 

@@ -875,6 +875,44 @@ WIRE_FIELD = re.compile(
 )
 
 
+def _top_level_body_span(source: str) -> tuple[int, int] | None:
+    """
+    The character range of the outermost type's body, exclusive of its braces.
+
+    Why this is needed: a composer may declare a nested class that is itself a
+    component -- `public class ArticleEditor extends Window` inside the composer,
+    building its own UI. Its @Wire fields are wired against that component's own
+    tree, so measuring them against this ZUL accuses correct code. Measured on ZK's
+    own documentation: 2 false accusations out of 170 real fields, all of this shape.
+
+    `source` must already have comments and string literals blanked in place, so a
+    brace inside either cannot be counted and every offset is still true.
+    """
+    opener = re.search(r'\b(?:class|interface|enum|record)\b[^{;]*\{', source)
+    if opener is None:
+        return None
+    start = opener.end()
+    depth = 1
+    for i in range(start, len(source)):
+        ch = source[i]
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return start, i
+    return start, len(source)
+
+
+def _blank_literals(source: str) -> str:
+    """Replace string and char literal contents with spaces, preserving length so
+    every offset computed against the result is still an offset into the original."""
+    def blank(match):
+        return match.group(0)[0] + ' ' * (len(match.group(0)) - 2) + match.group(0)[-1]
+    source = re.sub(r'"(?:\\.|[^"\\\n])*"', blank, source)
+    return re.sub(r"'(?:\\.|[^'\\\n])*'", blank, source)
+
+
 def _tag_to_class(tag: str) -> str:
     """ZK's ZUL tags map to class names by capitalising the first letter, with no
     other transformation: a -> A, hlayout -> Hlayout, toolbarbutton -> Toolbarbutton."""
@@ -923,6 +961,13 @@ def validate_controller_wiring(zul_path: Path, controller_path: Path,
         source = re.sub(r'/\*.*?\*/', blank, source, flags=re.S)
         source = re.sub(r'//[^\n]*', blank, source)
 
+        # Braces are counted on a copy with literals blanked too, because a brace
+        # inside "{0}" would shift the depth. Matching still uses `source`, where
+        # the @Wire("#id") selector is intact -- blanking preserves length, so the
+        # two strings share every offset.
+        body = _top_level_body_span(_blank_literals(source))
+        nesting = _blank_literals(source)
+
         for match in WIRE_FIELD.finditer(source):
             selector, field_type, field_name = match.groups()
             # Anchor on the type token, not on @Wire: the type is what has to change,
@@ -932,6 +977,15 @@ def validate_controller_wiring(zul_path: Path, controller_path: Path,
             # Generics and arrays are collections of components, not one component.
             if '<' in field_type or '[' in field_type:
                 continue
+
+            # Only the outermost class is wired against this ZUL. A field inside a
+            # nested class belongs to that class's own component tree, so neither
+            # half of this check can say anything true about it.
+            if body is not None:
+                start, end = body
+                pos = match.start(2)
+                if not (start <= pos < end) or nesting.count('{', start, pos) != nesting.count('}', start, pos):
+                    continue
 
             if selector is None:
                 target_id = field_name

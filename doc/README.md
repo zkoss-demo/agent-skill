@@ -38,9 +38,10 @@ Nothing here has an owner. Grouped by where the work would land.
       `<apply>` / `<include>` are named as pass-through elements. Measured 70 → 33 wrong answers over
       967 external pairs, −61% file-weighted, with the default output changing on exactly one file.
       → [effectiveness-measurement.md §6](effectiveness-measurement.md)
-- [ ] **Layer 7's unknown-id check false-positives on `@Wire` inside a nested component class** (a
-      `class Foo extends Window` declared inside the composer). 2 fields of 170 measured. Restrict that
-      half of the rule to fields declared in the top-level class body.
+- [x] **Layer 7 vs. `@Wire` inside a nested component class** — done (D26): both halves skip fields not
+      declared in the outermost class body. Re-measured at 0 findings over 192 external pairs and 140
+      `@Wire` fields. The same section records why the runtime NPE cannot replace the check: when the
+      field is used only in an event handler, the render reports `STATUS: ok` and never sees it.
       → [effectiveness-measurement.md §4](effectiveness-measurement.md)
 - [ ] **Fix the zk-doc retrieval precision bug** before growing any corpus. A combobox
       default-selection query returns `treeitem` first — and `treeitem`'s answer is exactly the wrong
