@@ -1,0 +1,472 @@
+<?page title="Enterprise Kanban"?>
+<zk>
+    <style>
+    /* ===== Page shell ===== */
+    .ekb-page{
+        background-color: #f8fafc;
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #0f172a;
+    }
+    /* Labels take the page font. Deliberately NOT applied to .z-span: an icon span's
+       font-family is the icon font, and overriding it draws every icon as an empty box. */
+    .ekb-page .z-label{
+        font-family: inherit;
+    }
+
+    /* ===== Top bar ===== */
+    .ekb-topbar{
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #e8eef5;
+        padding: 16px 32px;
+    }
+    .ekb-brand{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .ekb-logo{
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background-color: #e6efff;
+        color: #2563eb;
+        font-size: 18px;
+        line-height: 40px;
+        text-align: center;
+    }
+    .ekb-brand-name{
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .ekb-searchwrap{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 380px;
+        background-color: #f1f5f9;
+        border-radius: 10px;
+        padding: 0 14px;
+    }
+    .ekb-search-icon{
+        color: #94a3b8;
+        font-size: 14px;
+    }
+    .ekb-page input.ekb-search{
+        flex: 1;
+        border: 0 none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 12px 0;
+        font-size: 14px;
+        color: #0f172a;
+    }
+    .ekb-nav{
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        margin-left: auto;
+    }
+    .ekb-page a.ekb-navlink{
+        color: #64748b;
+        font-size: 15px;
+        text-decoration: none;
+    }
+    .ekb-topbar-actions{
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        border-left: 1px solid #e8eef5;
+        padding-left: 24px;
+    }
+    .ekb-page button.ekb-btn-primary{
+        background-color: #2563eb;
+        background-image: none;
+        border: 0 none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 12px 20px;
+    }
+    .ekb-avatar{
+        width: 40px;
+        height: 40px;
+        border-radius: 20px;
+        background-color: #fde8d7;
+        color: #c05621;
+        font-size: 16px;
+        line-height: 40px;
+        text-align: center;
+    }
+
+    /* ===== Filter bar ===== */
+    .ekb-filterbar{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 32px 4px 32px;
+    }
+    .ekb-page button.ekb-pill{
+        background-color: #ffffff;
+        background-image: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 10px 16px;
+    }
+    .ekb-page button.ekb-pill-on{
+        background-color: #e8f1fe;
+        border-color: #cfe0fd;
+        color: #2563eb;
+    }
+    .ekb-sortbox{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background-color: #ffffff;
+        padding: 10px 16px;
+    }
+    .ekb-sort-label{ color: #64748b; font-size: 14px; }
+    .ekb-sort-value{ color: #0f172a; font-size: 14px; font-weight: 600; }
+    .ekb-sort-icon{ color: #94a3b8; font-size: 14px; }
+
+    /* ===== Columns ===== */
+    .ekb-columns{ padding: 16px 32px 32px 32px; }
+    .ekb-col-head{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 4px 14px 4px;
+    }
+    .ekb-dot{
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: #94a3b8;
+    }
+    .ekb-dot-pending{ background-color: #3b82f6; }
+    .ekb-dot-processing{ background-color: #f59e0b; }
+    .ekb-dot-waiting{ background-color: #a855f7; }
+    .ekb-dot-ok{ background-color: #10b981; }
+    .ekb-col-title{
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #475569;
+    }
+    .ekb-count{
+        background-color: #eef2f7;
+        border-radius: 6px;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 3px 9px;
+    }
+    .ekb-more{ margin-left: auto; color: #94a3b8; font-size: 15px; }
+    .ekb-col-body{
+        background-color: #f1f5f9;
+        border-radius: 16px;
+        padding: 16px;
+        min-height: 720px;
+    }
+
+    /* ===== Task card ===== */
+    .ekb-card{
+        background-color: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        padding: 18px;
+        margin-bottom: 16px;
+    }
+    .ekb-card-accent{ border-left: 3px solid #f59e0b; }
+    .ekb-card-top{
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    .ekb-chip{
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        padding: 5px 10px;
+    }
+    .ekb-chip-high{ background-color: #fee2e2; color: #dc2626; }
+    .ekb-chip-medium{ background-color: #eef2f7; color: #475569; }
+    .ekb-chip-active{ background-color: #fef3c7; color: #b45309; }
+    .ekb-chip-review{ background-color: #e0e7ff; color: #4338ca; }
+    .ekb-chip-blocked{ background-color: #eef2f7; color: #64748b; }
+    .ekb-card-icon{ margin-left: auto; color: #94a3b8; font-size: 14px; }
+    .ekb-card-icon-active{ color: #f59e0b; }
+    .ekb-card-icon-blocked{ color: #a855f7; }
+    .ekb-card-title{
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 8px;
+    }
+    .ekb-card-desc{
+        display: block;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #64748b;
+    }
+    .ekb-card-sep{
+        border-top: 1px solid #eef2f7;
+        margin: 16px 0 14px 0;
+    }
+    .ekb-card-meta{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .ekb-mini-avatar{
+        width: 28px;
+        height: 28px;
+        border-radius: 14px;
+        background-color: #e2e8f0;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 28px;
+        text-align: center;
+    }
+    .ekb-assignee{ font-size: 14px; color: #334155; }
+    .ekb-meta-icon{ margin-left: auto; color: #94a3b8; font-size: 13px; }
+    .ekb-meta{
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: #64748b;
+    }
+    .ekb-meta-today{ color: #b45309; }
+    .ekb-meta-icon-today{ color: #f59e0b; }
+    .ekb-meta-blocked{ color: #a855f7; }
+
+    /* ===== Add-task placeholder ===== */
+    .ekb-addtask{
+        border: 2px dashed #d8e0ea;
+        border-radius: 14px;
+        padding: 22px;
+        text-align: center;
+    }
+    .ekb-addtask-icon{ color: #94a3b8; font-size: 15px; margin-right: 8px; }
+    .ekb-addtask-label{ color: #94a3b8; font-size: 14px; font-weight: 500; }
+
+    /* ===== Footer ===== */
+    .ekb-footer{
+        display: flex;
+        align-items: center;
+        gap: 34px;
+        background-color: #ffffff;
+        border-top: 1px solid #e8eef5;
+        padding: 20px 32px;
+    }
+    .ekb-foot{
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+    }
+    .ekb-page a.ekb-footlink{
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+        text-decoration: none;
+    }
+    .ekb-statusbox{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+        background-color: #ecfdf5;
+        border-radius: 999px;
+        padding: 8px 16px;
+    }
+    .ekb-status-label{ font-size: 12px; font-weight: 600; color: #047857; }
+    </style>
+
+    <div viewModel="@id('vm') @init('zwriter.KanbanBoardViewModel')" sclass="ekb-page" hflex="1">
+
+        <!-- ===== Top bar ===== -->
+        <div sclass="ekb-topbar" hflex="1">
+            <div sclass="ekb-brand">
+                <div sclass="ekb-logo z-icon-th-large"/>
+                <label value="Enterprise Kanban" sclass="ekb-brand-name"/>
+            </div>
+            <div sclass="ekb-searchwrap">
+                <span sclass="z-icon-search ekb-search-icon"/>
+                <textbox placeholder="Search resources or tasks..." sclass="ekb-search"/>
+            </div>
+            <div sclass="ekb-nav">
+                <a label="Dashboard" sclass="ekb-navlink"/>
+                <a label="Resources" sclass="ekb-navlink"/>
+                <a label="Reports" sclass="ekb-navlink"/>
+                <a label="Settings" sclass="ekb-navlink"/>
+            </div>
+            <div sclass="ekb-topbar-actions">
+                <button label="New Task" iconSclass="z-icon-plus" sclass="ekb-btn-primary"
+                        onClick="@command('newTask')"/>
+                <div sclass="ekb-avatar z-icon-user"/>
+            </div>
+        </div>
+
+        <!-- ===== Filter bar ===== -->
+        <div sclass="ekb-filterbar" hflex="1">
+            <button label="All Teams" iconSclass="z-icon-angle-down" dir="reverse" sclass="ekb-pill"/>
+            <button label="High Priority" iconSclass="z-icon-check" dir="reverse"
+                    sclass="ekb-pill ekb-pill-on"/>
+            <button label="This Quarter" iconSclass="z-icon-calendar" dir="reverse" sclass="ekb-pill"/>
+            <div sclass="ekb-sortbox">
+                <label value="Sort by:" sclass="ekb-sort-label"/>
+                <label value="Due Date" sclass="ekb-sort-value"/>
+                <span sclass="z-icon-filter ekb-sort-icon"/>
+            </div>
+        </div>
+
+        <!-- ===== Three status columns ===== -->
+        <hlayout sclass="ekb-columns" hflex="1" spacing="24px" valign="top">
+
+            <!-- ===== PENDING ===== -->
+            <vlayout hflex="1" spacing="0">
+                <div sclass="ekb-col-head" hflex="1">
+                    <div sclass="ekb-dot ekb-dot-pending"/>
+                    <label value="PENDING" sclass="ekb-col-title"/>
+                    <label value="4" sclass="ekb-count"/>
+                    <span sclass="z-icon-ellipsis-h ekb-more"/>
+                </div>
+                <div sclass="ekb-col-body" hflex="1">
+                    <div sclass="ekb-card">
+                        <div sclass="ekb-card-top">
+                            <label value="HIGH PRIORITY" sclass="ekb-chip ekb-chip-high"/>
+                            <span sclass="z-icon-external-link ekb-card-icon"/>
+                        </div>
+                        <label value="Database Schema Migration" sclass="ekb-card-title"/>
+                        <label sclass="ekb-card-desc"
+                               value="Upgrade legacy PostgreSQL clusters to v15 and optimize indexes for resource reporting."/>
+                        <div sclass="ekb-card-sep"/>
+                        <div sclass="ekb-card-meta">
+                            <div sclass="ekb-mini-avatar z-icon-user"/>
+                            <label value="Marcus" sclass="ekb-assignee"/>
+                            <span sclass="z-icon-calendar ekb-meta-icon"/>
+                            <label value="OCT 24" sclass="ekb-meta"/>
+                        </div>
+                    </div>
+                    <div sclass="ekb-card">
+                        <div sclass="ekb-card-top">
+                            <label value="MEDIUM" sclass="ekb-chip ekb-chip-medium"/>
+                            <span sclass="z-icon-external-link ekb-card-icon"/>
+                        </div>
+                        <label value="API Documentation Audit" sclass="ekb-card-title"/>
+                        <label sclass="ekb-card-desc"
+                               value="Review all public endpoints for compliance with the new enterprise security standards."/>
+                        <div sclass="ekb-card-sep"/>
+                        <div sclass="ekb-card-meta">
+                            <div sclass="ekb-mini-avatar z-icon-user"/>
+                            <label value="Sarah" sclass="ekb-assignee"/>
+                            <span sclass="z-icon-calendar ekb-meta-icon"/>
+                            <label value="OCT 28" sclass="ekb-meta"/>
+                        </div>
+                    </div>
+                    <div sclass="ekb-addtask" onClick="@command('addTask')">
+                        <span sclass="z-icon-plus-circle ekb-addtask-icon"/>
+                        <label value="Add new task" sclass="ekb-addtask-label"/>
+                    </div>
+                </div>
+            </vlayout>
+
+            <!-- ===== PROCESSING ===== -->
+            <vlayout hflex="1" spacing="0">
+                <div sclass="ekb-col-head" hflex="1">
+                    <div sclass="ekb-dot ekb-dot-processing"/>
+                    <label value="PROCESSING" sclass="ekb-col-title"/>
+                    <label value="2" sclass="ekb-count"/>
+                    <span sclass="z-icon-ellipsis-h ekb-more"/>
+                </div>
+                <div sclass="ekb-col-body" hflex="1">
+                    <div sclass="ekb-card ekb-card-accent">
+                        <div sclass="ekb-card-top">
+                            <label value="ACTIVE" sclass="ekb-chip ekb-chip-active"/>
+                            <span sclass="z-icon-refresh ekb-card-icon ekb-card-icon-active"/>
+                        </div>
+                        <label value="Frontend Design Implementation" sclass="ekb-card-title"/>
+                        <label sclass="ekb-card-desc"
+                               value="Converting Figma assets to Tailwind components for the resource dashboard UI."/>
+                        <div sclass="ekb-card-sep"/>
+                        <div sclass="ekb-card-meta">
+                            <div sclass="ekb-mini-avatar z-icon-user"/>
+                            <label value="Elena" sclass="ekb-assignee"/>
+                            <span sclass="z-icon-clock-o ekb-meta-icon ekb-meta-icon-today"/>
+                            <label value="TODAY" sclass="ekb-meta ekb-meta-today"/>
+                        </div>
+                    </div>
+                    <div sclass="ekb-card">
+                        <div sclass="ekb-card-top">
+                            <label value="IN REVIEW" sclass="ekb-chip ekb-chip-review"/>
+                            <span sclass="z-icon-external-link ekb-card-icon"/>
+                        </div>
+                        <label value="Q3 Financial Reporting Export" sclass="ekb-card-title"/>
+                        <label sclass="ekb-card-desc"
+                               value="Validation of CSV data exports for the quarterly board meeting presentation."/>
+                        <div sclass="ekb-card-sep"/>
+                        <div sclass="ekb-card-meta">
+                            <div sclass="ekb-mini-avatar z-icon-user"/>
+                            <label value="David" sclass="ekb-assignee"/>
+                            <span sclass="z-icon-calendar ekb-meta-icon"/>
+                            <label value="TOMORROW" sclass="ekb-meta"/>
+                        </div>
+                    </div>
+                </div>
+            </vlayout>
+
+            <!-- ===== WAITING ===== -->
+            <vlayout hflex="1" spacing="0">
+                <div sclass="ekb-col-head" hflex="1">
+                    <div sclass="ekb-dot ekb-dot-waiting"/>
+                    <label value="WAITING" sclass="ekb-col-title"/>
+                    <label value="1" sclass="ekb-count"/>
+                    <span sclass="z-icon-ellipsis-h ekb-more"/>
+                </div>
+                <div sclass="ekb-col-body" hflex="1">
+                    <div sclass="ekb-card">
+                        <div sclass="ekb-card-top">
+                            <label value="BLOCKED" sclass="ekb-chip ekb-chip-blocked"/>
+                            <span sclass="z-icon-pause ekb-card-icon ekb-card-icon-blocked"/>
+                        </div>
+                        <label value="SSO Authentication Bridge" sclass="ekb-card-title"/>
+                        <label sclass="ekb-card-desc"
+                               value="Integration with Azure AD for client-side authentication. Waiting for API credentials."/>
+                        <div sclass="ekb-card-sep"/>
+                        <div sclass="ekb-card-meta">
+                            <div sclass="ekb-mini-avatar z-icon-user"/>
+                            <label value="Anna" sclass="ekb-assignee"/>
+                            <span sclass="z-icon-hourglass ekb-meta-icon ekb-meta-blocked"/>
+                            <label value="PENDING" sclass="ekb-meta ekb-meta-blocked"/>
+                        </div>
+                    </div>
+                </div>
+            </vlayout>
+        </hlayout>
+
+        <!-- ===== Footer ===== -->
+        <div sclass="ekb-footer" hflex="1">
+            <label value="© 2024 ENTERPRISE RESOURCE CORP." sclass="ekb-foot"/>
+            <a label="SUPPORT" sclass="ekb-footlink"/>
+            <a label="DOCUMENTATION" sclass="ekb-footlink"/>
+            <div sclass="ekb-statusbox">
+                <div sclass="ekb-dot ekb-dot-ok"/>
+                <label value="System Operational" sclass="ekb-status-label"/>
+            </div>
+        </div>
+    </div>
+</zk>
