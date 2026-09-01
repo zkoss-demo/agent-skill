@@ -53,9 +53,21 @@ The infrastructure already exists and is already correct: `validate-zul.py` has 
 validates against the shipped `assets/zul.xsd` (183 KB), and Layer 4 is version-aware via
 `--zk-version`. **What is missing is a handful of rules, not a system.**
 
-*Status: partly done.* The icon case, `setModel()` beside literal rows, and collapsible state were all
-mechanised (in `preview-zul.py` rather than the validator, per [D18](decisions.md)). Still unwritten:
-`@Wire` field type vs. component type, and `selectedIndex` on a model-less mesh component.
+*Status: done.* The icon case, `setModel()` beside literal rows, and collapsible state were mechanised
+in `preview-zul.py` (per [D18](decisions.md)). The last two landed in `validate-zul.py`:
+
+- **Layer 6, runtime semantics** — a literal `selectedIndex` pointing past the items that exist. Safe
+  from markup alone because the index is applied while the component tree is built, *before* any
+  Composer runs and before the binder loads a model, so a controller filling the component later
+  cannot rescue it. Silent when a `model` is present, since the model's size is unknowable statically.
+- **Layer 7, controller cross-check** — `@Wire` field type against the id's component, plus a wired id
+  no component declares. Opt-in via `--controller`, so the default output shape is unchanged. It
+  declines to judge component families where one element-named class inherits from another
+  (`Textbox`/`Combobox`, `Checkbox`/`Radio`, `Box`/`Hbox`, `Row`/`Group`, `Listitem`/`Listgroup`,
+  `Button`/`Combobutton`), because without a real class hierarchy a legal ancestor and a wrong type
+  are indistinguishable — and a false accusation costs more than a missed defect. Measured against
+  the repository's own five controllers and 30 `@Wire` fields: zero false positives; an injected
+  `@Wire A` on a `<label>` is caught with the line of the declaration to edit.
 
 ### Tier 2 — a pre-write lookup (the gap nobody has filled)
 
@@ -151,13 +163,11 @@ the agent copies from, whose runnability is asserted rather than tested, degrade
 
 ## 5. Recommendations, in priority order
 
-1. **Finish the Tier-1 rules.** Cheapest, highest recall, no retrieval, harness already exists. Remaining:
-   `@Wire` type mismatch, and `selectedIndex` on a model-less mesh component. These are the failures
-   documentation structurally cannot reach, because the agent did not know to look.
-2. **Turn the shipped `zul.xsd` into a pre-write lookup, and tell the skill to use it.** Two of six runs
-   invented this move and both were saved by it. A small script — *does component X exist at ZK version V,
-   and what attributes does it accept* — plus one line in Step 2 converts an accident into a habit. No new
-   corpus, no retrieval risk, and it attacks "get it right the first time" directly.
+1. ~~**Finish the Tier-1 rules.**~~ **Done** — Layers 6 and 7, see §Tier 1 above.
+2. ~~**Turn the shipped `zul.xsd` into a pre-write lookup, and tell the skill to use it.**~~ **Done** —
+   `--describe`, with the instruction in Step 2 and a routing-table row so a bare "does ZK 10 have X?"
+   reaches it without starting a workflow. No new corpus and no retrieval risk, as designed. The
+   remaining measurement is item 6 below: whether renders-per-page actually falls.
 3. **Fix retrieval precision before growing the corpus.** The combobox→treeitem result is a concrete,
    reproducible bug with a concrete fix: extract the component name from the query and use it to filter or
    boost. Measure with a fixed query set built from the nine evaluation findings — real questions with

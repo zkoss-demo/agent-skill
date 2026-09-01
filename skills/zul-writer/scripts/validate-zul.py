@@ -15,6 +15,17 @@ Validates ZUL files for:
            (removed/deprecated API; ZK-10-only API on ZK 9 targets)
   Layer 5: Inline style advisory (never fails) - static style="..." attributes
            that belong in a <style> class attached with sclass
+  Layer 6: Runtime semantics - markup that is legal by every static measure and
+           still throws while the page is being built (a literal selectedIndex
+           pointing past the items that exist)
+  Layer 7: Controller cross-check (only with --controller) - @Wire fields against
+           the ZUL's ids: a wrong id leaves the field null, a wrong field type
+           throws ClassCastException at first use
+
+Also provides --describe, which queries the bundled schema instead of validating
+a file: does this component exist at this ZK version, and does it accept this
+attribute. Asking before writing costs nothing; finding out afterwards costs a
+render round.
 
 Recommended invocation is `uv run validate-zul.py ...`: uv reads the PEP 723
 inline metadata above and provides `lxml` in an ephemeral environment, so no
@@ -31,9 +42,11 @@ import json
 import threading
 import urllib.request
 import argparse
+import difflib
 import re
 import subprocess
 import tempfile
+import textwrap
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -673,6 +686,384 @@ def validate_version_compatibility(file_path: Path, major: int) -> tuple[bool, l
         return False, [f"Compatibility check error: {e}"]
 
 
+# --- Layer 6: runtime semantics -------------------------------------------
+# Markup that is legal by every static measure and still dies when the page is built.
+
+# The six components that accept selectedIndex, and the literal child that the index
+# counts. `selectedIndex` is applied while the component tree is built, which is BEFORE
+# any Composer's doAfterCompose and before the MVVM binder loads a model -- so a
+# controller that fills the component later cannot rescue it. That timing is what makes
+# this checkable from the markup alone.
+#   None  -> the index counts arbitrary child components (cardlayout's cards)
+#   set() -> the component has no literal item form at all; it requires a model
+SELECTABLE_ITEM_TAGS = {
+    "combobox": {"comboitem"},
+    "listbox": {"listitem", "listgroup"},
+    "radiogroup": {"radio"},
+    "tabbox": {"tab"},
+    "selectbox": set(),
+    "cardlayout": None,
+}
+
+
+def validate_runtime_semantics(file_path: Path) -> tuple[bool, list[str]]:
+    """
+    Layer 6: legal markup that throws while the page is being built.
+
+    Currently one rule: a literal selectedIndex pointing past the items that exist.
+    An evaluation run shipped `<combobox selectedIndex="0">` with no items; it passed
+    all five layers and the render died with `Out of bound: 0 while size=0`.
+
+    Deliberately silent when a `model` attribute is present. The model's size is not
+    knowable from the markup, and under-reporting is the safe direction for a list the
+    agent is told to trust.
+    """
+    errors = []
+    try:
+        try:
+            from lxml import etree
+            with open(file_path, 'rb') as f:
+                root = etree.parse(f).getroot()
+            use_lxml = True
+        except ImportError:
+            root = ET.parse(file_path).getroot()
+            use_lxml = False
+
+        for elem in root.iter():
+            if not isinstance(elem.tag, str):
+                continue
+            tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+            if tag.lower() not in SELECTABLE_ITEM_TAGS:
+                continue
+
+            raw = None
+            for name, value in elem.attrib.items():
+                if (name.split('}')[-1] if '}' in name else name) == 'selectedIndex':
+                    raw = value
+                    break
+            if raw is None:
+                continue
+
+            # A bound or computed index is resolved after construction; not ours to judge.
+            if not re.fullmatch(r'\s*-?\d+\s*', raw):
+                continue
+            index = int(raw.strip())
+            # -1 is the documented "nothing selected" value and is always legal.
+            if index < 0:
+                continue
+
+            if any((n.split('}')[-1] if '}' in n else n) == 'model' for n in elem.attrib):
+                continue
+
+            item_tags = SELECTABLE_ITEM_TAGS[tag.lower()]
+            if item_tags is None:
+                available = sum(1 for c in elem if isinstance(c.tag, str))
+                what = "child components"
+            else:
+                available = sum(
+                    1 for d in elem.iter()
+                    if isinstance(d.tag, str)
+                    and (d.tag.split('}')[-1] if '}' in d.tag else d.tag).lower() in item_tags
+                )
+                what = " or ".join(f"<{t}>" for t in sorted(item_tags)) if item_tags else "items"
+
+            if available > index:
+                continue
+
+            line_str = f"Line {elem.sourceline}: " if use_lxml and hasattr(elem, 'sourceline') else ""
+            if item_tags == set():
+                detail = (f"<{tag}> has no literal item form, so it needs a model. "
+                          f"Set the model before selecting, or drop selectedIndex.")
+            elif available == 0:
+                detail = (f"<{tag}> declares no {what} and no model, so index {index} has nothing "
+                          f"to point at. Add the items, bind a model, or drop selectedIndex.")
+            else:
+                detail = (f"<{tag}> declares {available} {what}, so index {index} is out of range "
+                          f"(valid: 0-{available - 1}).")
+            errors.append(
+                f"{line_str}selectedIndex=\"{index}\" will throw at render time. {detail}"
+            )
+
+        return len(errors) == 0, errors
+
+    except Exception as e:
+        return False, [f"Runtime semantics check error: {e}"]
+
+
+# --- Layer 7: controller cross-check --------------------------------------
+# @Wire binds a Java field to a ZUL id. A wrong type compiles, validates, renders
+# fine, and throws ClassCastException only when the field is first used; a wrong id
+# leaves the field null. Neither the validator nor the render can see either one,
+# which is what puts this in reach of a source check and nothing else.
+
+# Families where one element-named class inherits from another, so a field typed as
+# the ancestor is perfectly legal. The rule cannot tell those apart without a real
+# class hierarchy, so it declines to judge any component in this set. Skipping a
+# whole family is a deliberate trade: a missed defect costs a round, a false
+# accusation costs the agent's trust in the whole list.
+WIRE_AMBIGUOUS_FAMILIES = {
+    # Textbox is the ancestor of combobox and bandbox, but not of the numeric boxes.
+    "textbox", "combobox", "bandbox", "intbox", "longbox", "doublebox", "decimalbox",
+    "spinner", "doublespinner", "datebox", "timebox",
+    # Radio extends Checkbox.
+    "checkbox", "radio",
+    # Hbox and Vbox extend Box.
+    "box", "hbox", "vbox",
+    # Group and Groupfoot extend Row; Listgroup and Listgroupfoot extend Listitem.
+    "row", "group", "groupfoot", "listitem", "listgroup", "listgroupfoot",
+    # Combobutton extends Button.
+    "button", "combobutton",
+}
+
+# An id may legitimately come from somewhere this file cannot see.
+WIRE_OPAQUE_TAGS = {"include", "foreach", "apply", "if", "choose", "when", "otherwise"}
+
+# @Wire, then optionally ("selector"), then a field declaration. Methods are excluded
+# by requiring the declaration to end in a semicolon.
+WIRE_FIELD = re.compile(
+    r'@Wire\s*(?:\(\s*"([^"]*)"\s*\)\s*)?'
+    r'(?:(?:private|protected|public|static|final|transient|volatile)\s+)*'
+    r'([A-Za-z_][\w.]*)\s+([A-Za-z_]\w*)\s*(?:=[^;]*)?;'
+)
+
+
+def _tag_to_class(tag: str) -> str:
+    """ZK's ZUL tags map to class names by capitalising the first letter, with no
+    other transformation: a -> A, hlayout -> Hlayout, toolbarbutton -> Toolbarbutton."""
+    return tag[:1].upper() + tag[1:]
+
+
+def validate_controller_wiring(zul_path: Path, controller_path: Path,
+                               element_names: set[str]) -> tuple[bool, list[str]]:
+    """
+    Layer 7: cross-check @Wire fields in a controller against the ZUL's ids.
+
+    Reports two things it can establish from the two files alone:
+      - a wired id that no component in the ZUL declares (the field stays null)
+      - a field whose type is a different concrete component than the one it names
+
+    Everything it cannot establish, it stays silent about: see WIRE_AMBIGUOUS_FAMILIES
+    and WIRE_OPAQUE_TAGS.
+    """
+    errors = []
+    try:
+        try:
+            from lxml import etree
+            with open(zul_path, 'rb') as f:
+                root = etree.parse(f).getroot()
+        except ImportError:
+            root = ET.parse(zul_path).getroot()
+
+        id_to_tag = {}
+        opaque = False
+        for elem in root.iter():
+            if not isinstance(elem.tag, str):
+                continue
+            tag = (elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag)
+            if tag.lower() in WIRE_OPAQUE_TAGS:
+                opaque = True
+            for name, value in elem.attrib.items():
+                if (name.split('}')[-1] if '}' in name else name) == 'id':
+                    id_to_tag[value] = tag
+
+        source = controller_path.read_text(encoding='utf-8', errors='replace')
+        # Blank comments rather than removing them, so a commented-out @Wire is not
+        # read as real AND every remaining match keeps its true offset. Deleting them
+        # shifts every line number after the first comment, which sends the reader to
+        # the wrong line -- a wrong location is worse than no location.
+        blank = lambda m: re.sub(r'[^\n]', ' ', m.group(0))
+        source = re.sub(r'/\*.*?\*/', blank, source, flags=re.S)
+        source = re.sub(r'//[^\n]*', blank, source)
+
+        for match in WIRE_FIELD.finditer(source):
+            selector, field_type, field_name = match.groups()
+            # Anchor on the type token, not on @Wire: the type is what has to change,
+            # and the annotation is usually on the line above it.
+            line = source.count('\n', 0, match.start(2)) + 1
+
+            # Generics and arrays are collections of components, not one component.
+            if '<' in field_type or '[' in field_type:
+                continue
+
+            if selector is None:
+                target_id = field_name
+            elif re.fullmatch(r'#[A-Za-z_][\w-]*', selector.strip()):
+                target_id = selector.strip()[1:]
+            else:
+                # A class or pseudo-class selector can match many components.
+                continue
+
+            simple_type = field_type.rsplit('.', 1)[-1]
+            zul_tag = id_to_tag.get(target_id)
+
+            if zul_tag is None:
+                if opaque:
+                    # An <include> or a shadow element can contribute ids this file
+                    # never shows, so absence proves nothing here.
+                    continue
+                errors.append(
+                    f"Line {line}: @Wire {simple_type} {field_name} names id '{target_id}', which "
+                    f"no component in {zul_path.name} declares. The field stays null and the first "
+                    f"use throws NullPointerException."
+                )
+                continue
+
+            # Only compare when both sides are unambiguously concrete components.
+            if simple_type.lower() not in element_names:
+                continue
+            if zul_tag.lower() in WIRE_AMBIGUOUS_FAMILIES or simple_type.lower() in WIRE_AMBIGUOUS_FAMILIES:
+                continue
+
+            expected = _tag_to_class(zul_tag)
+            if simple_type != expected:
+                article = "an" if expected[:1] in "AEIOU" else "a"
+                errors.append(
+                    f"Line {line}: @Wire {simple_type} {field_name} is wired to <{zul_tag} "
+                    f"id=\"{target_id}\">, which is {article} {expected}. This compiles and renders, "
+                    f"then throws ClassCastException the first time the field is used. Change the "
+                    f"field type to {expected}."
+                )
+
+        return len(errors) == 0, errors
+
+    except Exception as e:
+        return False, [f"Controller cross-check error: {e}"]
+
+
+def collect_element_names(xsd_path: Path) -> set[str] | None:
+    """Every component name the schema declares, including those whose type it
+    does not resolve. Used to answer "does <x> exist" independently of whether
+    the attribute map could be built for it."""
+    try:
+        from lxml import etree
+    except ImportError:
+        return None
+    XS = "{http://www.w3.org/2001/XMLSchema}"
+    root = etree.parse(str(xsd_path)).getroot()
+    return {e.get('name') for e in root.iterchildren(f'{XS}element') if e.get('name')}
+
+
+def describe_component(component: str, attrs_asked: list[str], xsd_path: Path, major: int) -> bool:
+    """
+    Answer, from the bundled schema, what a component is and what it accepts --
+    BEFORE the component gets written, rather than after.
+
+    The skill has shipped this 183 KB schema all along and used it only as a
+    checker. A checker answers once the markup is already wrong, at the cost of a
+    render round; the same file asked first answers for free, exactly, locally,
+    with no retrieval involved. Two of six evaluation runs invented this move on
+    their own (one learned <charts> takes className/zclass and not sclass, the
+    other that <togglebutton> does not exist in ZK 10) and both reported that the
+    schema, not the documentation, is what saved them.
+
+    Returns True when the component exists at this ZK version and every asked-for
+    attribute is accepted, so the exit code is usable in a script.
+    """
+    names = collect_element_names(xsd_path)
+    if names is None:
+        print("lxml is required for --describe. Install with: pip install lxml")
+        return False
+
+    element_attrs, attr_elements = build_attribute_map(xsd_path)
+    if element_attrs is None:
+        print("lxml is required for --describe. Install with: pip install lxml")
+        return False
+
+    asked = component.lstrip('<').rstrip('>').strip()
+    # The schema is case-sensitive, but an agent reaching for a component may not be.
+    actual = asked if asked in names else next((n for n in names if n.lower() == asked.lower()), None)
+
+    # Removal is checked BEFORE absence, because the two look identical in this file and
+    # mean opposite things. The bundled schema is a single 10.x document, so a component
+    # dropped in 10.x is simply missing from it -- and reporting that as "not a ZUL
+    # component" would be flatly wrong for a ZK 9 target, where it is valid.
+    removed_in, removed_hint = REMOVED_COMPONENTS.get(asked.lower(), (None, None))
+    if removed_in is not None and major >= removed_in:
+        print(f"Component <{asked}>: REMOVED as of ZK {removed_in}, so not available for your "
+              f"ZK {major} target.")
+        print(f"  {removed_hint}")
+        return False
+    if removed_in is not None and actual is None:
+        print(f"Component <{asked}>: existed in ZK {major}, removed in ZK {removed_in}.")
+        print(f"  {removed_hint}")
+        print(f"  The bundled schema is 10.x and no longer declares it, so this tool cannot list "
+              f"its attributes. Verify those against the ZK {major} component reference.")
+        return True
+
+    if actual is None:
+        print(f"Component <{asked}>: NOT FOUND in the bundled schema.")
+        close = difflib.get_close_matches(asked.lower(), sorted(names), n=5, cutoff=0.6)
+        if close:
+            print(f"  Closest names in the schema: {', '.join(close)}")
+        print("  Nothing in the schema declares this component -- do not write it, and do not "
+              "assume an add-on jar would supply it without checking.")
+        if major < 10:
+            print(f"  Caveat: the bundled schema is 10.x, so it cannot confirm a component that "
+                  f"exists only in ZK {major}. Absence here is decisive for ZK 10+ and suggestive, "
+                  f"not conclusive, for ZK {major}.")
+        return False
+
+    status = f"available in ZK {major}"
+    if removed_in is not None:
+        status += f" (but removed in ZK {removed_in} -- avoid if the project may upgrade)"
+    print(f"Component <{actual}>: {status}")
+
+    valid = element_attrs.get(actual)
+    if valid is None:
+        print("  The schema declares this component but does not resolve an attribute list for it.")
+        print("  Treat the attribute set as unknown: verify against the ZK component reference.")
+        return not attrs_asked
+
+    ok = True
+    if attrs_asked:
+        # The question that actually costs a round is "does it take THIS attribute",
+        # and a 40-name list is the wrong shape for proving an absence.
+        for want in attrs_asked:
+            want = want.strip()
+            if want in valid:
+                notes = []
+                gone = REMOVED_ATTRIBUTES.get(want)
+                if gone and actual.lower() in gone[0]:
+                    notes.append(f"REMOVED: {gone[1]}")
+                    ok = False
+                new10 = NEW_IN_ZK10_ATTRIBUTES.get(want)
+                if new10 and actual.lower() in new10[0] and major < 10:
+                    notes.append(f"NOT IN ZK {major}: {new10[1]}")
+                    ok = False
+                suffix = (" -- " + "; ".join(notes)) if notes else ""
+                print(f"  {want}: accepted{suffix}")
+            else:
+                ok = False
+                near = difflib.get_close_matches(want, sorted(valid), n=4, cutoff=0.5)
+                hint = f" Did you mean: {', '.join(near)}?" if near else ""
+                print(f"  {want}: NOT accepted on <{actual}>.{hint}")
+                elsewhere = sorted(attr_elements.get(want, []))
+                if elsewhere:
+                    shown = ', '.join(elsewhere[:8])
+                    more = f" (+{len(elsewhere) - 8} more)" if len(elsewhere) > 8 else ""
+                    print(f"    '{want}' is valid on: {shown}{more}")
+        return ok
+
+    listed = sorted(valid)
+    print(f"  Accepts {len(listed)} attributes:")
+    for line in textwrap.wrap(', '.join(listed), width=92):
+        print(f"    {line}")
+
+    deprecated = sorted(a for a in listed
+                        if a in REMOVED_ATTRIBUTES and actual.lower() in REMOVED_ATTRIBUTES[a][0])
+    if deprecated:
+        print(f"  Declared but REMOVED -- do not use: {', '.join(deprecated)}")
+    if major < 10:
+        too_new = sorted(a for a in listed
+                         if a in NEW_IN_ZK10_ATTRIBUTES and actual.lower() in NEW_IN_ZK10_ATTRIBUTES[a][0])
+        if too_new:
+            print(f"  Declared but NOT available in ZK {major}: {', '.join(too_new)}")
+
+    print("  An attribute absent from that list is not accepted, however plausible it looks. "
+          "Use --attr to ask about one directly.")
+    return ok
+
+
 # A style value that is computed while the page runs -- a colour or a width taken from a
 # record -- cannot be expressed as a static class, so a binding or EL expression here is
 # a legitimate inline style and not worth reporting.
@@ -725,7 +1116,8 @@ def find_inline_styles(file_path: Path) -> list[str]:
         return []
 
 
-def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(DEFAULT_XSD_PATH), zk_version: str = "10") -> bool:
+def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(DEFAULT_XSD_PATH),
+                 zk_version: str = "10", controller: Path | None = None) -> bool:
     """
     Validate a ZUL file through all validation layers.
 
@@ -832,6 +1224,41 @@ def validate_zul(file_path: Path, skip_xsd: bool = False, xsd_source: str = str(
         print("  Move these declarations into the page's <style> block as a class and "
               "attach it with sclass.")
 
+    # Layer 6: Runtime Semantics
+    print("Layer 6: Runtime Semantics... ", end="")
+    is_valid, errors = validate_runtime_semantics(active_path)
+    if is_valid:
+        print("✓ PASS")
+    else:
+        print("✗ FAIL")
+        for error in errors:
+            print(f"  {error}")
+        all_valid = False
+
+    # Layer 7: Controller Cross-Check -- only when a controller is named, so the
+    # default output shape stays exactly what it has always been.
+    if controller is not None:
+        print("Layer 7: Controller Cross-Check... ", end="")
+        if not controller.exists():
+            print("✗ FAIL")
+            print(f"  Controller not found: {controller}")
+            all_valid = False
+        else:
+            xsd_path = (Path(xsd_source) if not xsd_source.startswith(('http://', 'https://'))
+                        else DEFAULT_XSD_PATH)
+            element_names = collect_element_names(xsd_path)
+            if element_names is None:
+                print("SKIPPED (lxml unavailable)")
+            else:
+                is_valid, errors = validate_controller_wiring(active_path, controller, element_names)
+                if is_valid:
+                    print("✓ PASS")
+                else:
+                    print("✗ FAIL")
+                    for error in errors:
+                        print(f"  {error}")
+                    all_valid = False
+
     if wrapped_path:
         wrapped_path.unlink(missing_ok=True)
 
@@ -849,11 +1276,30 @@ def main():
         description="Validate ZUL files for XML well-formedness and XSD schema compliance",
         epilog=f"Default schema: {DEFAULT_XSD_PATH}"
     )
+    # nargs="*" rather than "+" so --describe can run without a file. The
+    # "no arguments at all" usage error is re-created by hand below, because
+    # argparse can no longer enforce it.
     parser.add_argument(
         "files",
-        nargs="+",
+        nargs="*",
         type=Path,
         help="ZUL file(s) to validate"
+    )
+    parser.add_argument(
+        "--describe",
+        metavar="COMPONENT",
+        help="Ask the bundled schema about a component instead of validating a file: does it exist "
+             "at this ZK version, and what attributes does it accept. Use this BEFORE writing a "
+             "component you have not used before -- it costs nothing and replaces a guess."
+    )
+    parser.add_argument(
+        "--attr",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="With --describe, ask whether this specific attribute is accepted (repeatable). "
+             "Answering 'is this attribute allowed here' is what --describe is for; a full "
+             "attribute list is the wrong shape for proving an absence."
     )
     parser.add_argument(
         "--skip-xsd",
@@ -876,6 +1322,15 @@ def main():
     )
 
     parser.add_argument(
+        "--controller",
+        type=Path,
+        metavar="PATH",
+        help="Path to the Composer or ViewModel for this page. Enables Layer 7, which cross-checks "
+             "@Wire fields against the ZUL's ids: a wrong id leaves the field null, and a wrong "
+             "field type throws ClassCastException at first use. Neither is visible to the other "
+             "layers or to a render."
+    )
+    parser.add_argument(
         "--dev",
         action="store_true",
         help="Development mode: suppress the anonymous usage ping for this run, so "
@@ -884,6 +1339,22 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if not args.files and not args.describe:
+        parser.error("the following arguments are required: files")
+    if args.attr and not args.describe:
+        parser.error("--attr only applies with --describe")
+
+    if args.describe:
+        # No usage ping for a schema lookup. It is not a run of the skill, and a
+        # third emitter inside one run would break the usage trend line at the
+        # version boundary in a way that reads as growth (the D19 reasoning).
+        xsd_path = (Path(args.xsd_source)
+                    if not args.xsd_source.startswith(('http://', 'https://'))
+                    else DEFAULT_XSD_PATH)
+        ok = describe_component(args.describe, args.attr, xsd_path,
+                                parse_major_version(args.zk_version))
+        sys.exit(0 if ok else 1)
 
     track_usage_async(dev=args.dev)
 
@@ -894,7 +1365,8 @@ def main():
             all_passed = False
             continue
 
-        if not validate_zul(file_path, skip_xsd=args.skip_xsd, xsd_source=args.xsd_source, zk_version=args.zk_version):
+        if not validate_zul(file_path, skip_xsd=args.skip_xsd, xsd_source=args.xsd_source,
+                            zk_version=args.zk_version, controller=args.controller):
             all_passed = False
 
         print()  # Blank line between files

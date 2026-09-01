@@ -26,12 +26,11 @@ Nothing here has an owner. Grouped by where the work would land.
 
 ### Knowledge and prevention — the highest-leverage group
 
-- [ ] **Turn `assets/zul.xsd` into a pre-write lookup** and tell Step 2 to use it. Two of six runs
-      invented this move unprompted and both were saved by it.
-      → [knowledge-roadmap.md §Tier 2](knowledge-roadmap.md)
-- [ ] **Two Tier-1 rules still unwritten**: `@Wire` field type vs. component type, and `selectedIndex`
-      on a model-less mesh component. Both are mechanically detectable and invisible to every existing
-      layer.
+- [x] **Turn `assets/zul.xsd` into a pre-write lookup** — done: `validate-zul.py --describe
+      <component> [--attr <name>]`, with the instruction in Step 2 guideline 3 and a routing-table row
+      so a bare "does ZK 10 have X?" reaches it. → [knowledge-roadmap.md §Tier 2](knowledge-roadmap.md)
+- [x] **The last two Tier-1 rules** — done: Layer 6 (a literal `selectedIndex` pointing past the items
+      that exist) and Layer 7 (`@Wire` type and id cross-check, opt-in via `--controller`).
 - [ ] **Fix the zk-doc retrieval precision bug** before growing any corpus. A combobox
       default-selection query returns `treeitem` first — and `treeitem`'s answer is exactly the wrong
       spelling an evaluation run tried first.
@@ -91,9 +90,8 @@ Nothing here has an owner. Grouped by where the work would land.
 - [ ] `license: MIT` is declared in `marketplace.json` but there is **no LICENSE file**.
 - [ ] `.DS_Store` is not gitignored and copies sit **inside `skills/zul-writer/`**, so they ship with any
       packaging.
-- [ ] `SKILL.md` says *"Query `zk-doc-mcp-server`"*. **The server is named `zk-doc`** (tool:
-      `search_zk_docs`), so the instruction names something that does not exist. Keep the "if available"
-      qualifier.
+- [x] `SKILL.md` said *"Query `zk-doc-mcp-server`"*, a server that does not exist — corrected to
+      `zk-doc` (tool: `search_zk_docs`).
 - [ ] **No "do not generate" list in Step 2.** `<zscript>` and inline Java in event attributes are
       classic LLM ZUL mistakes — they are all over the old forum and demo content models trained on —
       and `SKILL.md` mentions `<zscript>` only in terms of what the *preview* does with it, never as

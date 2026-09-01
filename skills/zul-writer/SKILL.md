@@ -40,6 +40,7 @@ the way past, answers a question they did not ask and costs them a page they wer
 | "Preview / screenshot / show me what `foo.zul` looks like" | 5 |
 | "Why is this icon a blank box / this label clipped / this section missing?" | 5, then `--probe` the element |
 | "Is this ZUL valid?", "why won't this page parse?" | 3 |
+| "Does ZK 10 have a `<togglebutton>`?", "can `<charts>` take `sclass`?" | neither — answer from the schema with `--describe` (Step 2, guideline 3) |
 | "Write the ViewModel for this page" | 4 |
 | "Move this page's data into a ViewModel/Composer" | the extraction pass in Step 2 → 4 → 5 with `--run-controllers` |
 | "Add a column to this grid", "make the sidebar narrower" | 2 on the existing file → 3 → 5 if the change is visible |
@@ -251,10 +252,35 @@ When generating the ZUL file, follow these technical guidelines:
      that one declaration inline and leave the rest in the class.
    - If fallback native HTML elements (e.g. `<n:div>`) are used, include the CSS they need in that
      same `<style>` block.
-3. **ZK Documentation**:
-   - Query `zk-doc-mcp-server` for detailed component info if available.
+3. **Ask the schema before you write — it is bundled, exact, and free**:
+
+   Before writing a component you have not used before, or putting an attribute on a component you
+   have not put it on before, ask:
+
+   ```bash
+   uv run <skill-base-dir>/scripts/validate-zul.py --describe <component> [--attr <name>] --zk-version <detected-version>
+   ```
+
+   ```bash
+   # Does <charts> take sclass?  -> no: className or zclass
+   uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --describe charts --attr sclass
+   # Does <togglebutton> exist in ZK 10?  -> no such component
+   uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --describe togglebutton
+   ```
+
+   **Do this instead of guessing between two spellings you both half-remember.** The usual failure
+   here is not ignorance of how to build a grid — it is knowing three plausible spellings and
+   picking a wrong one. Validation catches that afterwards, at the cost of a whole round; the same
+   schema asked first answers immediately and locally. An attribute absent from the printed list is
+   not accepted, however plausible it looks.
+
+   One limit to respect: the bundled schema is a 10.x document. For a ZK 9 target its absences are
+   suggestive, not conclusive, and it says so when that applies.
+
+4. **ZK Documentation**:
+   - Query the `zk-doc` MCP server (tool: `search_zk_docs`) for detailed component info if available.
    - Use [ZK Javadoc](https://www.zkoss.org/javadoc/latest/zk/) for properties and event details.
-4. **Best Practices**:
+5. **Best Practices**:
    - Prefer `hflex`/`vflex` over fixed pixel widths for responsive layouts. `hflex="min"` sizes a component to fit its content — useful for a `<button>` sitting beside an `hflex="1"` field (see [assets/flexible-sizing.zul](assets/flexible-sizing.zul)).
    - Use meaningful IDs and follow the [assets/template.zul](assets/template.zul) structure.
    - **Never put `--` inside an XML comment.** XML forbids it anywhere between `<!--` and `-->`, so
@@ -367,6 +393,13 @@ uv run ~/.claude/skills/zul-writer/scripts/validate-zul.py --zk-version 10.3.0 p
   class attached with `sclass`. It reports and never fails the run, so treat each line as a defect
   to fix rather than noise to pass over; a data-driven `style="@load(...)"` is skipped on purpose.
 - Layer 4: version compatibility checks for the target ZK version — removed/deprecated API for all targets, plus ZK-10-only API (e.g. dropped `<fragment>`, or new `accept`/`responsive` attributes) gated by `--zk-version`. Defaults to `10` if omitted.
+- Layer 6: runtime semantics — markup that is legal by every static measure and still throws while
+  the page is being built. Today that is a literal `selectedIndex` pointing past the items that
+  exist: `<combobox selectedIndex="0"/>` with no items and no model passes Layers 1-5 and dies with
+  `Out of bound: 0 while size=0`. The index is applied before any controller runs, so a Composer
+  filling the component later cannot rescue it. Silent when a `model` is present, since the model's
+  size is not knowable from markup.
+- Layer 7: controller cross-check — **only runs when you pass `--controller`** (see Step 4).
 
 ### Prerequisites
 Layer 2 and 3 require `lxml`. **`uv run` handles this automatically** via the script's PEP 723 inline metadata — it provisions `lxml` in an ephemeral environment, so no manual setup is needed. If `uv` is unavailable, run with a plain interpreter instead and the script self-installs `lxml` as a fallback:
@@ -426,6 +459,27 @@ anything you checked.
    - Use **ViewModel** for MVVM patterns.
    - Use **Composer** for MVC patterns.
 2. **Implementation Details**: Follow the technical requirements in [references/controller-guidelines.md](references/controller-guidelines.md).
+3. **Cross-check the wiring against the ZUL before you finish.** Re-run the validator with
+   `--controller`, which turns on Layer 7:
+
+   ```bash
+   uv run <skill-base-dir>/scripts/validate-zul.py <path-to-zul> --controller <path-to-controller>
+   ```
+
+   It reports two defects that **nothing else in this workflow can see** — not the other layers, not
+   the Step 5 render:
+   - a `@Wire` field whose type is a different component than the id it names. This compiles, passes
+     every validation layer, renders correctly, and then throws `ClassCastException` the first time
+     the field is used. An earlier run shipped `@Wire Label` on an `<a>` and only caught it by
+     re-reading its own composer.
+   - a `@Wire` field naming an id no component in the ZUL declares. The field stays null and the
+     first use throws `NullPointerException`.
+
+   Layer 7 stays silent wherever it cannot be certain — component families where one class inherits
+   from another (`Textbox`/`Combobox`, `Checkbox`/`Radio`, `Box`/`Hbox`, `Row`/`Group`,
+   `Listitem`/`Listgroup`, `Button`/`Combobutton`), base-class field types like `Component`,
+   collections, non-`#id` selectors, and pages containing an `<include>`. **A silent Layer 7 is not
+   a guarantee of correct wiring**; it means nothing it can prove is wrong.
 
 #### MVC Pattern - Composer Class
 [assets/MyComposer.java](assets/MyComposer.java)
