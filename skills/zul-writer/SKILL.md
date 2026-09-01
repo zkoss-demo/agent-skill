@@ -96,6 +96,10 @@ Ask only what is still open. The request, the project and any existing file answ
 already — a version in `pom.xml`, a pattern visible in the markup you were pointed at, a layout
 described in the prompt — and re-asking those reads as though you did not look.
 
+Sometimes there is nobody to ask — a scripted run, a batch job, a user who has gone quiet. That is
+not a reason to stop, and it is not a licence to invent an answer either: see *When there is no one
+to ask* after the questions.
+
 ### Questions to Ask
 
 #### 1. ZK Version
@@ -126,6 +130,9 @@ controller, and it governs the component it is set on **and every descendant of 
 single answer to "where does this value come from", which is the question both the extraction pass
 and the Step 5 self-review depend on. If the user asks for both, ask which one the page's data
 should follow.
+
+If this question goes unanswered, see *When there is no one to ask* below — it is the one question
+where the project's existing pages get a say before the default does.
 
 #### 4. Static Data or Model-Driven
 
@@ -161,6 +168,53 @@ If the ZUL page requires a `<charts>` component, follow [references/charts-guide
 #### 7. Theme and Data Density
 
 If a page is designed to show a high density of data, suggest to the user to use another free theme called `iceblue_c`, a compact theme that has smaller padding, margin, and font-size.
+
+### When there is no one to ask
+
+Every question above has an answer to fall back on, so an unanswered question costs a stated choice
+rather than the whole run:
+
+| Question | Unanswered → use | Why this one |
+|---|---|---|
+| 1. ZK version | **10.x** | Not a new decision — `validate-zul.py` already defaults to `10` and `preview-zul.py` to 10.2.1. A different default here would set the skill writing against its own validators. |
+| 2. Page purpose | **No default — read it out of the request** | The user always described the page they wanted. There is nothing to guess, and a fixed default would overwrite something already said. |
+| 3. MVC or MVVM | **MVC**, unless the project is unanimous — see below | Composer-and-`@Wire` is the smaller thing to get right when nobody is available to correct it. |
+| 4. Static or model-driven | **Static (literal rows)** | This is where a page starts anyway: Pass 1 of a model-driven page is literal rows. Choose model-driven only when the request names a real data source. |
+| 5. Layout | **No default — derive it from the purpose, and say how you derived it** | Layout is the most concrete part of any request or mockup. A fixed default here means ignoring what you were given. |
+| 6. ZK Charts | Not applicable — asked only when the page needs a chart | — |
+| 7. Theme and density | **Keep the project's theme**, and note in the report that `iceblue_c` exists | Switching themes repaints every page in the app. That is not something to do while nobody is looking. |
+
+**Name every default you used, in the final report.** A default is worth having because it is
+predictable and can be checked afterwards; a default nobody is told about is neither.
+
+#### What the project already does (question 3 only)
+
+A project where every existing page is MVVM is evidence, not a guess — adding one MVC page to it
+makes the codebase worse in a way the default cannot see. So for question 3, and only question 3,
+look before falling back:
+
+```bash
+uv run <skill-base-dir>/scripts/detect-pattern.py <project-root>
+```
+
+It reads the ZUL side only, because that is the side where both patterns declare themselves in an
+attribute. The Java side cannot be counted honestly: a ViewModel is a plain class, `@Init` is
+optional so counting it misses ViewModels that do without one, and counting `Composer` subclasses
+sweeps in every base class and helper that was never applied to a page.
+
+```
+PATTERN: mixed (MVC 6, MVVM 2)
+USE: mvc -- the project uses both, so it has no single answer to give
+```
+
+Follow the project **only when it is unanimous** — `PATTERN: mvc` or `PATTERN: mvvm`. Anything else,
+including a lopsided 6-to-2, leaves the MVC default standing, because a project that already mixes
+patterns is not telling you which one it wants. Either way, say in the report what the scan found
+and which answer you used.
+
+The other six questions do not work this way. A pattern is one architectural decision that holds
+across a codebase; a page's purpose and layout are different on every page, and the ZK version comes
+from the build file rather than from a survey.
 
 ---
 
@@ -223,6 +277,12 @@ means a new controller and the two-pass path below. Only an existing `.zul` can 
 and then you open it: if it exists and compiles, there is nothing to extract — render with
 `--run-controllers` from the start and judge the real data.
 
+**What counts as data.** A value that changes when the data changes is data. A word that stays put
+no matter what the data says is chrome, and chrome belongs in the ZUL permanently — column headers,
+button captions, section titles, units, empty-state messages, validation hints. Cell values, list
+items, counts, amounts and status labels are data. The test is not "is it text": it is *would this
+word still be right tomorrow, against tomorrow's rows*.
+
 #### Pass 1 — literal data, real shape
 
 Write the first version with literal values, shaped like the data that will replace them: a name of
@@ -237,6 +297,14 @@ would render real rows through `--run-controllers` and you would be back to judg
 against text you never checked.
 
 Iterate here until the layout and the styling are right.
+
+**A chart has no Pass 1.** `<charts>` has no literal form — a series cannot be spelled out in the
+markup the way a `<row>` can — so the two-pass shape does not exist for it. Write the chart's data
+into the controller from the start and render that region with `--run-controllers` from its first
+render, while the rest of the page still goes through the literal pass. The cost is that this page's
+first render now depends on the controller compiling, so read the `CONTROLLERS:` line before
+concluding anything about a chart that is missing: a stale `.class` looks exactly like a chart that
+was never drawn.
 
 #### Pass 2 — extraction, after Step 5 has settled the layout
 
