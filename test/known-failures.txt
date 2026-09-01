@@ -7,8 +7,8 @@
 # of blocking every push.
 #
 # This is a shrinking list, not a dumping ground:
-#   * When a fix lands (see finding B1 in tasks/zul-writer-improvement-proposal.md),
-#     the file starts passing — remove its line here and CI will enforce PASS.
+#   * When a fix lands (see doc/knowledge-roadmap.md §7), the file starts
+#     passing — remove its line here and CI will enforce PASS.
 #   * If a quarantined file starts passing while still listed, CI FAILS with
 #     "stale quarantine" so the list never drifts out of date.
 #
@@ -27,5 +27,7 @@ test/valid/zk-5721.zul
 test/valid/zk-5751.zul
 skills/zul-writer/assets/example-data-management-mvvm.zul
 
-# --- B1: Layer 3 attribute-placement false-positives ---
-test/valid/zk-5793.zul
+# Left this list on 2026-09-01: test/valid/zk-5793.zul, which was quarantined for
+# "Layer 3 attribute-placement false-positives". The cause was build_attribute_map
+# never traversing xs:simpleContent, so <attribute name="onUpload"> resolved
+# against an empty attribute set. Fixed rather than quarantined.

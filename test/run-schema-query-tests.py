@@ -112,6 +112,68 @@ def check_a_bare_component_lists_its_attributes():
     assert code == 0, code
 
 
+def check_a_text_bearing_element_resolves_its_attributes():
+    """<attribute name="..."> is canonical ZUL and was answered "NOT accepted",
+    because the attributes of a text-bearing element live inside xs:simpleContent
+    and the schema walk only handled xs:complexContent. Paired with an attribute
+    that genuinely is not there, so a blanket yes cannot pass this."""
+    out, code = describe("attribute", "--attr", "name", "--attr", "trim")
+    assert "name: accepted" in out, out
+    assert "trim: accepted" in out, out
+    assert code == 0, code
+
+    out, code = describe("attribute", "--attr", "value")
+    assert "value: NOT accepted" in out, out
+    assert code == 1, code
+
+
+def check_a_schema_wildcard_element_declines_to_judge():
+    """<custom-attributes> declares xs:anyAttribute, so every name is legal and
+    a No would be a confident wrong answer."""
+    out, code = describe("custom-attributes", "--attr", "org.zkoss.zul.listbox.rod")
+    assert "ARBITRARY attribute names" in out, out
+    assert "xs:anyAttribute" in out, out
+    assert code == 0, code
+
+
+def check_a_pass_through_element_declines_to_judge():
+    """<include> and <apply> forward unrecognised attributes as arguments -- ZK's
+    own reference documents <include type="..."/>. Nothing in the XSD says so."""
+    for element, attr in (("include", "type"), ("apply", "item")):
+        out, code = describe(element, "--attr", attr)
+        assert "ARBITRARY attribute names" in out, (element, out)
+        assert code == 0, (element, code)
+
+
+def check_an_ordinary_element_still_judges():
+    """The pair for the two checks above: declining must be reserved for the
+    elements that earn it, or the lookup has stopped answering the question."""
+    out, _ = describe("label", "--attr", "sclass")
+    assert "ARBITRARY" not in out, out
+    out, code = describe("charts", "--attr", "sclass")
+    assert "NOT accepted" in out and "ARBITRARY" not in out, out
+    assert code == 1, code
+
+
+PASS_THROUGH_PAGE = (
+    '<zk>\n  <include src="inner.zul" type="x"/>\n'
+    '  <button label="Go">\n    <attribute name="onClick">doIt();</attribute>\n'
+    '  </button>\n</zk>\n')
+MISPLACED_ATTRIBUTE_PAGE = '<zk>\n  <charts sclass="x"/>\n</zk>\n'
+
+
+def check_layer_3_accepts_documented_pass_through_markup():
+    """Layer 3 shares the schema walk, so the same two fixes reach it. Paired
+    with a real misplacement, which must still fail."""
+    out, code = validate(PASS_THROUGH_PAGE)
+    assert "Layer 3: Attribute Placement... ✓ PASS" in out, out
+    assert code == 0, out
+
+    out, code = validate(MISPLACED_ATTRIBUTE_PAGE)
+    assert "'sclass' is not supported on <charts>" in out, out
+    assert code == 1, out
+
+
 def check_no_arguments_is_still_a_usage_error():
     """--describe made the file argument optional; 'no arguments at all' must
     keep failing the way it always has."""
@@ -295,6 +357,11 @@ CHECKS = [
     ("describe: absent != removed", check_absence_is_not_reported_as_removal),
     ("describe: accepted attrs   ", check_an_accepted_attribute_answers_yes),
     ("describe: attribute listing", check_a_bare_component_lists_its_attributes),
+    ("describe: simpleContent    ", check_a_text_bearing_element_resolves_its_attributes),
+    ("describe: schema wildcard  ", check_a_schema_wildcard_element_declines_to_judge),
+    ("describe: pass-through     ", check_a_pass_through_element_declines_to_judge),
+    ("describe: ordinary still No", check_an_ordinary_element_still_judges),
+    ("L3: pass-through accepted  ", check_layer_3_accepts_documented_pass_through_markup),
     ("describe: no args = usage  ", check_no_arguments_is_still_a_usage_error),
     ("L6: out-of-bound fires     ", check_the_out_of_bound_case_fires),
     ("L6: one item is legal      ", check_one_literal_item_makes_index_zero_legal),

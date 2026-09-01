@@ -382,20 +382,32 @@ def validate_xsd_schema(file_path: Path, xsd_source: str = str(DEFAULT_XSD_PATH)
         return False, [f"Validation error: {e}"]
 
 
-def build_attribute_map(xsd_path: Path) -> tuple[dict[str, set[str]], dict[str, list[str]]] | tuple[None, None]:
+# Elements that forward any attribute they are given somewhere else -- to an
+# included page or to a template -- so an undeclared name is the feature, not a
+# mistake. The XSD has no way to express this, and a check that does not know it
+# reports ZK's own documented examples as errors.
+PASS_THROUGH_ATTRIBUTE_ELEMENTS = {"apply", "include"}
+
+
+def build_attribute_map(
+    xsd_path: Path,
+) -> tuple[dict[str, set[str]], dict[str, list[str]], set[str]] | tuple[None, None, None]:
     """
     Parse the XSD to build per-element valid attribute maps.
 
     Returns:
-        (element_attrs, attr_elements) where:
+        (element_attrs, attr_elements, wildcard_elements) where:
         - element_attrs: {element_name: {valid_attr_names}}
         - attr_elements: {attr_name: [element_names]} (reverse map for hints)
-        Or (None, None) if lxml is unavailable.
+        - wildcard_elements: elements whose own type declares xs:anyAttribute, so
+          any attribute name is legal on them and asking "is X accepted here" has
+          no meaningful No answer
+        Or (None, None, None) if lxml is unavailable.
     """
     try:
         from lxml import etree
     except ImportError:
-        return None, None
+        return None, None, None
 
     XS = "{http://www.w3.org/2001/XMLSchema}"
 
@@ -455,8 +467,12 @@ def build_attribute_map(xsd_path: Path) -> tuple[dict[str, set[str]], dict[str, 
                 ref = child.get('ref')
                 if ref and ref in resolved_groups:
                     attrs |= resolved_groups[ref]
-            elif child.tag == f'{XS}complexContent':
-                # Handle type extension (e.g., toolbarbuttonType extends buttonType)
+            elif child.tag in (f'{XS}complexContent', f'{XS}simpleContent'):
+                # Handle type extension (e.g., toolbarbuttonType extends buttonType).
+                # simpleContent is not an afterthought: every text-bearing element
+                # keeps its attributes in there, so skipping it resolved <attribute>
+                # and <zscript> to an empty set and made the tool answer "NOT
+                # accepted" for <attribute name="...">, which is canonical ZUL.
                 for ext in child:
                     if ext.tag == f'{XS}extension':
                         base = ext.get('base')
@@ -464,6 +480,25 @@ def build_attribute_map(xsd_path: Path) -> tuple[dict[str, set[str]], dict[str, 
                             attrs |= type_attrs[base]
                         attrs |= collect_type_attrs(ext)
         return attrs
+
+    def declares_wildcard(ct_elem) -> bool:
+        """
+        True when this type declares xs:anyAttribute itself.
+
+        Deliberately not a search of the whole subtree: the shared zkAttrGroup
+        carries an anyAttribute that every component inherits, so a recursive
+        search would call every element a wildcard. Only a wildcard written into
+        the element's own type means "this element really does take any name",
+        which is how <custom-attributes> and <variables> are defined.
+        """
+        for child in ct_elem:
+            if child.tag == f'{XS}anyAttribute':
+                return True
+            if child.tag in (f'{XS}complexContent', f'{XS}simpleContent'):
+                for ext in child:
+                    if ext.tag == f'{XS}extension' and declares_wildcard(ext):
+                        return True
+        return False
 
     type_attrs = {}  # type_name -> set of attr names
     # Two-pass: first collect all, then resolve extensions
@@ -483,13 +518,26 @@ def build_attribute_map(xsd_path: Path) -> tuple[dict[str, set[str]], dict[str, 
         if name not in type_attrs:
             type_attrs[name] = collect_type_attrs(ct)
 
+    wildcard_types = {name for name, ct in type_elems.items() if declares_wildcard(ct)}
+
     # Step 3: Map element names to valid attributes
     element_attrs = {}
+    wildcard_elements = set()
     for elem in root.iterchildren(f'{XS}element'):
         name = elem.get('name')
         type_name = elem.get('type')
         if name and type_name and type_name in type_attrs:
             element_attrs[name] = type_attrs[type_name]
+            if type_name in wildcard_types:
+                wildcard_elements.add(name)
+
+    # Elements whose arbitrary attributes are a documented feature rather than a
+    # schema wildcard, so nothing in the XSD can be read to discover them:
+    #   <include src="inner.zul" type="..."/>   passes type as a page argument
+    #   <apply template="x" item="${each}"/>    passes item to the template
+    # ZK's own reference documents both. Judging those names against a declared
+    # list produces a confident No for the feature working as designed.
+    wildcard_elements |= PASS_THROUGH_ATTRIBUTE_ELEMENTS & set(element_attrs)
 
     # Step 4: Build reverse map
     attr_elements = {}
@@ -499,7 +547,7 @@ def build_attribute_map(xsd_path: Path) -> tuple[dict[str, set[str]], dict[str, 
                 attr_elements[attr] = []
             attr_elements[attr].append(elem_name)
 
-    return element_attrs, attr_elements
+    return element_attrs, attr_elements, wildcard_elements
 
 
 def validate_attribute_placement(file_path: Path, xsd_path: Path) -> tuple[bool, list[str]]:
@@ -515,7 +563,7 @@ def validate_attribute_placement(file_path: Path, xsd_path: Path) -> tuple[bool,
         (True, []) if all attributes are correctly placed
         (False, [error_messages]) if misplaced attributes found
     """
-    element_attrs, attr_elements = build_attribute_map(xsd_path)
+    element_attrs, attr_elements, wildcard_elements = build_attribute_map(xsd_path)
     if element_attrs is None:
         return False, ["lxml is required for attribute placement check. Install with: pip install lxml"]
 
@@ -542,7 +590,7 @@ def validate_attribute_placement(file_path: Path, xsd_path: Path) -> tuple[bool,
             continue
 
         valid_attrs = element_attrs.get(local)
-        if valid_attrs is None:
+        if valid_attrs is None or local in wildcard_elements:
             continue
 
         for attr_name in elem.attrib:
@@ -964,7 +1012,7 @@ def describe_component(component: str, attrs_asked: list[str], xsd_path: Path, m
         print("lxml is required for --describe. Install with: pip install lxml")
         return False
 
-    element_attrs, attr_elements = build_attribute_map(xsd_path)
+    element_attrs, attr_elements, wildcard_elements = build_attribute_map(xsd_path)
     if element_attrs is None:
         print("lxml is required for --describe. Install with: pip install lxml")
         return False
@@ -1013,6 +1061,21 @@ def describe_component(component: str, attrs_asked: list[str], xsd_path: Path, m
         print("  The schema declares this component but does not resolve an attribute list for it.")
         print("  Treat the attribute set as unknown: verify against the ZK component reference.")
         return not attrs_asked
+
+    if actual in wildcard_elements:
+        # Answering No here would be a confident wrong answer about a feature: these
+        # elements hand whatever name they are given to an included page, a template,
+        # or the component's attribute map. There is no list to check against.
+        why = ("passes any attribute it does not recognise on as an argument"
+               if actual in PASS_THROUGH_ATTRIBUTE_ELEMENTS
+               else "declares xs:anyAttribute, so the schema itself imposes no list")
+        print(f"  <{actual}> accepts ARBITRARY attribute names -- it {why}.")
+        for want in attrs_asked:
+            print(f"  {want.strip()}: accepted (any name is)")
+        print("  Nothing here can be checked for you: a typo in the name is legal markup "
+              "and will simply be ignored at runtime, so check the spelling against "
+              "whatever reads it.")
+        return True
 
     ok = True
     if attrs_asked:

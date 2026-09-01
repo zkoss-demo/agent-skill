@@ -81,8 +81,10 @@ tested on a scratch copy:
 
 `<attribute name>` and `<zscript deferred>` both become "accepted". **`build_attribute_map()` is shared
 with Layer 3**, so this is also the root cause of a quarantine entry that
-[knowledge-roadmap.md §7](knowledge-roadmap.md) lists as unresolved: `test/valid/zk-5793.zul`, filed
+[knowledge-roadmap.md §7](knowledge-roadmap.md) listed as unresolved: `test/valid/zk-5793.zul`, filed
 under "Layer 3 attribute-placement false-positives", uses `<attribute name="onUpload">`.
+
+**Fixed, along with the two lookup bugs below — see §6 for the measured result.**
 
 ### Triage of the 68 that remain
 
@@ -149,6 +151,44 @@ false-positive shape.
 is what renders-per-page would have measured. A right answer nobody asks for changes nothing, and the
 evaluation's plainest lesson was that a capability without prose goes unused — the instruction is in
 Step 2 guideline 3, and its uptake is untested.
+
+---
+
+## 6. What the fix changed (D25, measured the same way)
+
+Three changes landed: `xs:simpleContent` is traversed; an element whose own type declares
+`xs:anyAttribute` is reported as taking arbitrary names instead of being judged; and `<apply>` /
+`<include>` are named as pass-through elements, which no part of the XSD can express.
+
+| | wrong answers (distinct pairs) | file-weighted |
+|---|---|---|
+| before | 70 of 967 (7.24%) | 179 |
+| after | **33 of 967 (3.41%)** | **69 (−61%)** |
+
+Nothing in the remaining 33 is a defect in the lookup. All of them are corpus-version or schema-coverage
+facts, and they split into two groups worth naming:
+
+- **19 rows / 47 file-uses — add-on or post-ZK-10 components**: `chart`, `ckeditor`, `gmaps`,
+  `gpolyline`, `gpolygon`, `cropper`, `rating`, `rangeslider`, responsive `grid`/`column`. Out of scope
+  at a ZK 10 target.
+- **14 rows / 22 file-uses — genuine ZK 10 schema gaps**, and they have a shape: **five are event
+  attributes** (`tree onAfterRender`, `tab onSelect`, `group onOpen`, `div onUpload`,
+  `div onAnyServerEvent`) and **two are the `class` alias for `sclass`**. The rest are
+  `label pre`, `panel framable`, `groupbox contentSclass`, `grid fixedLayout`, `include enclosingTag`
+  and two shadow-element attributes. Those two families are systematic enough to fix as families
+  rather than one at a time — the argument in [knowledge-roadmap.md §7](knowledge-roadmap.md).
+
+On this repository's own corpus the lookup is now clean in both directions: **0 of 42 pairs in
+`test/valid`, 0 elements not found.**
+
+Side effects, both intended and both verified:
+
+- **Quarantine 6 → 5.** `test/valid/zk-5793.zul` was fixed rather than quarantined.
+- **Default output changed on exactly one file.** Diffed every corpus file against the committed
+  validator: **35 of 36 byte-identical**, and the one change is that file's Layer 3 going
+  `✗ FAIL → ✓ PASS`. Nothing else moved.
+
+---
 
 Reproduce with the three scripts in `test/measure/`; each is self-contained and takes a corpus root as
 its only argument, so any ZUL tree can be swept:

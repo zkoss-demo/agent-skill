@@ -32,14 +32,12 @@ Nothing here has an owner. Grouped by where the work would land.
       so a bare "does ZK 10 have X?" reaches it. → [knowledge-roadmap.md §Tier 2](knowledge-roadmap.md)
 - [x] **The last two Tier-1 rules** — done: Layer 6 (a literal `selectedIndex` pointing past the items
       that exist) and Layer 7 (`@Wire` type and id cross-check, opt-in via `--controller`).
-- [ ] **`build_attribute_map()` never traverses `xs:simpleContent`**, so text-bearing elements resolve
-      to an empty attribute set. `--describe attribute --attr name` answers "NOT accepted" for canonical
-      ZUL used in 48 of ZK's own example files, and the same function drives Layer 3 — this is the root
-      cause of the `test/valid/zk-5793.zul` quarantine. Six-line fix, measured at −28% wrong answers.
-      → [effectiveness-measurement.md §2](effectiveness-measurement.md)
-- [ ] **`--describe` ignores `xs:anyAttribute` and pass-through parameter elements.** `custom-attributes`
-      and `variables` declare `anyAttribute` in the schema; `<apply>` and `<include>` take arbitrary
-      attribute names as documented parameters. Together, half the residual wrong answers.
+- [x] **The lookup's own wrong answers** — done (D25): `xs:simpleContent` is now traversed (it was the
+      root cause of the `test/valid/zk-5793.zul` quarantine, which has been removed from the list), an
+      element whose own type declares `xs:anyAttribute` is reported as taking arbitrary names, and
+      `<apply>` / `<include>` are named as pass-through elements. Measured 70 → 33 wrong answers over
+      967 external pairs, −61% file-weighted, with the default output changing on exactly one file.
+      → [effectiveness-measurement.md §6](effectiveness-measurement.md)
 - [ ] **Layer 7's unknown-id check false-positives on `@Wire` inside a nested component class** (a
       `class Foo extends Window` declared inside the composer). 2 fields of 170 measured. Restrict that
       half of the rule to fields declared in the top-level class body.

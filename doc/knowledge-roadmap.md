@@ -215,11 +215,19 @@ Today it is patched reactively, one bug at a time: git history shows one-off com
 `anyGroup`, `toolbarType` children, `groupfoot` in `rowsType` — and a single afternoon's review found two
 more *classes* of false positive.
 
-`test/known-failures.txt` currently quarantines **six files** for exactly this reason — four
-`test/valid/*` files and two of the skill's own bundled assets (`kanban-board.zul`,
-`example-data-management-mvvm.zul`). CI is green because it fails on *drift* (a new regression, or a
-quarantined file that now passes and must leave the list), not on the absolute state. Every entry is an
-unfixed schema false positive.
+`test/known-failures.txt` quarantines **five files** for exactly this reason — three `test/valid/*` files
+and two of the skill's own bundled assets (`kanban-board.zul`, `example-data-management-mvvm.zul`). CI is
+green because it fails on *drift* (a new regression, or a quarantined file that now passes and must leave
+the list), not on the absolute state. Every entry is an unfixed schema false positive.
+
+It was six until 2026-09-01. `test/valid/zk-5793.zul` left the list because the precision sweep in
+[effectiveness-measurement.md](effectiveness-measurement.md) traced its "Layer 3 attribute-placement
+false-positive" to a cause in the *walker* rather than the schema — `xs:simpleContent` was never
+traversed — and it was fixed. That is the pattern worth repeating: **the sweep turned a quarantined
+symptom into a located cause.** Two families in the residue look equally systematic and are the obvious
+next candidates: **event attributes** declared on only some of the components that fire them
+(`tree onAfterRender`, `tab onSelect`, `group onOpen`, `div onUpload`), and **the `class` alias for
+`sclass`**.
 
 **Why this is worse than ordinary technical debt:** when the skill validates its own examples as broken,
 the agent either wastes turns "fixing" correct code or learns to ignore validation failures. Both are
