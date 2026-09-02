@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pins the second way a z-icon comes out blank, which the resolved font stack cannot explain.
+     Both spans carry the SAME class and so request the same ::before glyph, and both resolve the
+     same stack "ZK85Icons, FontAwesome": a declared webfont either way, so a check that asks only
+     which family resolved passes both and reports neither. Only the weight differs.
+
+     ZK's base rule is [class*="z-icon"]{font: normal normal normal 14px/1 FontAwesome}, a
+     shorthand that resets font-weight to 400, and ZK declares family FontAwesome at both 900
+     (fa-solid-900) and 400 (fa-regular-400). Font Awesome 6 keeps most glyphs in the solid face
+     only, so weight 400 selects the regular face and money-bill-wave is simply not in it. Weight
+     900 selects the solid face and it draws.
+
+     Measured on a clean-room page that shipped with five blank icons and a clean LAYOUT: block.
+     The second span is the negative control: a rule that reports both has gone back to firing on
+     the class, and a rule that reports neither has been switched off. -->
+<zk>
+	<style>
+		.iw-page { padding: 20px; font-size: 32px; }
+		.iw-solid { font-weight: 900; }
+	</style>
+	<vlayout spacing="12" sclass="iw-page">
+		<span sclass="z-icon-money-bill-wave iw-blank"/>
+		<span sclass="z-icon-money-bill-wave iw-solid"/>
+	</vlayout>
+</zk>

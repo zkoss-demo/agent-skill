@@ -84,8 +84,15 @@ Nothing here has an owner. Grouped by where the work would land.
       spots: arrangement *within* a section, and a broken icon.
 - [ ] **The human spot-check (phase 3) was never run.** By design it cannot be delegated. Two pairs, R6
       and R4. If a reading disagrees with the blind verdict, every remaining blind verdict is void.
-- [ ] **A third batch is blocked on material**, not on effort: all three remaining mockups are
-      disqualified. Needs new mockups with no counterpart in this repo, or a decision to converge here.
+- [ ] **A third batch is no longer blocked on material.** This item used to read *"all three remaining
+      mockups are disqualified"* — true only while the generation happens *in* this repository.
+      `test/cleanroom/make-sandbox.sh` moves it out, which puts **8 of the 9 mockups back in play**
+      (only *enterprise kanban board* stays out, its answer shipping inside the skill's own `assets/`).
+      What is still open is whether to spend the runs. → [effectiveness-measurement.md §7](effectiveness-measurement.md)
+- [ ] **D32: a second clean-room run.** One page cannot separate *"the skill does this"* from *"that page
+      did this"*, and every pilot-01 finding is dashboard-shaped. Prefer a non-dashboard layout — *Data
+      Comparison Modal* or *Test Case Management*. Worth doing now rather than earlier: the icon false
+      negative is fixed, so a second run's icon results are trustworthy in a way pilot-01's were not.
 - [ ] **Probe iteration 2**: drop the falsifying contrast from prompt 1, which currently measures the
       wrong thing; and reword *"let the measurement pick the edit"* → *"…name the cause"*, then re-run
       prompt 2 to see whether the report-don't-rewrite behaviour returns.
@@ -119,6 +126,14 @@ Nothing here has an owner. Grouped by where the work would land.
       → [decisions.md](decisions.md)
 - [ ] **Skill-level evals** (`skills/zul-writer/evals/`) do not exist. Validator tests exist; nothing
       measures the skill as a whole against a no-skill baseline.
+- [ ] **`make-sandbox.sh` does not stamp the skill version it copied.** Pilot-01's copy was three commits
+      stale when the run was about to start — it would have measured a skill nobody ships, and nothing in
+      the sandbox would have said so. Caught by hand once; print the copied skill's `git describe` into
+      `MANIFEST.md` at build time.
+- [ ] **`--dev` does not say which side of the line a clean-room pilot is on.** The flag is documented as
+      "runs made while developing or testing the skill itself"; `MANIFEST.md` calls the sandbox "the skill
+      under test", but the examinee is doing a genuine page build. Pilot-01 judged it real and left the
+      flag off, so ~15 validator runs counted as ordinary usage. One sentence settles it either way.
 - [ ] **`--watch` mode** (re-render on change, JVM and browser kept warm) is the one item from the
       preview specification never built. Lowest priority; it mainly helps people developing the skill
       itself, where the render is the slow part of every iteration.
@@ -126,10 +141,12 @@ Nothing here has an owner. Grouped by where the work would land.
       `/error.zul`, which does not exist, so Step 5's error path may be reading a 404 instead of ZK's
       real error page. One cheap experiment settles it.
       → [dev-environment.md §2](dev-environment.md)
-- [ ] **The clean-room comparison was never run.** The rig is designed and the reasoning is recorded, but
-      no screenshot has been put through both a scratch project and the showcase to measure the repo's
-      influence — which is the only way to know whether `SKILL.md` or the showcase examples are carrying
-      the output. → [dev-environment.md §4–5](dev-environment.md)
+- [x] **The clean-room comparison was run** (pilot-01, `test/cleanroom/make-sandbox.sh`). Same mockup as
+      evaluation run R5, generated outside this repository with no answer on disk: **7 renders, 2 of them
+      fix rounds**, against R5's 10. It cannot separate the clean-room effect from the skill's changes
+      since R5, but it yielded four defects the in-repo runs never surfaced — one of them a false negative
+      in `icon-not-rendered`. → [effectiveness-measurement.md §7](effectiveness-measurement.md)
+      A second run is **D32**, filed with the evaluation items above.
 
 ### Repo hygiene, still open from the 2026-07 review
 
@@ -163,3 +180,7 @@ Nothing here has an owner. Grouped by where the work would land.
   at 2.0.0 until the branch converges"*; the work converged into `main` and **2.0.0 is tagged
   `v2.0.0`**, so the number is a released point rather than a held one. The next change to any of the
   three places is a version bump, and it moves all three.
+- **"The next change" means the next *release*, not the next commit.** Read the other way once, on
+  `fix/icon-not-rendered-weight`, and the bump was reverted: an unreleased branch must not carry a
+  version number no tag corresponds to. The version stays at 2.0.0 until someone cuts a release, and
+  that is when all three places move together.

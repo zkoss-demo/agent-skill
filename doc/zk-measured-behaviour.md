@@ -283,6 +283,23 @@ Measured 2026-08-23 with a purpose-built probe. Three findings, each contradicti
   other and stitches to 1600×1400. Pairing the two flags in one caveat is what produced a false claim in
   the first draft of the shipped documentation.
 
+### 17b. `position: fixed` is captured at the viewport edge, not the page edge
+
+Same root cause as §17 and a different symptom: `--full-page` stitches a taller PNG without ever
+resizing the browsing context, so an element fixed to the viewport is painted where the viewport
+was and the extra stitched height appears *below* it.
+
+Measured on the clean-room pilot: a floating action button written `position: fixed; bottom: 40px;
+height: 62px` in a 900-tall viewport rendered at **y=798** of a **1277-tall** PNG — exactly
+`900 − 40 − 62`. In the mockup it belongs at the bottom-right of the page; in the capture it floats
+in the middle, stranded between two cards.
+
+**The page is correct and the image is not**, which makes this the rare case where the visual
+self-review must be overruled. It is also actively dangerous: the pilot read the FAB's position as
+content-relative, credited an unrelated edit with "lifting it clear" of a caption, and carried the
+misreading through two renders. Nothing in the capture distinguishes it from a real misplacement —
+only a viewport-sized render does.
+
 ### 18. Forwarding `Accept-Encoding` to `/zkau/web/*` breaks the page completely
 
 The launcher forwards the browser's request headers into its mock servlet request, because ZK resolves
@@ -331,6 +348,27 @@ This matters because **`iconSclass="z-icon-file-pdf-o"` with a typo renders *not
 through every validation layer.** Two greps against the jar remove that whole class of defect — and this
 is a "does the name exist" question, which is the only kind where reading the jar is the right move (see
 [product-rationale.md](product-rationale.md) §6).
+
+**The base rule is a `font:` shorthand, and it resets the weight to 400.** The full declaration is
+`[class*="z-icon"] { font: normal normal normal 14px/1 FontAwesome }`, and ZK declares family
+`FontAwesome` at *two* weights: 900 (`fa-solid-900`, 150 KB) and 400 (`fa-regular-400`, 24 KB). Font
+Awesome 6 keeps most glyphs in the solid face only, so a correctly spelled modern name resolves the
+right family, is handed the **regular** face, and draws nothing. The FA4-era glyphs the regular face
+happens to carry keep working, which is why the symptom is *some* icons blank rather than all of
+them — and why it reads as a random failure. `.z-icon` itself sets weight 900, but only elements
+carrying that exact class get it. One rule fixes a whole page:
+`.your-page [class*="z-icon-"] { font-weight: 900; }`.
+
+Measured on the clean-room pilot: five blank icons, `LAYOUT:` clean, because `icon-not-rendered`
+compared only the resolved `font-family` — which was correct. The rule now rasterises the codepoint
+and compares it against a codepoint no font can supply, in the *same* font, so coverage is measured
+rather than inferred. Pinned by `preview-fixtures/icon-weight.zul`.
+
+A near-miss worth keeping: comparing the glyph against the same codepoint in a **different** stack
+(`monospace`) looks equivalent and is not. When no family in a list supplies a character, the mark
+comes from the *first* family in that list, so two different lists disagree even when both lack the
+glyph — which reads as "supplied" and silences the rule. That version was written, tested against
+this page, and stayed silent.
 
 ### 21. Passing validation does not mean the page renders
 

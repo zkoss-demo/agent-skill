@@ -786,6 +786,44 @@ def check_a21_a_broken_icon_is_measured_not_guessed():
     return fails
 
 
+def check_a21b_a_blank_icon_is_caught_when_the_font_stack_is_right():
+    """A21b: icon-not-rendered fires when the family resolves and the WEIGHT picks a face
+    without the glyph.
+
+    A21's fixture varies the carrier, so the failing element has a visibly wrong font stack and a
+    check that reads only `fontFamily` passes it. This fixture varies nothing but the weight: both
+    spans carry the same class, request the same glyph and resolve the same declared webfont, so
+    every family-based reading of the page says both are fine. One of them draws nothing.
+
+    Measured on a clean-room pilot that shipped five blank icons under a clean LAYOUT: block, which
+    is the failure this rule exists to make impossible. The `iw-solid` span is the negative
+    control: reporting both means the rule went back to firing on the class.
+
+    The finding must carry the weight. "Some font in this stack lacks the glyph" is not actionable
+    on a stack of two; "at weight 400" names the one-line fix.
+    """
+    code, out, _, _ = render(FIXTURES / "icon-weight.zul")
+    fails = []
+    if code != 0:
+        fails.append(f"icon-weight: expected exit 0, got {code}\n{out}")
+    icons = [e for e in layout_entries(out) if e.startswith("icon-not-rendered")]
+    if len(icons) != 1:
+        fails.append(f"icon-weight: expected exactly one icon-not-rendered finding, got "
+                     f"{len(icons)}:\n{icons}")
+        return fails
+    if "iw-blank" not in icons[0]:
+        fails.append(f"icon-weight: the finding does not name the blank span: {icons[0]!r}")
+    if "iw-solid" in icons[0]:
+        fails.append(f"icon-weight: reported the span whose icon draws correctly -- the rule is "
+                     f"firing on the class, not on what the font supplies: {icons[0]!r}")
+    if "U+F53A" not in icons[0]:
+        fails.append(f"icon-weight: the finding carries no codepoint measurement: {icons[0]!r}")
+    if "400" not in icons[0]:
+        fails.append(f"icon-weight: the finding does not name the weight, which is the whole "
+                     f"difference between the two spans: {icons[0]!r}")
+    return fails
+
+
 def check_a22_a_missing_page_asset_is_reported():
     """A22: a missing asset reaches WARNINGS per URL, and the two causes stay separable.
 
@@ -1035,6 +1073,7 @@ CHECKS = [
     ("A19b icon carrier    ", check_a19b_probe_pins_the_icon_carrier_rule),
     ("A20 --dump-dom       ", check_a20_dump_dom_writes_a_file_and_names_it),
     ("A21 broken icon      ", check_a21_a_broken_icon_is_measured_not_guessed),
+    ("A21b icon by weight  ", check_a21b_a_blank_icon_is_caught_when_the_font_stack_is_right),
     ("A22 missing asset    ", check_a22_a_missing_page_asset_is_reported),
     ("A23 unpinned launcher ", check_a23_an_unidentified_launcher_is_not_given_a_version),
     ("A24 model + literals ", check_a24_a_model_beside_literal_rows_is_reported),

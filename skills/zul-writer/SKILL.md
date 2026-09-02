@@ -491,6 +491,10 @@ a second time to receive them. Writing the data in now is the single easiest way
 pass without noticing: Step 5 would render real rows and the layout would never be judged against
 anything you checked.
 
+**Except a chart.** `<charts>` has no literal form, so its model belongs here from the first render
+while everything else on the page stays literal — see *A chart has no Pass 1* in Step 2. Stripping a
+chart's data back out to obey the paragraph above leaves an empty chart that reports no error.
+
 ### Controller Generation Guidelines
 
 1. **Pattern Consistency**: 
@@ -834,6 +838,7 @@ drive a re-render:
 - **Exact spacing, font rendering, sub-pixel alignment, or a colour that is merely close** to the mockup.
 - **Data content from the mockup** — sample data will differ. Compare the *shape* of the UI, not the values in it.
 - **How tall a `--full-page` image is.** `--full-page` never resizes the browsing context — Playwright stitches a taller PNG afterwards — so the `LAYOUT:` findings and every `hflex`/`vflex` measurement refer to the `SIZE:` viewport, not to the image height. See *Viewport* in [references/preview-guidelines.md](references/preview-guidelines.md).
+- **Where a `position: fixed` element sits, in a `--full-page` capture.** It is fixed to the *viewport*, and the stitched image is taller than the viewport, so a floating action button written `bottom: 40px` lands 40px above the `SIZE:` height and appears stranded in the middle of the image. The page is correct and the capture is not. Measured: a FAB at `bottom: 40px` in a 900-tall viewport rendered at y=798 of a 1277-tall PNG. Do not chase it, and do not let it be "fixed" by moving something else — check it against a viewport-sized render instead.
 
 **Under `CONTROLLERS: executed`, the first four bullets above no longer apply** — dimmed expression
 text, placeholder rows, the missing bound-`src` section and "anything a Composer or ViewModel would

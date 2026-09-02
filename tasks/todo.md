@@ -1,129 +1,66 @@
-# Showcase gallery: generate ZULs for the remaining mockups
+# D31 — act on the pilot-01 findings
 
-## Context
+Approved: option A, fix all four.
 
-`zulwriter-showcase/ui-screenshots/` holds 9 mockups. Two already have pages:
+## Why the obvious fix is wrong
 
-| Mockup | Page | Pattern | Data |
-|---|---|---|---|
-| AppTracker.png | `app-tracker.zul` | MVC | literal |
-| enterprise kanban board.png | `kanban-board.zul` | MVVM | literal |
+The naive reading of finding 1 is "also compare `cs.fontWeight` against the declared face's
+weight". That would be **actively harmful**. CSS font matching never fails to pick a face: for a
+family declaring only weight 400, a request for 900 still selects the 400 face and renders
+correctly. Material Icons (declared 400) inside a `font-weight:bold` heading is exactly that, and
+a weight-equality test would report it as a broken icon. That is a false positive on a rule the
+agent is told to trust — the direction the rule's own comment calls unsafe.
 
-The remaining 7 are to be generated: half MVC, half MVVM, **all model-driven**.
+The real failure is **glyph coverage inside the face the browser chose**, and `document.fonts`
+cannot report coverage. So the check has to measure the rasterisation, not the declaration.
 
-## Step 1 answers (shared across all 7 pages)
+## Plan
 
-| Question | Answer | Source |
-|---|---|---|
-| 1. ZK version | **10.3.0.1-Eval** | `zulwriter-showcase/pom.xml` `<zk.version>` |
-| 2. Page purpose | per page, read from the mockup | the images |
-| 3. MVC / MVVM | **user-specified: half and half** | user's message (overrides `detect-pattern.py`, which reported `mixed (MVC 7, MVVM 4)` → `USE: mvc`) |
-| 4. Static or model-driven | **model-driven, all 7** | user's message |
-| 5. Layout | per page, derived from the mockup | the images |
-| 6. ZK Charts | **available** — `org.zkoss.chart:zkcharts:12.2.0.0-Eval` is already a dependency | `pom.xml` |
-| 7. Theme / density | **keep the project theme** (no `iceblue_c` switch) | switching repaints every existing page |
-
-No defaults from the *"when there is no one to ask"* table were needed: every question was
-answered by the user, the build file, or the mockup.
-
-## Pattern assignment
-
-Balanced across the whole gallery (9 pages → MVC 4, MVVM 5).
-
-| # | Mockup | New page | Pattern | Model-driven via |
-|---|---|---|---|---|
-| 1 | Task Master.png | `task-master.zul` | MVVM | `<tree model>` + `<forEach items="@load(vm.tasks)">` cards |
-| 2 | Feedback Dashboard.png | `feedback-dashboard.zul` | MVVM | `<charts model>` ×2 + bound progress/labels |
-| 3 | Data Comparison Modal.png | `data-comparison-modal.zul` | MVVM | `<grid model>` + `<template name="model">` |
-| 4 | Data Analytics Dashboard.png | `data-analytics-dashboard.zul` | MVVM | `<forEach>` KPI cards + `<charts model>` ×2 + `<grid model>` |
-| 5 | Bank Reconciliation Dashboard.png | `bank-reconciliation.zul` | MVC | Composer `setModel()` on a wired `<listbox>` |
-| 6 | Test Case Management.png | `test-case-management.zul` | MVC | Composer `setModel()` on a wired `<tree>` + `<grid>` |
-| 7 | Application Review.png | `application-review.zul` | MVC | Composer sets the wired detail labels |
-
-## Verified before writing any markup
-
-- `<forEach items="@load(vm.x)" var="y">` repeats a ViewModel collection — probed with a throwaway
-  page + ViewModel, rendered `CONTROLLERS: executed`, 3 cards laid out across an `hlayout`.
-  Probe files deleted afterwards.
-- `<forEach>` schema: accepts `begin, end, items, step, var, varStatus`.
-- `<charts>` takes `className`/`zclass`, **not** `sclass`; takes `model`; no `width` needed (100% by default).
-- zkcharts models present in the jar: `DefaultCategoryModel`, `DefaultXYModel`, `DefaultPieModel`.
-- Icon classes go on `<span>`/`<div>` carriers or `iconSclass` — never on `<label>`.
-- Toolchain: `withjdk.sh 17 mvn -o compile`, then `withjdk.sh 17 uv run .../preview-zul.py`.
-  Default `java` on this machine is 11, which the preview rejects.
-
-## Per-page procedure
-
-For each page, in order:
-
-1. Visual analysis of the mockup → component/layout plan.
-2. **Pass 1** — write the ZUL with literal data, shaped like the real data.
-3. Validate: `validate-zul.py --zk-version 10.3.0.1-Eval --dev <page>`.
-4. Write the controller — **behaviour only**, no data.
-5. Render at the mockup's width (`--width 1600`, `--width 1280` for Feedback Dashboard, whose PNG is
-   a 2× export) and self-review. Fix rounds until the layout is settled (budget: 4).
-6. **Pass 2** — extract the literals into the controller, point the ZUL at them, delete the literal
-   rows.
-7. Validate with `--controller` (Layer 7), then re-render with `--run-controllers` once.
-
-## Checklist
-
-- [x] Toolchain + schema + `<forEach>` probe
-- [x] `task-master.zul` + `TaskMasterViewModel` (MVVM)
-- [x] `feedback-dashboard.zul` + `FeedbackDashboardViewModel` (MVVM)
-- [x] `data-comparison-modal.zul` + `DataComparisonViewModel` (MVVM)
-- [x] `data-analytics-dashboard.zul` + `DataAnalyticsViewModel` (MVVM)
-- [x] `bank-reconciliation.zul` + `BankReconciliationComposer` (MVC)
-- [x] `test-case-management.zul` + `TestCaseManagementComposer` (MVC)
-- [x] `application-review.zul` + `ApplicationReviewComposer` (MVC)
-
-## Open question for the user
-
-The two pre-existing pages (`app-tracker.zul`, `kanban-board.zul`) hold their data as literal
-markup, not model-driven. Converting them was not asked for and is not in this scope — see the
-report's decision section.
+1. [x] Build a reproduction fixture: the pilot page minus its `font-weight:900` rule
+       → verify: current code renders blank icons and reports **nothing**
+2. [x] Replace the family-only test with a rasterisation comparison: draw the codepoint with the
+       pseudo-element's own computed font, and again with the same size/style/weight but a
+       non-icon family. Identical rasterisation ⇒ the icon font supplied nothing.
+       → verify: fixture now reports; the fixed pilot page still reports nothing
+3. [x] Sweep the whole regression corpus for new false positives
+       → verify: 0 new findings vs. the pre-change baseline
+4. [x] Regression test covering "family resolves, weight selects a face without the glyph"
+       → verify: fails on the old implementation, passes on the new
+5. [x] SKILL.md Step 4 — cross-reference the chart carve-out at the point the rule is stated
+6. [x] charts-guidelines.md — add the MVVM/`model=` path (file currently has zero mentions)
+7. [x] SKILL.md Step 5 — warn that `position:fixed` lands at the viewport edge in a
+       `--full-page` capture, so the image misplaces it
 
 ## Review
 
-All seven pages built, both passes each. Every page passes validator layers 1-7 (with
-`--controller`), and `mvn clean compile` is green.
+All seven items done. The code fix went in twice: the first version compared the glyph against a
+**different** font stack (`monospace`), which looks equivalent and is not — when no family in a list
+supplies a character the mark comes from the *first* family in that list, so two different lists
+disagree even when both lack the glyph. That version was tested against the very page it was written
+for and stayed silent. Holding the font constant and varying the codepoint instead is what works.
 
-| Page | Pattern | Pass 1 fix rounds | Pass 2 fix rounds |
-|---|---|---|---|
-| `task-master.zul` | MVVM | 1 (tree indentation + duplicate carets) | 0 |
-| `feedback-dashboard.zul` | MVVM | 0 | 0 |
-| `data-comparison-modal.zul` | MVVM | 2 (middle-column tint; 1st aimed at the wrong selector) | 0 |
-| `data-analytics-dashboard.zul` | MVVM | 0 | 0 |
-| `bank-reconciliation.zul` | MVC | 1 (DATE column wrapped, doubling row height) | 1 (model reset multi-select; % truncation) |
-| `test-case-management.zul` | MVC | 2 (3 folders open vs design; column clipping) | 2 (tree template EL; `--` in an XML comment) |
-| `application-review.zul` | MVC | 1 (page background did not fill the viewport) | 0 |
+Evidence, in the order it was gathered:
 
-No page reached the four-round backstop in either pass.
+| Check | Result |
+|---|---|
+| Fixture = pilot page minus one CSS line, old code | **0 findings**, icons visibly blank |
+| Same fixture, new code | **4 findings**, each naming codepoint and weight 400 |
+| Pilot page with the line restored, new code | **0 findings** — no false positive |
+| 9 known-good showcase pages, new code | **0 findings** on all nine |
+| A21 (the original wrong-carrier case) | still exactly 1, still names the label |
+| A21b (`icon-weight.zul`) against the old code | silent — so it is a real regression test |
+| `run-preview-tests.py` | **35 checks, 0 failed** |
+| `run-regression.py` | 42 files, 0 regression / 0 stale / 0 orphan, 5 quarantined |
+| `run-schema-query-tests.py` / `run-pattern-tests.py` | 35/0 · 7/0 |
 
-### Things measured along the way, worth keeping
+**Version stays at 2.0.0.** It was briefly moved to 2.0.1 on the reading that `doc/README.md`'s
+*"the next change to any of the three places is a version bump"* meant per-change; it means per
+release, and this branch is not one. See the open item below.
 
-1. **A grid's data cells are `td.z-row-inner`, not `.z-cell`.** Two rules aimed at `.z-cell`
-   painted nothing at all; the DOM dump settled it. `.z-cell` is what an explicit `cell`
-   component renders.
-2. **A tree template's EL variable is always `each`, and it is the `TreeNode`.** A custom
-   `var="..."` is silently ignored on the plain-EL (MVC) path, so expressions through it render
-   empty instead of failing — which is why this cost two rounds before being probed. The MVVM
-   binder *does* honour `var`. So: MVC writes `${each.data.x}`, MVVM writes `@load(node.data.x)`.
-3. **`selectedIndex="0"` on a `<combobox>` throws even when the markup has `<comboitem>`
-   children** — the attribute is applied before the children exist. Layer 6 only fires when there
-   are no items in the markup at all, so it passed this page and the render caught it. Use
-   `value="..."` on a readonly combobox instead.
-4. **`Listbox.setModel()` copies the model's own `multiple` flag onto the listbox**, and
-   `ListModelList` defaults to single selection — silently overruling `multiple="true"` in the
-   ZUL and turning a `checkmark` column into radio buttons. Call `model.setMultiple(true)`.
-5. **The bundled XSD rejects a model-driven `<tree>` whose only child is a `<template>`** —
-   `treeType` requires a `treecols` or `treechildren` once the tree has any child. An empty
-   `<treechildren/>` satisfies it and the model still fills the tree.
-6. **ZK Charts chrome must come from the controller, not from ZUL text.** `legend="false"` throws
-   `ClassCastException` (it wants a `Legend` object); `colors="#3b82f6"` finds no setter. Bind
-   `Legend` / `Credits` / `Exporting` / `List<Color>` / `PlotOptions` from the controller instead.
-   `yAxis` is *not* usable: Layer 3 rejects it on `<charts>`, so axis chrome stays ZK-default.
-7. **`<forEach items="@load(vm.x)" var="y">`** repeats a ViewModel collection and is the way to
-   build a wrapping card grid from a model — no model-bearing component required.
-8. **`<checkbox mold="switch">`** is a real ZK 10 mold (confirmed in `zul.jar`'s `lang.xml`), and
-   renders the design's toggle without any custom CSS.
+Findings recorded in `doc/effectiveness-measurement.md` §7 and `doc/zk-measured-behaviour.md`
+§20 / §17b.
+
+Not done, and deliberately: `make-sandbox.sh` still does not stamp the skill version it copied.
+Pilot-01's copy was three commits stale when the run was about to start, which would have measured a
+skill nobody ships. It was caught by hand this time.
+</content>

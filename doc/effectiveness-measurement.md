@@ -236,3 +236,76 @@ uv run test/measure/layer7-false-positives.py  <corpus-root>   # ~2 min over 192
 
 They are measurement tools, not CI checks: their output needs triage against the corpus's ZK version, so
 none of them has a meaningful pass/fail exit code and none is wired into `run-regression.py`.
+
+---
+
+## 7. The clean-room pilot (pilot-01) — what generation outside this repository found
+
+The six-run evaluation happened *inside* this repository, where every mockup already had its committed
+`.zul` a few directories away. That measures recall as much as generation. `test/cleanroom/make-sandbox.sh`
+removes the answer: a Maven webapp outside the repo holding the plumbing, one mockup and a **copy** of the
+skill, and nothing else. The global skill symlink was moved aside for the duration, because resolving it
+walks straight back to the showcase.
+
+**Input:** *Data Analytics Dashboard* — deliberately the same mockup as evaluation run **R5**, which is
+both the only directly comparable pair available and R5's worst-in-six result.
+
+| | R5 (in repo, answer present, cap 3) | pilot-01 (clean room, no answer) |
+|---|---|---|
+| Renders | **10** | **7** — of which only **2** were fix rounds |
+| Validator | 5/5 | **7/7**, Layer 7 included |
+| Lookups before writing | not recorded | 12 `--describe`, 9 `javap`, 2 jar greps |
+
+**This does not isolate the clean-room effect.** The skill changed substantially between R5 and now, and
+one run cannot separate the two causes. What the pilot does establish is that the material is not used up:
+the sandbox makes 8 of the 9 mockups usable again, which was the premise
+[evaluation.md §6](evaluation.md) concluded against.
+
+### Four defects the in-repo runs never surfaced
+
+1. **`icon-not-rendered` had a false negative, and it was the rule's own core case.** Five icons rendered
+   as empty boxes under a completely clean `LAYOUT:` block. The check read only the resolved
+   `font-family`, which was correct; the *weight* selected a face without the glyph. Reproduced by
+   deleting one CSS line from the finished page — 0 findings before the fix, 4 after, 0 on the page with
+   the line restored. → [zk-measured-behaviour.md §20](zk-measured-behaviour.md)
+
+   The prose was worse than the rule: `ui-to-component-mapping.md` told the reader to `--probe` and treat
+   a correct icon `font-family` as exoneration, which is exactly the wrong conclusion here.
+
+2. **Step 4 and the chart carve-out contradicted each other.** *"no `setModel()`, no getter backing a
+   bound `model`, not yet"* is stated flatly, with the chart exception 160 lines earlier in Step 2. A
+   reader following Step 4 literally strips a chart's data back out and gets an empty chart that reports
+   nothing.
+
+3. **`references/charts-guidelines.md` had no MVVM path at all** — 25 lines, zero occurrences of `MVVM`,
+   `model`, `@load` or `ViewModel`, and its only data advice (`Series`) is reachable solely from a
+   Composer. The skill treats MVVM as a first-class pattern everywhere else.
+
+4. **`hflex="min"` is unsafe beside a `<style>` block that enlarges type**, which is the combination
+   Step 2's own guideline pushes you into. ZK measures `min` before the page CSS applies, writes the small
+   number as an inline width, and `.z-hlayout` clips it. Six `clipped-text` findings on the first render,
+   one of them a navigation link that vanished entirely.
+
+### Two things the pilot got wrong, which are findings of their own
+
+- **It reported a contradiction that is not one.** Step 5 says the PNG belongs in the working directory
+  and to pass `--out` "only when the user names a destination"; the brief named `out/`. The rule resolves
+  cleanly as written.
+- **It misread a capture artifact as page state.** The floating action button is `position: fixed`, so a
+  `--full-page` capture paints it at the *viewport* bottom — measured at y=798 of a 1277-tall PNG. The
+  pilot instead credited an unrelated edit with "lifting it clear" of a caption and carried that reading
+  through two renders. This is the one place the visual self-review must be overruled, and nothing in the
+  image distinguishes it from a real defect. → [zk-measured-behaviour.md §17b](zk-measured-behaviour.md)
+
+### Reproducing
+
+```bash
+./test/cleanroom/make-sandbox.sh "Data Analytics Dashboard" pilot-02
+mv ~/.claude/skills/zul-writer ~/.claude/skills/zul-writer.off      # restore afterwards
+cd ~/Documents/workspace/zul-writer-cleanroom/pilot-02
+claude --bg --dangerously-skip-permissions "Read BRIEF.md in this directory and follow it."
+```
+
+The sandbox script copies the skill at build time and does not track it afterwards. Pilot-01's copy was
+three commits stale when the pilot was about to start, which would have measured a skill nobody ships —
+check it before every run until the script stamps the version itself.

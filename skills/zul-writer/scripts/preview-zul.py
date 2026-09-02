@@ -1829,13 +1829,76 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
                   (cp >= 0x100000 && cp <= 0x10FFFD);
       return pua ? cp : null;
     };
-    const reachesWebfont = (fontFamily) => {
-      const list = String(fontFamily || '').split(',');
-      for (let i = 0; i < list.length; i++) {
-        const fam = list[i].trim().replace(/^['"]|['"]$/g, '').toLowerCase();
-        if (webfonts.has(fam)) return true;
-      }
-      return false;
+    // Whether the font that resolved for this pseudo-element actually SUPPLIES the codepoint,
+    // decided by rasterising it twice. Checking the declaration instead is not enough, and the
+    // tempting version of that check is worse than none:
+    //
+    //   A page asked for `.z-icon-money-bill-wave` and got an empty box. The resolved stack was
+    //   "ZK85Icons, FontAwesome" -- a declared webfont, so a family test passes -- but ZK's base
+    //   rule `font: normal normal normal 14px/1 FontAwesome` is a shorthand that resets weight to
+    //   400, and ZK declares family FontAwesome at BOTH 900 (fa-solid) and 400 (fa-regular). The
+    //   browser selected the regular face, which carries a handful of legacy glyphs and none of
+    //   the solid-only ones. Family right, weight right for the face that exists, glyph absent.
+    //
+    // Comparing the computed weight against the declared weight would report that -- and would
+    // also report every correct page that uses a single-weight icon font at another weight, which
+    // is most of them: CSS font matching never fails to pick a face, so Material Icons declared
+    // at 400 inside a bold heading still renders from the 400 face. That is a false positive on a
+    // rule the agent is told to trust, the one direction this rule must not fail in.
+    //
+    // Coverage is not in `document.fonts` at all, so measure it: rasterise the codepoint with the
+    // element's own computed font, rasterise a codepoint no font can supply with the SAME font,
+    // and compare the pixels. Identical means the stack drew its "I have no such glyph" mark
+    // either way.
+    //
+    // The comparison has to hold the font constant. Comparing against a different stack
+    // (monospace, say) looks equivalent and is not: when no family in a list supplies a
+    // character, the mark comes from the FIRST family in that list, so two different lists
+    // disagree even when both are missing the glyph -- which reads as "supplied" and silences the
+    // rule. Measured: that version stayed silent on the very page this was written for.
+    //
+    // This also subsumes the original wrong-carrier case -- a <label> whose stack is
+    // "Helvetica Neue, ..." has no such glyph either -- so it replaces the family test rather
+    // than joining it.
+    const PROBE_PX = 32;
+    // A permanent noncharacter. Unicode guarantees it will never be assigned, so no font maps it
+    // and every stack answers it with the same mark it uses for any glyph it does not have.
+    const NO_SUCH_GLYPH = 0x10FFFF;
+    const inkCache = new Map();
+    let ictx = null;
+    try {
+      const probe = document.createElement('canvas');
+      probe.width = PROBE_PX * 2;
+      probe.height = PROBE_PX * 2;
+      ictx = probe.getContext('2d', {willReadFrequently: true});
+    } catch (e) { ictx = null; }
+
+    const inkOf = (cp, font) => {
+      const key = cp + '@' + font;
+      if (inkCache.has(key)) return inkCache.get(key);
+      ictx.clearRect(0, 0, ictx.canvas.width, ictx.canvas.height);
+      ictx.font = font;
+      ictx.textBaseline = 'top';
+      ictx.fillStyle = '#000';
+      ictx.fillText(String.fromCodePoint(cp), 4, 4);
+      const data = ictx.getImageData(0, 0, ictx.canvas.width, ictx.canvas.height).data;
+      let h = 5381;
+      for (let i = 3; i < data.length; i += 4) h = ((h * 33) ^ data[i]) >>> 0;
+      inkCache.set(key, h);
+      return h;
+    };
+
+    const suppliesGlyph = (cp, cs) => {
+      // Every failure to measure returns true: no canvas, no stack, a font string the canvas
+      // refuses. Silence beats accusing a page on the strength of a broken probe.
+      if (!ictx) return true;
+      const stack = String(cs.fontFamily || '').trim();
+      if (!stack) return true;
+      const font = (cs.fontStyle || 'normal') + ' ' + (cs.fontWeight || 'normal') + ' ' +
+                   PROBE_PX + 'px ' + stack;
+      try {
+        return inkOf(cp, font) !== inkOf(NO_SUCH_GLYPH, font);
+      } catch (e) { return true; }
     };
     for (let i = 0; i < all.length; i++) {
       const el = all[i];
@@ -1846,12 +1909,14 @@ LAYOUT_AUDIT_JS = """(collectCap) => {
         if (!cs) continue;
         const cp = puaGlyph(cs.content);
         if (cp === null) continue;
-        if (reachesWebfont(cs.fontFamily)) continue;
+        if (suppliesGlyph(cp, cs)) continue;
         const hex = 'U+' + cp.toString(16).toUpperCase();
+        const weight = String(cs.fontWeight || 'normal');
         record('icon-not-rendered', el,
-               pseudo + ' glyph ' + hex + ' needs an icon font, but the resolved stack is ' +
-                 snip(String(cs.fontFamily || '(none)'), 60),
-               {pseudo: pseudo, codepoint: hex, fontFamily: cs.fontFamily || null});
+               pseudo + ' glyph ' + hex + ' draws nothing: no font in ' +
+                 snip(String(cs.fontFamily || '(none)'), 60) + ' supplies it at weight ' + weight,
+               {pseudo: pseudo, codepoint: hex, fontFamily: cs.fontFamily || null,
+                fontWeight: weight});
         break;      // one finding per element: both pseudos share the one broken stack
       }
     }

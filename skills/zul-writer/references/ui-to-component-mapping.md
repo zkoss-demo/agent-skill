@@ -87,6 +87,17 @@ you see empty boxes, `--probe '[class*="z-icon-"]'`: a `::before content` that i
 `font-family` that is not the icon font means the class is on the wrong carrier, not that the
 resource 404'd. Pinned by `preview-fixtures/icon-carrier.zul`.
 
+**A right font-family does not clear the page.** There is a second cause, and the probe looks
+innocent for it: ZK's base rule is `[class*="z-icon"]{font: normal normal normal 14px/1
+FontAwesome}`, a shorthand that also resets `font-weight` to **400**, and ZK declares family
+FontAwesome at both 900 (`fa-solid`) and 400 (`fa-regular`). Font Awesome 6 keeps most glyphs in
+the solid face only, so a modern name like `z-icon-money-bill-wave` resolves the right family, is
+handed the regular face, and draws nothing. The FA4-era glyphs that the regular face happens to
+carry keep working, which is why this shows up as *some* icons blank rather than all of them. Fix
+with one rule — `.your-page [class*="z-icon-"] { font-weight: 900; }` — rather than by changing
+carriers. `icon-not-rendered` reports this case and names the weight; pinned by
+`preview-fixtures/icon-weight.zul`.
+
 ## Common Mistakes — Do NOT Use Native HTML For These
 
 - **Tab-like navigation** → Use `<tabbox>`, not `<n:button class="tab">`
