@@ -35,11 +35,17 @@ gemini extension install .
 
 Two independent version lines. Do not sync one to the other.
 
-**A skill's version** lives in three places that must always match. Bumping a skill means editing all three:
+**A skill's version** lives in two places that must always match. Bumping a skill means editing both:
 
 1. `skills/<skill>/SKILL.md` — `metadata.version`
 2. `marketplace.json` — that skill's `version` entry
-3. the skill's scripts — the `SKILL_VERSION` constant each one sends in its usage ping
+
+The skill's scripts are **not** a third place. They import `SKILL_VERSION` from
+`skills/<skill>/scripts/_skill_meta.py`, which reads `SKILL.md`'s frontmatter at runtime, so a bump
+never touches them. Do not write a version literal back into a script — `test/run-version-consistency.py`
+fails the build if you do, and it is also what keeps `marketplace.json` (which sits outside the skill
+directory and so cannot read `SKILL.md`) in step. Run it locally with
+`python3 test/run-version-consistency.py`.
 
 **The Gemini extension's version** is `gemini-extension.json` — the version of the packaged extension as a whole, not of any skill inside it. It moves on its own schedule and is deliberately *not* kept in step with a skill bump, so a mismatch there is not drift to fix.
 

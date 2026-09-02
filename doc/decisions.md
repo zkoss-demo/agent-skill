@@ -146,10 +146,41 @@ Several changes have landed (a `LAYOUT` rule, a new script, a whole Step 1 secti
 still 2.0.0. That is deliberate: remaining work touches the same files, so the version bumps once, at
 convergence.
 
-**Until then, do not touch any one of the three places in isolation.** `SKILL.md`
-`metadata.version`, `marketplace.json`, and the `SKILL_VERSION` constant in each script must move
-together; changing one is drift. `gemini-extension.json` is a separate version line and is not expected
-to follow — a mismatch there is not drift.
+**Until then, do not touch either of the two places in isolation.** `SKILL.md` `metadata.version` and
+`marketplace.json` must move together; changing one is drift. `gemini-extension.json` is a separate
+version line and is not expected to follow — a mismatch there is not drift.
+
+There were three places when this was written, because each script carried its own `SKILL_VERSION`
+literal. They do not any more — see D21.
+
+### D21 — `SKILL.md` is the version, and the scripts read it · **decided: B + D**
+
+Four sites held `"2.0.0"`: `SKILL.md`, `marketplace.json`, and a literal in each of `validate-zul.py`
+and `preview-zul.py`. The docs called it three by counting the scripts as one, which understated the
+edit a release actually takes. The failure mode was silent: nothing errors when one is missed, the
+usage endpoint simply receives a version that was never released.
+
+- Chosen (B): `scripts/_skill_meta.py` reads `metadata.version` out of `SKILL.md`'s frontmatter, and
+  both scripts import `SKILL_VERSION` from it. Four sites become two, and the file that declares what
+  the skill is now also declares its version. Cost: the reported version depends on a documentation
+  file being present and parseable beside the scripts, so the reader falls back to `"unknown"` rather
+  than raising — reporting a version is never the job the user asked for, and a broken install showing
+  up as its own bucket beats it vanishing from the counts.
+- Chosen alongside (D): `test/run-version-consistency.py`, run first in CI. `marketplace.json`
+  **structurally cannot** participate in B — it sits at the repo root, and `npx skills add`, a
+  directory symlink and `.github/skills/` all ship `skills/zul-writer/` without it, so a script
+  reading it would find nothing on every real install. The check is the only thing holding it in step,
+  and it also fails if a `SKILL_VERSION` literal is ever written back into a script. The workflow's
+  path filter gained `SKILL.md` and `marketplace.json`, without which the one job that catches version
+  drift would never run on the commit that causes it.
+- **Rejected (C): read from `marketplace.json`.** Same reason it cannot participate above.
+- **Rejected (A alone): a shared module holding the literal.** Two lines, but it leaves the version
+  duplicated against `SKILL.md` — three sites instead of four, and the file declaring the skill still
+  not the one declaring its version.
+
+The `sys.path.insert` before each import is not decoration: `PYTHONSAFEPATH=1` (and `python -P`) drops
+the script's own directory from `sys.path`, and without the line the import fails there and takes the
+whole run with it. Measured, not assumed.
 
 ### D15 — the `LAUNCHER:` line must not claim an unverified version
 

@@ -178,7 +178,13 @@ from pathlib import Path
 # TRACK_URL="" in the env, or per-run with --dev (see track_usage_async).
 
 TRACK_URL = os.environ.get("TRACK_URL", "https://www.zkoss.org/api/track")
-SKILL_VERSION = "2.0.0"
+
+# The version is read from SKILL.md's frontmatter by the sibling module, so it is
+# written down once for the whole skill. sys.path[0] is normally this script's own
+# directory, but PYTHONSAFEPATH=1 (and python -P) removes it -- without this line the
+# import would fail there and take the whole run with it.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _skill_meta import SKILL_VERSION  # noqa: E402
 
 
 def _tracking_opted_out() -> bool:

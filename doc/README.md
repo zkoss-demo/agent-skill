@@ -172,15 +172,20 @@ Nothing here has an owner. Grouped by where the work would land.
 
 ### Live constraint, not a task
 
-- **The three version places move together, or not at all**: `SKILL.md` `metadata.version`,
-  `marketplace.json`, and the `SKILL_VERSION` constant in each script. Changing one alone is drift.
-  `gemini-extension.json` is a separate line and is not expected to follow.
-  → [decisions.md §D20](decisions.md)
+- **The two version places move together, or not at all**: `SKILL.md` `metadata.version` and
+  `marketplace.json`. Changing one alone is drift. `gemini-extension.json` is a separate line and is
+  not expected to follow. → [decisions.md §D20](decisions.md)
+- **There were three, and the scripts are no longer one of them.** `validate-zul.py` and
+  `preview-zul.py` used to carry their own `SKILL_VERSION` literal; they now read `SKILL.md`'s
+  frontmatter through `scripts/_skill_meta.py`, so a bump does not touch them at all.
+  `marketplace.json` cannot join them — it sits outside the skill directory and no install ships it —
+  so `test/run-version-consistency.py` holds it in step, and CI runs it first.
+  → [decisions.md §D21](decisions.md)
 - The condition the earlier wording waited on has happened. This entry used to read *"the version stays
   at 2.0.0 until the branch converges"*; the work converged into `main` and **2.0.0 is tagged
-  `v2.0.0`**, so the number is a released point rather than a held one. The next change to any of the
-  three places is a version bump, and it moves all three.
+  `v2.0.0`**, so the number is a released point rather than a held one. The next change to either of
+  the two places is a version bump, and it moves both.
 - **"The next change" means the next *release*, not the next commit.** Read the other way once, on
   `fix/icon-not-rendered-weight`, and the bump was reverted: an unreleased branch must not carry a
   version number no tag corresponds to. The version stays at 2.0.0 until someone cuts a release, and
-  that is when all three places move together.
+  that is when both places move together.
