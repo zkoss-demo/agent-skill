@@ -3,3 +3,5 @@
 .vscode
 zulwriter-showcase/.agents
 tasks/eval-private/
+eval-previews/
+__pycache__
